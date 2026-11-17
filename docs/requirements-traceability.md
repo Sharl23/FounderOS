@@ -1,3 +1,5 @@
+> Note: this table dates from v0.2. Current per-criterion and per-rule traceability: [criteria-traceability.md](criteria-traceability.md).
+
 # Compliance traceability (reviewed against organizers' provided slides + one-page PDF)
 
 Source of truth: user-supplied photos of slides titled **The problem statement**, **The Six Phases**, **How It Works**, **The Rules**, **Tips & Tricks**, plus *AI Hackathon – Details.pdf* one-pager.

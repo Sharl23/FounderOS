@@ -26,6 +26,11 @@ services:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b-instruct}
       OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-150}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-2048}
+      OLLAMA_NUM_GPU: ${OLLAMA_NUM_GPU:-}
+      OLLAMA_NUM_THREAD: ${OLLAMA_NUM_THREAD:-}
+      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-}
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
       FOUNDEROS_DB: /data/founderos-v2.sqlite3
     volumes:
       - founder_data:/data

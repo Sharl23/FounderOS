@@ -136,7 +136,7 @@ with sync_playwright() as p:
     no_raw_json(page, 'brief')
     shot(page, '02-brief-1366')
     page.click('[data-confirm="problem"]')
-    page.wait_for_selector('.notice.info[role=status]')
+    page.wait_for_selector('text=confirmed as yours')
     check('version 2' in page.locator('#crumb-sub').inner_text(), 'confirming an inferred field creates brief v2')
 
     print('3. Safety')
@@ -159,7 +159,7 @@ with sync_playwright() as p:
     page.click('[data-decide="REVISE"]')
     page.fill('#d-fb', 'Focus on third-year students only')
     page.click('#dlg-ok')
-    page.wait_for_selector('.notice.info[role=status]')
+    page.wait_for_selector('text=Recorded: Revision requested')
     page.click('#disc-run')
     page.wait_for_selector('text=run v2')
     check(main.LLM.calls[-1][1].get('founder_revision_feedback') == 'Focus on third-year students only', 'revision feedback reached the next agent run')

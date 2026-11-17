@@ -40,7 +40,8 @@
     DISCOVERY_NOT_AVAILABLE: 'Not searched automatically', INVALID_QUERY: 'Invalid query', EXCERPT_MATCHED: 'Excerpt verified', NOT_MATCHED: 'Excerpt not found',
     NOT_CHECKED: 'Not checked', METADATA_ONLY: 'Metadata only', STRUCTURED_DATUM: 'Official datum', URL_ACCESSIBLE: 'Page reached', UNVERIFIED: 'Unverified',
     CONTEXT_ONLY: 'Context only', CONTEXT_WEAK: 'Context, weak', DIRECT_STATEMENT: 'Customer statement', DIRECT_BEHAVIOR: 'Customer behaviour',
-    LOCKED_RESULT: 'Locked-test result', EXCLUDED: 'Excluded', READY: 'Model ready', SUPPORTED: 'Supported', REFUTED: 'Refuted', MIXED: 'Mixed',
+    LOCKED_RESULT: 'Locked-test result', EXCLUDED: 'Excluded', READY: 'Model ready', MODEL_OOM_CPU: 'it ran out of RAM', MODEL_OOM_GPU: 'it ran out of GPU memory',
+    OLLAMA_UNREACHABLE: 'Ollama is not reachable', MODEL_NOT_FOUND: 'the model is not installed', MODEL_TIMEOUT: 'it timed out', MODEL_BAD_OUTPUT: 'its answer was malformed twice', MODEL_ERROR: 'Ollama returned an error', SUPPORTED: 'Supported', REFUTED: 'Refuted', MIXED: 'Mixed',
   };
   const TONE = {
     clear: ['SUPPORTED', 'ALLOW_DISCOVERY', 'CLEAR', 'PASS', 'SCORED', 'GO_ON', 'CONTINUE_TESTING', 'HIT', 'LOCKED', 'APPROVED', 'EXCERPT_MATCHED', 'URL_ACCESSIBLE', 'OK', 'READY', 'EVIDENCE_ADDED', 'RANKED', 'STRUCTURED_DATUM', 'DIRECT_BEHAVIOR', 'LOCKED_RESULT', 'APPLIED', 'REPORTED'],
@@ -79,7 +80,7 @@
     const d = e.detail;
     const status = e.status ? ` (HTTP ${e.status})` : '';
     if (d && typeof d === 'object' && d.code) {
-      return `<div class="notice error" role="alert"><b>The local model could not answer: ${esc(label(d.code))}${status}.</b>
+      return `<div class="notice error" role="alert"><b>The local model could not answer: ${esc(label(d.code))}${status}.</b> <span class="small faint">${esc(d.code)}</span>
         <p>${esc(d.advice || '')}</p><p class="small muted">${esc(d.note || '')} Details: ${esc(d.message || '')}</p></div>`;
     }
     let msg = typeof d === 'string' ? d : (d && d.message) || e.message;
