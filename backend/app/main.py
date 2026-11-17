@@ -1,4 +1,4 @@
-"""FounderOS API (v0.7). Phase transitions, safety, criteria and verdicts are backend-enforced.
+"""FounderOS API (v0.8). Phase transitions, safety, criteria and verdicts are backend-enforced.
 
 Agent roles are isolated functions with typed contracts:
   Refiner (LLM, RefinedBrief) -> Safety screen (code + escalate-only model flags)
@@ -32,21 +32,22 @@ from pydantic import BaseModel, Field
 from .db import init_db, conn, now, qone, qall, audit, unpack_run, unpack_brief, unpack_experiment
 from .schemas import (ProjectCreate, RefinedBrief, DiscoveryReport, ValidationReport, ClarifyRequest, SafetyAck,
                       DecisionRequest, EvidenceAdd, ExperimentDraft, ExperimentLock, ExperimentResult,
-                      PublicActionRequest, JudgeOutput, BRIEF_FIELDS)
+                      PublicActionRequest, JudgeOutput, CheckJudgeOutput, BRIEF_FIELDS)
 from .gates import evaluate_validation, PHASES, ACTIVE_PHASES
 from .decision import stable_hash, norm, criteria_of, evaluate_result, skeptic_review, suggest_experiment, risk_register
-from . import safety, criteria, research
+from . import safety, criteria, research, brief_extract, rubric, discovery_guard, prose, review
 from .research import check_public_url, FetchError
 from .llm import (OllamaClient, ModelUnavailable, ModelOutputError, ADVICE, REFINE_SYSTEM, DISCOVER_SYSTEM,
-                  VALIDATE_SYSTEM, JUDGE_SYSTEM)
+                  VALIDATE_SYSTEM, JUDGE_SYSTEM, CHECK_JUDGE_SYSTEM)
 
 LLM = OllamaClient()
 STARTED_AT = now()
-VERSION = '0.7.0'
+VERSION = '0.8.0'
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    rubric.validate()          # refuses to start on a malformed or edited team rubric
     init_db()
     yield
 
@@ -196,6 +197,39 @@ def store_safety(db, pid, brief_version, project, payload, keep_ack=False):
 
 
 # ----------------------------------------------------------------------------- snapshot
+DECISION_LABEL = {'APPROVE': 'Approved (research only)', 'REVISE': 'Revision requested', 'PIVOT': 'Pivot requested', 'STOP': 'Stopped'}
+NOT_STORED = 'not stored (record predates this field)'
+
+
+def decision_row(d: dict, runs: list[dict]) -> dict:
+    """One explicit, named field per column: the UI renders these keys and never infers positions."""
+    run = next((r for r in runs if r['id'] == d['phase_run_id']), None)
+    against = d['gate_recommendation'] in ADVISES_AGAINST
+    if d['feedback']:
+        reason_status = 'PROVIDED'
+    elif d['action'] in ('REVISE', 'PIVOT') or (d['action'] == 'APPROVE' and against):
+        reason_status = 'MISSING_BUT_REQUIRED'      # cannot happen through the API (422); shown if an old record lacks it
+    else:
+        reason_status = 'NOT_GIVEN_OPTIONAL'
+    refs = {'brief_version': d.get('brief_version'), 'safety_status': d.get('safety_status'), 'safety_policy_hash': d.get('safety_policy_hash'),
+            'run_id': d.get('phase_run_id'), 'run_version': d.get('run_version'), 'report_hash': d.get('report_hash'), 'input_hash': d.get('input_hash'),
+            'criteria_version': d.get('criteria_version'), 'criteria_policy_hash': d.get('criteria_policy_hash'), 'config_hash': d.get('config_hash'),
+            'evaluation_hash': d.get('evaluation_hash'), 'discover_evaluation_version': d.get('discover_evaluation_version'),
+            'rubric_version': d.get('rubric_version'), 'rubric_hash': d.get('rubric_hash')}
+    if d['phase'] == 'validate':
+        refs['discover_evaluation_version'] = refs['discover_evaluation_version'] or 'not applicable (validation decision)'
+    missing = [k for k, v in refs.items() if v in (None, '')]
+    for k in missing:
+        refs[k] = NOT_STORED
+    return {'id': d['id'], 'at': d['created_at'], 'phase': d['phase'], 'run_version': d['run_version'],
+            'decision': d['action'], 'decision_label': DECISION_LABEL.get(d['action'], d['action']), 'scope': d['scope'],
+            'gate_said': d['gate_recommendation'], 'founder_overrode_gate': bool(d['acknowledged_risk']),
+            'reason': d['feedback'] or None, 'reason_status': reason_status,
+            'bound_to': refs, 'refs_not_stored': missing, 'tests': d['experiment_versions'],
+            'run_state_now': run and run['state'], 'permissions': 'RESEARCH_ONLY' if d['scope'] == 'RESEARCH_ONLY' else 'NONE',
+            'never_enabled': ['build', 'launch', 'send', 'spend', 'publish', 'pay']}
+
+
 def public_project(pid):
     with conn() as db:
         project = qone(db, 'SELECT id,name,original_idea,intake_json,created_at,stopped FROM projects WHERE id=?', (pid,))
@@ -216,6 +250,7 @@ def public_project(pid):
         h['details'] = json.loads(h.pop('details_json'))
     for d in decisions:
         d['experiment_versions'] = json.loads(d.pop('experiment_versions_json'))
+    decision_log = [decision_row(d, runs) for d in decisions]
     disc = next((r for r in runs if r['phase'] == 'discover'), None)
     val = next((r for r in runs if r['phase'] == 'validate'), None)
     passport = None
@@ -233,9 +268,9 @@ def public_project(pid):
         x['reading'] = None
         if x.get('result_evidence_id'):
             r = next((e for e in evidence if e['id'] == x['result_evidence_id']), None)
-            x['reading'] = r and criteria.READING.get(r.get('outcome'))
+            x['reading'] = r and ('SIMULATED_NOT_COUNTED' if r['kind'] == 'SIMULATED_RESULT' else criteria.READING.get(r.get('outcome')))
     return {'project': project, 'brief': brief, 'safety': safety_row, 'safety_sources': sources, 'phase_runs': runs, 'evidence': evidence,
-            'experiments': experiments, 'decisions': decisions, 'audit': history, 'passport': passport,
+            'experiments': experiments, 'decisions': decisions, 'decision_log': decision_log, 'audit': history, 'passport': passport,
             'criteria': {'version': criteria.VERSION, 'policy_hash': criteria.POLICY_HASH, 'config': cfg, 'config_version': cfg_version,
                          'config_hash': stable_hash(cfg), 'discover': ev_d, 'validate': ev_v},
             'research_candidate_count': rcount,
@@ -274,6 +309,57 @@ async def warmup():
 async def safety_policy():
     return {'version': safety.POLICY_VERSION, 'hash': safety.POLICY_HASH, 'rules': safety.POLICY['rules'],
             'note': 'Quoted provenance is design provenance from the founder-supplied documents, not legal evidence.'}
+
+
+@app.get('/api/rubric')
+async def rubric_catalog():
+    """All 67 team-rubric checks, verbatim, with provenance and FounderOS's labelled implementation overlay."""
+    return rubric.catalog()
+
+
+class RubricJudge(BaseModel):
+    only: str | None = Field(default=None, max_length=60, pattern='^([a-z_]{3,60}|D0[3-7])$')
+    max_calls: int = Field(default=4, ge=1, le=12)
+
+
+@app.get('/api/projects/{pid}/rubric')
+async def project_rubric(pid: str, project=Depends(authorize)):
+    """Research Matrix: every check with its status, evidence, queries tried and next step. Code only, no model call."""
+    with conn() as db:
+        brief = latest_brief(db, pid)
+        if brief is None:
+            return {'coverage': rubric.coverage(), 'checks': [], 'dimensions': {}, 'note': 'Refine the brief first.'}
+        srow = safety_for(db, pid, brief['version'])
+        cfg, _ = config_of(db, pid)
+        ev = criteria.annotate(evidence_of(db, pid), brief['payload'], cfg)
+        ex = experiments_of(db, pid)
+        g = granular_for(db, pid, brief, srow, ev, ex, cfg)
+    bp = dict(brief['payload'], original_idea_text=project['original_idea'])
+    for c in g['checks']:
+        if c['kind'] != 'knockout':
+            c['search'] = rubric.check_queries(c['id'], bp)
+    return {'coverage': rubric.coverage(), 'brief_version': brief['version'], **g,
+            'note': 'Statuses are computed by code from accepted, relevant, linked evidence. UNKNOWN means not yet researched or not enough evidence, never a low score.'}
+
+
+@app.post('/api/projects/{pid}/rubric/judge')
+async def judge_rubric(pid: str, req: RubricJudge, project=Depends(authorize)):
+    """Judge checks that have eligible evidence (one local-model call each, highest decision risk first, cached)."""
+    not_stopped(project)
+    with conn() as db:
+        brief = latest_brief(db, pid)
+        if brief is None:
+            raise HTTPException(409, 'Refine the founder brief first')
+        cfg, _ = config_of(db, pid)
+        ev = criteria.annotate(evidence_of(db, pid), brief['payload'], cfg)
+        ex = experiments_of(db, pid)
+    try:
+        results, calls = await run_rubric_judges(pid, brief['payload'], ev, ex, cfg, only=req.only, max_calls=req.max_calls)
+    except ModelUnavailable as exc:
+        raise model_error(exc) from exc
+    return {'judged': {k: {'valid': v.get('valid'), 'rating': v.get('rating'), 'caps': v.get('caps'), 'rejected_reason': v.get('rejected_reason')}
+                       for k, v in results.items()}, 'model_calls': calls,
+            'note': 'Checks without eligible evidence were not sent to the model; they stay UNKNOWN.'}
 
 
 @app.get('/api/criteria')
@@ -315,24 +401,28 @@ async def project_summary(pid: str, project=Depends(authorize)):
             'verdict': s['passport'] and s['passport']['verdict'].get('verdict'), 'evidence': len(s['evidence'])}
 
 
-def _brief_payload_from(project, intake, answers, result=None, model_flags=None):
+def apply_fields(payload, fields):
+    """Write typed fields into the flat payload. Model suggestions are kept but NOT promoted to field values."""
+    payload['fields'] = fields
+    for key in BRIEF_FIELDS:
+        f = fields.get(key) or {}
+        payload[key] = f.get('value') if f.get('status') in brief_extract.COUNTS_AS_CAPTURED else None
+    payload['model_suggestions'] = {k: (fields.get(k) or {}).get('value') if (fields.get(k) or {}).get('status') == 'MODEL_SUGGESTED_UNCONFIRMED'
+                                    else (fields.get(k) or {}).get('model_suggestion') for k in BRIEF_FIELDS}
+    payload['model_suggestions'] = {k: v for k, v in payload['model_suggestions'].items() if v}
+    payload['provenance'] = brief_extract.legacy_provenance(fields)
+    payload['d02_preview'] = brief_extract.d02(fields)
+    return payload
+
+
+def _brief_payload_from(project, intake, answers, result=None, model_flags=None, confirmed=None, previous_fields=None):
     payload = (result or {}).copy()
     payload.setdefault('idea_summary', project['original_idea'][:300])
     payload['questions'] = (payload.get('questions') or [])[:3]
     payload.setdefault('assumptions', [])
-    payload['provenance'] = {}
-    for key in BRIEF_FIELDS:
-        if intake.get(key):
-            payload[key] = intake[key]
-            payload['provenance'][key] = 'EXPLICIT'
-        elif answers.get(key):
-            payload[key] = answers[key]
-            payload['provenance'][key] = 'EXPLICIT'
-        elif payload.get(key):
-            payload['provenance'][key] = 'INFERRED_UNCONFIRMED'
-        else:
-            payload[key] = None
-            payload['provenance'][key] = 'UNKNOWN'
+    model_vals = {k: (result or {}).get(k) for k in BRIEF_FIELDS}
+    fields = brief_extract.merge(project['original_idea'], intake, answers, confirmed=confirmed, model=model_vals, previous=previous_fields)
+    apply_fields(payload, fields)
     payload.pop('risk_flags', None)
     payload['model_risk_flags'] = model_flags or []
     payload['founder_answers'] = answers
@@ -388,17 +478,58 @@ async def clarify(pid: str, req: ClarifyRequest, project=Depends(authorize)):
             raise HTTPException(409, 'Refine the founder brief first')
         payload = dict(brief['payload'])
         payload['founder_answers'] = dict(payload.get('founder_answers', {}))
-        payload['founder_answers'].update(req.answers)
-        payload['provenance'] = dict(payload.get('provenance', {}))
-        for k, v in req.answers.items():
-            payload[k] = v.strip()
-            payload['provenance'][k] = 'EXPLICIT'
+        payload['founder_answers'].update({k: v.strip() for k, v in req.answers.items()})
+        intake = json.loads(project['intake_json'])
+        model_vals = payload.get('model_suggestions') or {}
+        prev_fields = payload.get('fields') or {}
+        confirmed = [k for k, f in prev_fields.items() if isinstance(f, dict) and f.get('status') == 'FOUNDER_CONFIRMED']
+        fields = brief_extract.merge(project['original_idea'], intake, payload['founder_answers'], confirmed=confirmed, model=model_vals, previous=prev_fields)
+        apply_fields(payload, fields)
         version = brief['version'] + 1
         db.execute('INSERT INTO briefs(project_id,version,payload_json,created_at) VALUES(?,?,?,?)', (pid, version, jsonstr(payload), now()))
         invalidate_runs(db, pid, f'brief corrected to v{version} (fields: {", ".join(req.answers)})')
         assessment = store_safety(db, pid, version, project, payload)
         audit(db, pid, 'BRIEF_CLARIFIED', {'fields': list(req.answers), 'version': version})
     return {'version': version, 'brief': payload, 'safety': assessment, 'missing_fields': missing_fields({'payload': payload})}
+
+
+class ConfirmFields(BaseModel):
+    fields: list[str] = Field(min_length=1, max_length=9)
+
+
+@app.post('/api/projects/{pid}/brief/confirm')
+async def confirm_fields(pid: str, req: ConfirmFields, project=Depends(authorize)):
+    """Founder confirms values as written. Own-words spans are kept; a model suggestion becomes the founder's answer."""
+    not_stopped(project)
+    bad = [f for f in req.fields if f not in BRIEF_FIELDS]
+    if bad:
+        raise HTTPException(422, f'Unknown fields: {bad}')
+    with conn() as db:
+        brief = latest_brief(db, pid)
+        if brief is None:
+            raise HTTPException(409, 'Refine the founder brief first')
+        payload = dict(brief['payload'])
+        prev = payload.get('fields') or {}
+        answers = dict(payload.get('founder_answers') or {})
+        confirmed = [k for k, f in prev.items() if isinstance(f, dict) and f.get('status') == 'FOUNDER_CONFIRMED']
+        for f in req.fields:
+            row = prev.get(f) or {}
+            if not row.get('value'):
+                raise HTTPException(422, f'{f} has no value to confirm; type an answer instead.')
+            if row.get('status') == 'MODEL_SUGGESTED_UNCONFIRMED':
+                answers[f] = row['value']
+            else:
+                confirmed.append(f)
+        payload['founder_answers'] = answers
+        fields = brief_extract.merge(project['original_idea'], json.loads(project['intake_json']), answers, confirmed=confirmed,
+                                     model=payload.get('model_suggestions') or {}, previous=prev)
+        apply_fields(payload, fields)
+        version = brief['version'] + 1
+        db.execute('INSERT INTO briefs(project_id,version,payload_json,created_at) VALUES(?,?,?,?)', (pid, version, jsonstr(payload), now()))
+        invalidate_runs(db, pid, f'brief fields confirmed in v{version} ({", ".join(req.fields)})')
+        assessment = store_safety(db, pid, version, project, payload, keep_ack=False)
+        audit(db, pid, 'BRIEF_FIELDS_CONFIRMED', {'fields': req.fields, 'version': version, 'd02': payload['d02_preview']['status']})
+    return {'version': version, 'brief': payload, 'safety': assessment, 'd02': payload['d02_preview']}
 
 
 @app.post('/api/projects/{pid}/safety/acknowledge')
@@ -507,13 +638,69 @@ def live_discover_fingerprint(db, pid):
     cfg, _ = config_of(db, pid)
     ev = evidence_of(db, pid)
     ex = experiments_of(db, pid)
-    quality = criteria.prepare(brief['payload'], criteria.annotate(ev, brief['payload'], cfg), ex, cfg)
+    ann = criteria.annotate(ev, brief['payload'], cfg)
+    quality = criteria.prepare(brief['payload'], ann, ex, cfg)
+    g = granular_for(db, pid, brief, srow, ann, ex, cfg)
     fp = {'phase': 'discover', 'brief_version': brief['version'], 'safety': srow and srow['status'],
           'safety_policy': srow and srow['assessment'].get('policy_hash'), 'criteria_policy': criteria.POLICY_HASH,
           'config': stable_hash(cfg), 'run_id': run and run['id'],
           'evidence': sorted((e['id'], quality[e['id']]['grade']) for e in ev),
-          'experiments': sorted((x['id'], x['version'], x['status'], x.get('result_evidence_id')) for x in ex)}
+          'experiments': sorted((x['id'], x['version'], x['status'], x.get('result_evidence_id')) for x in ex),
+          'rubric': criteria.granular_signature(g)}
     return stable_hash(fp)
+
+
+def research_runs_of(db, pid):
+    return qall(db, 'SELECT * FROM research_runs WHERE project_id=? ORDER BY created_at DESC LIMIT 400', (pid,))
+
+
+def rubric_judgments_for(db, evidence, quality):
+    out = {}
+    for cid, rows in rubric.judgeable(evidence, quality):
+        hit = qone(db, 'SELECT payload_json FROM judgments WHERE cache_key=?', (rubric.cache_key(cid, rows, LLM.model),))
+        if hit:
+            out[cid] = json.loads(hit['payload_json'])
+    return out
+
+
+def granular_for(db, pid, brief, srow, evidence, experiments, cfg):
+    """Evaluate all 67 team-rubric checks (code only; uses cached validated judgments)."""
+    quality = criteria.prepare(brief['payload'], evidence, experiments, cfg)
+    return rubric.evaluate(brief['payload'], evidence, quality, rubric_judgments_for(db, evidence, quality), research_runs_of(db, pid),
+                           srow and srow['assessment'])
+
+
+async def run_rubric_judges(pid, brief, evidence, experiments, cfg, only=None, max_calls=6):
+    """One local-model call per granular check that has eligible evidence, highest decision risk first. Cached; validated in code."""
+    quality = criteria.prepare(brief, evidence, experiments, cfg)
+    calls, results = 0, {}
+    for cid, rows in rubric.judgeable(evidence, quality, only):
+        key = rubric.cache_key(cid, rows, LLM.model)
+        with conn() as db:
+            hit = qone(db, 'SELECT payload_json FROM judgments WHERE cache_key=?', (key,))
+        if hit:
+            results[cid] = json.loads(hit['payload_json'])
+            continue
+        if calls >= max_calls:
+            continue
+        ctx, alias = rubric.judge_input(cid, brief, rows)
+        t = time.monotonic()
+        try:
+            out = await LLM.generate(CHECK_JUDGE_SYSTEM, ctx, CheckJudgeOutput, max_tokens=220)
+            calls += 1
+            j = rubric.validate_judgment(cid, out.model_dump(), alias, rows)
+        except ModelOutputError as exc:
+            calls += 1
+            j = {'valid': False, 'rejected_reason': f'model output unusable (parse failure falls back to UNKNOWN): {str(exc)[:120]}'}
+        j['model'], j['judged_at'], j['rubric_version'] = LLM.model, now(), rubric.VERSION
+        with conn() as db:
+            db.execute('INSERT OR REPLACE INTO judgments(cache_key,project_id,criterion_id,payload_json,model,latency_ms,created_at) VALUES(?,?,?,?,?,?,?)',
+                       (key, pid, cid, jsonstr(j), LLM.model, int((time.monotonic() - t) * 1000), now()))
+            audit(db, pid, 'RUBRIC_CHECK_JUDGED' if j.get('valid') else 'RUBRIC_JUDGMENT_REJECTED',
+                  {'check': cid, 'rating': j.get('rating'), 'rejected_reason': j.get('rejected_reason'), 'caps': j.get('caps'),
+                   'evidence_ids': j.get('evidence_ids'), 'rubric_version': rubric.VERSION})
+        results[cid] = j
+    return results, calls
 
 
 async def run_judges(pid, phase, brief, evidence, experiments, cfg):
@@ -560,7 +747,7 @@ def store_discover_evaluation(db, pid, judgments):
     e = criteria.evaluate_discover(brief=brief['payload'], brief_version=brief['version'], safety=srow and srow['assessment'],
                                    safety_ack=bool(srow and srow['acknowledged_at']), discovery=run and run['report'],
                                    discovery_run_id=run and run['id'], evidence=ev, experiments=ex, judgments=judgments, cfg=cfg,
-                                   blocked_actions=_blocked_count(db, pid))
+                                   blocked_actions=_blocked_count(db, pid), granular=granular_for(db, pid, brief, srow, ev, ex, cfg))
     last = latest_eval(db, pid, 'discover')
     version = (last['version'] + 1) if last else 1
     db.execute('INSERT INTO criteria_evaluations(id,project_id,phase,version,payload_json,evaluation_hash,fingerprint_hash,criteria_version,criteria_policy_hash,config_hash,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
@@ -585,11 +772,12 @@ async def evaluate_criteria(pid: str, project=Depends(authorize)):
         ex = experiments_of(db, pid)
     try:
         judgments, calls = await run_judges(pid, 'discover', brief['payload'], ev, ex, cfg)
+        _, rcalls = await run_rubric_judges(pid, brief['payload'], ev, ex, cfg, max_calls=6)
     except ModelUnavailable as exc:
         raise model_error(exc) from exc
     with conn() as db:
         e, version = store_discover_evaluation(db, pid, judgments)
-    return {'version': version, 'evaluation': e, 'judge_calls': calls}
+    return {'version': version, 'evaluation': e, 'judge_calls': calls + rcalls, 'rubric_judge_calls': rcalls}
 
 
 @app.get('/api/projects/{pid}/criteria')
@@ -642,9 +830,29 @@ async def run_phase(pid: str, phase: str, project=Depends(authorize)):
         except (ModelUnavailable, ModelOutputError) as exc:
             raise model_error(exc) from exc
         report = result.model_dump()
-        for i, d in enumerate(report.get('directions') or []):
-            d['id'] = 'ABC'[i] if i < 3 else str(i)
+        bp = dict(brief['payload'], original_idea_text=project['original_idea'])
+        issues = discovery_guard.review(report, bp)
+        quality = {'attempts': 1, 'first_pass_issues': issues}
+        if discovery_guard.high(issues):
+            # Retry ONCE with the specific problems listed; then degrade gracefully (remove, never invent).
+            try:
+                retry = await LLM.generate(DISCOVER_SYSTEM, {**ctx, 'correction': discovery_guard.correction_message(issues)}, DiscoveryReport, max_tokens=900)
+                report2 = retry.model_dump()
+                issues2 = discovery_guard.review(report2, bp)
+                quality['attempts'] = 2
+                if len(discovery_guard.high(issues2)) <= len(discovery_guard.high(issues)):
+                    report, issues = report2, issues2
+            except (ModelUnavailable, ModelOutputError) as exc:
+                quality['retry_error'] = str(exc)[:160]
+            if discovery_guard.high(issues):
+                report = discovery_guard.degrade(report, issues)
+                quality['degraded'] = True
+        quality['remaining_issues'] = issues
         report['directions'] = (report.get('directions') or [])[:3]
+        for i, d in enumerate(report['directions']):
+            d['id'] = 'ABC'[i]
+        report['_quality'] = quality
+        report['_label'] = 'HYPOTHESES: everything below was written by the local model from your brief. None of it is evidence.'
         report['_status'] = 'AI_HYPOTHESES_ONLY: nothing here is evidence; no customer was contacted.'
         report['_skeptic_flags'] = skeptic_review(report)
         report['_safety_flags'] = safety.screen_agent_output(report)
@@ -677,14 +885,22 @@ async def run_phase(pid: str, phase: str, project=Depends(authorize)):
                                   'unresolved_critical_assumptions': [u['claim_id'] for u in verdict['unresolved_critical_assumptions']]}
         try:
             result = await LLM.generate(VALIDATE_SYSTEM, ctx, ValidationReport, max_tokens=700)
-        except (ModelUnavailable, ModelOutputError) as exc:
+            report = prose.clean_report(result.model_dump(), verdict['verdict'])
+        except ModelUnavailable as exc:
             raise model_error(exc) from exc
-        report = result.model_dump()
+        except ModelOutputError as exc:
+            # The verdict is computed by code; a malformed model narrative must not block it.
+            report = {'summary': prose.UNKNOWN, 'market_research_vs_customer_demand': prose.UNKNOWN, 'risks': [], 'contradictions_or_gaps': [],
+                      'pricing_hypotheses': [], 'business_model_hypotheses': [], 'competitor_research_limitations': [],
+                      '_model_error': f'The model narrative was unusable and was omitted ({str(exc)[:120]}). The code verdict is unaffected.',
+                      '_prose_checks': []}
         report['_status'] = 'VALIDATION_ASSISTANCE: AI explanation of a backend-computed verdict. Not customer testing.'
         report['_skeptic_flags'] = skeptic_review(report)
         report['_safety_flags'] = safety.screen_agent_output(report)
         gate = verdict
         gate['criteria'] = {k: vcrit[k] for k in ('criteria', 'unknown_count', 'criteria_version', 'criteria_policy_hash', 'config_hash', 'evaluation_hash')}
+        gate['explanation'] = prose.verdict_explanation(verdict)
+        gate['simulated_results_not_counted'] = [x['id'] for x in experiments if (x['payload'] or {}).get('simulated')]
     latency = int((time.monotonic() - started) * 1000)
     report_hash = stable_hash(report)
     input_hash = stable_hash({'brief_version': brief['version'], 'safety': safety_row['status'], 'policy': safety_row['assessment'].get('policy_hash'),
@@ -744,7 +960,7 @@ async def decide(pid: str, phase: str, req: DecisionRequest, project=Depends(aut
         if safety_row['status'] == 'BLOCK':
             raise HTTPException(403, 'HARD STOP: no decision can approve a blocked brief.')
         cfg, _ = config_of(db, pid)
-        evaluation_hash = None
+        evaluation_hash, eval_version = None, None
         if phase == 'discover':
             ev = latest_eval(db, pid, 'discover')
             if not ev:
@@ -754,7 +970,7 @@ async def decide(pid: str, phase: str, req: DecisionRequest, project=Depends(aut
             if req.evaluation_hash and not hmac.compare_digest(ev['evaluation_hash'], req.evaluation_hash):
                 raise HTTPException(409, 'The criteria evaluation you saw is not the latest one. Reload.')
             rec = ev['evaluation']['exit']
-            evaluation_hash = ev['evaluation_hash']
+            evaluation_hash, eval_version = ev['evaluation_hash'], ev['version']
             if rec == 'STOP':
                 raise HTTPException(403, 'D01 hard stop: the system must not work on this idea.')
         else:
@@ -771,12 +987,13 @@ async def decide(pid: str, phase: str, req: DecisionRequest, project=Depends(aut
         db.execute('UPDATE phase_runs SET state=? WHERE id=?', (state, run['id']))
         experiments = experiments_of(db, pid)
         decision_id = uuid.uuid4().hex
-        db.execute('INSERT INTO decisions(id,project_id,phase,phase_run_id,run_version,action,scope,feedback,acknowledged_risk,actor,brief_version,safety_status,report_hash,input_hash,experiment_versions_json,gate_recommendation,created_at,criteria_version,criteria_policy_hash,config_hash,evaluation_hash,safety_policy_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                   (decision_id, pid, phase, run['id'], run['version'], req.decision, scope, req.feedback, int(req.acknowledge_risk),
+        db.execute('INSERT INTO decisions(id,project_id,phase,phase_run_id,run_version,action,scope,feedback,acknowledged_risk,actor,brief_version,safety_status,report_hash,input_hash,experiment_versions_json,gate_recommendation,created_at,criteria_version,criteria_policy_hash,config_hash,evaluation_hash,safety_policy_hash,rubric_version,rubric_hash,discover_evaluation_version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (decision_id, pid, phase, run['id'], run['version'], req.decision, scope, req.feedback.strip(), int(req.acknowledge_risk),
                     'FOUNDER(project capability token)', brief['version'], safety_row['status'], run['report_hash'], run['input_hash'],
-                    jsonstr([{'id': x['id'], 'version': x['version'], 'status': x['status'], 'criteria_hash': x['criteria_hash']} for x in experiments]),
+                    jsonstr([{'id': x['id'], 'version': x['version'], 'status': x['status'], 'criteria_hash': x['criteria_hash'],
+                              'simulated': bool((x['payload'] or {}).get('simulated'))} for x in experiments]),
                     str(rec), now(), criteria.VERSION, criteria.POLICY_HASH, stable_hash(cfg), evaluation_hash,
-                    safety_row['assessment'].get('policy_hash')))
+                    safety_row['assessment'].get('policy_hash'), rubric.VERSION, rubric.FILE_HASH, eval_version))
         if req.decision == 'STOP':
             db.execute('UPDATE projects SET stopped=1 WHERE id=?', (pid,))
         if req.decision == 'PIVOT':
@@ -821,7 +1038,9 @@ def insert_evidence(db, pid, *, kind, dimension, claim, direction, relevance, in
                     dedupe_key, url=None, title=None, publisher=None, author=None, published_on=None, retrieved_at=None, excerpt=None,
                     method=None, sample_size=None, positives=None, segment=None, geography=None, collected_from=None, collected_to=None,
                     consent=False, positive_signals=None, negative_signals=None, injection=False, criterion_id=None, direction_id=None,
-                    source_hash=None, candidate_id=None, doi=None, provider=None, final_url=None, claim_id=None):
+                    source_hash=None, candidate_id=None, doi=None, provider=None, final_url=None, claim_id=None,
+                    subcriterion_id=None, source_type=None, review_state=None, review_reason=None, relevance_checks=None,
+                    organization=None, meta=None):
     dup = qone(db, 'SELECT id FROM evidence WHERE project_id=? AND dedupe_key=? ORDER BY created_at LIMIT 1', (pid, dedupe_key))
     if not dup and excerpt and kind == 'SECONDARY_BACKGROUND':
         # Syndicated copy: the same passage on a different host is not independent evidence.
@@ -837,17 +1056,21 @@ def insert_evidence(db, pid, *, kind, dimension, claim, direction, relevance, in
     db.execute('''INSERT INTO evidence(id,project_id,kind,dimension,claim_id,claim,direction,source_url,title,publisher,author,published_on,retrieved_at,excerpt,
                   url_status,excerpt_status,relevance,independence,method,sample_size,positives,segment,geography,collected_from,collected_to,consent_confirmed,
                   experiment_id,experiment_version,outcome,rate_pct,adverse,positive_signals,negative_signals,dedupe_key,duplicate_of,injection_flag,limitations,created_at,
-                  direction_id,criterion_id,source_hash,candidate_id,doi,provider,final_url)
-                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                  direction_id,criterion_id,source_hash,candidate_id,doi,provider,final_url,
+                  subcriterion_id,source_type,review_state,review_reason,relevance_checks_json,organization,meta_json)
+                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                (eid, pid, kind, dimension, claim_id, claim, direction, url, title, publisher, author, published_on, retrieved_at, excerpt,
                 url_status, excerpt_status, relevance, independence, method, sample_size, positives, segment, geography,
                 str(collected_from) if collected_from else None, str(collected_to) if collected_to else None, int(consent),
                 None, None, None, None, None, positive_signals, negative_signals, dedupe_key, dup['id'] if dup else None, int(injection),
-                limitations, now(), direction_id, criterion_id, source_hash, candidate_id, doi, provider, final_url))
+                limitations, now(), direction_id, criterion_id, source_hash, candidate_id, doi, provider, final_url,
+                subcriterion_id, source_type, review_state, review_reason, jsonstr(relevance_checks) if relevance_checks else None,
+                organization, jsonstr(meta) if meta else None))
     invalidate_runs(db, pid, 'new evidence added', phases=('validate',))
     audit(db, pid, 'EVIDENCE_ADDED', {'id': eid, 'kind': kind, 'dimension': dimension, 'url_status': url_status,
                                       'excerpt_status': excerpt_status, 'duplicate_of': dup['id'] if dup else None, 'injection_flag': injection,
-                                      'provider': provider, 'candidate_id': candidate_id})
+                                      'provider': provider, 'candidate_id': candidate_id, 'subcriterion_id': subcriterion_id,
+                                      'source_type': source_type, 'review_state': review_state})
     return eid, dup
 
 
@@ -858,37 +1081,62 @@ LIMITS = {
 }
 
 
+def _check_link(subcriterion_id, source_type):
+    if subcriterion_id and subcriterion_id not in rubric.BY_ID:
+        raise HTTPException(422, f'Unknown rubric check id {subcriterion_id!r}.')
+    if subcriterion_id and rubric.BY_ID[subcriterion_id]['kind'] == 'knockout':
+        raise HTTPException(422, 'Ethics checks are decided by the written safety rules; attach official sources on the Safety screen.')
+    if source_type and (source_type not in rubric.SOURCE_TYPES or source_type == 'BRIEF'):
+        raise HTTPException(422, f'Unknown source type {source_type!r}. Allowed: {sorted(k for k in rubric.SOURCE_TYPES if k != "BRIEF")}')
+    if subcriterion_id and source_type and source_type not in rubric.OV[subcriterion_id]['accepted_source_types']:
+        raise HTTPException(422, {'message': f'This check asks for {", ".join(rubric.OV[subcriterion_id]["accepted_source_types"])}; '
+                                             f'a {source_type} source cannot count for it. Link it to another check or leave it unlinked.'})
+
+
 @app.post('/api/projects/{pid}/evidence')
 async def add_evidence(pid: str, req: EvidenceAdd, project=Depends(authorize)):
     reject_obvious_secrets(jsonstr(req.model_dump()))
     not_stopped(project)
+    _check_link(req.subcriterion_id, req.source_type)
     with conn() as db:
         _guard_validate_open(db, pid)
     free_text = ' '.join(filter(None, [req.claim, req.excerpt, req.method, req.positive_signals, req.negative_signals, req.title]))
     injection = safety.looks_like_injection(free_text)
+    founder_supplied = False
     if req.kind == 'SECONDARY_BACKGROUND':
         url_status, excerpt_status, retrieved_at, note = await verify_excerpt(req.url, req.excerpt)
+        if excerpt_status != 'EXCERPT_MATCHED' and req.founder_supplied_excerpt:
+            founder_supplied = True
+            url_status, excerpt_status = 'FOUNDER_SUPPLIED', 'FOUNDER_SUPPLIED_UNVERIFIED'
+            note = 'Founder-supplied excerpt with URL: FounderOS could not verify it at the URL (' + note + ').'
         independence = 'INDEPENDENT_SOURCE_FOUNDER_SELECTED'
         dedupe_key = stable_hash([urlparse(req.url).hostname, urlparse(req.url).path.rstrip('/'), norm(req.excerpt)])
     else:
         url_status, excerpt_status, retrieved_at, note = 'NOT_APPLICABLE', 'NOT_APPLICABLE', None, 'Founder-run research.'
         independence = 'FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED'
         dedupe_key = stable_hash([req.kind, norm(req.method), req.sample_size, req.positives, str(req.collected_from), norm(req.segment or '')])
+    state, reason, rflags = review.decide(req.relevance_checks, claim=req.claim, excerpt=req.excerpt, url=req.url,
+                                          verified=excerpt_status == 'EXCERPT_MATCHED', founder_supplied=founder_supplied,
+                                          customer_research=req.kind != 'SECONDARY_BACKGROUND')
     limits = LIMITS[req.kind]
     if injection:
         limits = 'EXCLUDED: instruction-like text detected (possible prompt injection). Withheld from agents and gates. ' + limits
+    stype = req.source_type or ('FOUNDER_CUSTOMER_RESEARCH' if req.kind != 'SECONDARY_BACKGROUND' else None)
     with conn() as db:
         eid, dup = insert_evidence(db, pid, kind=req.kind, dimension=req.dimension, claim=req.claim, direction=req.direction,
-                                   relevance=req.relevance, independence=independence, url_status=url_status, excerpt_status=excerpt_status,
-                                   limitations=limits + ' ' + note, dedupe_key=dedupe_key, url=req.url, title=req.title, publisher=req.publisher,
+                                   relevance=review.legacy_relevance(state, req.relevance), independence=independence, url_status=url_status,
+                                   excerpt_status=excerpt_status, limitations=limits + ' ' + note + (' ' + ' '.join(rflags) if rflags else ''),
+                                   dedupe_key=dedupe_key, url=req.url, title=req.title, publisher=req.publisher,
                                    author=req.author, published_on=req.published_on, retrieved_at=retrieved_at, excerpt=req.excerpt,
                                    method=req.method, sample_size=req.sample_size, positives=req.positives, segment=req.segment,
                                    geography=req.geography, collected_from=req.collected_from, collected_to=req.collected_to,
                                    consent=req.consent_confirmed, positive_signals=req.positive_signals, negative_signals=req.negative_signals,
-                                   injection=injection, criterion_id=getattr(req, 'criterion_id', None), direction_id=getattr(req, 'direction_id', None),
-                                   provider='founder_manual', claim_id=req.claim_id)
+                                   injection=injection, criterion_id=req.criterion_id, direction_id=req.direction_id,
+                                   provider='founder_manual', claim_id=req.claim_id, subcriterion_id=req.subcriterion_id, source_type=stype,
+                                   review_state=state, review_reason=reason, relevance_checks=req.relevance_checks, organization=req.organization)
     return {'id': eid, 'kind': req.kind, 'url_status': url_status, 'excerpt_status': excerpt_status, 'independence': independence,
             'duplicate_of': dup['id'] if dup else None, 'injection_flag': injection, 'limitations': limits + ' ' + note,
+            'review_state': state, 'review_reason': reason, 'review_flags': rflags,
             'notice': 'Nothing here proves demand on its own. Counting rules: docs/criteria-methodology.md'}
 
 
@@ -920,6 +1168,7 @@ class ResearchItem(BaseModel):
     provider: str = Field(pattern='^(crossref|openalex|worldbank)$')
     query: str | None = Field(default=None, max_length=160)
     indicator: str | None = Field(default=None, max_length=40)
+    subcriterion_id: str | None = Field(default=None, max_length=60, pattern='^[a-z_]{3,60}$')
 
 
 class ResearchRun(BaseModel):
@@ -951,15 +1200,16 @@ async def research_run(pid: str, req: ResearchRun, project=Depends(authorize)):
         rid = uuid.uuid4().hex
         added = 0
         with conn() as db:
-            db.execute('INSERT INTO research_runs(id,project_id,bucket,provider,query,status,error,result_count,brief_version,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            db.execute('INSERT INTO research_runs(id,project_id,bucket,provider,query,status,error,result_count,brief_version,created_at,subcriterion_id,error_code) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
                        (rid, pid, it.bucket, it.provider, it.query or it.indicator or '', res['status'], res.get('error'), len(res.get('results', [])),
-                        brief['version'], now()))
+                        brief['version'], now(), it.subcriterion_id, res['status'] if res['status'] not in ('OK', 'NO_RESULTS') else None))
             for c in res.get('results', []):
                 key_url, key_doi = c.get('url'), c.get('doi')
                 exists = qone(db, 'SELECT id FROM research_candidates WHERE project_id=? AND ((doi IS NOT NULL AND doi=?) OR (url IS NOT NULL AND url=?))',
                               (pid, key_doi, key_url))
                 if exists:
                     continue
+                c = {**c, 'subcriterion_id': it.subcriterion_id, 'query': it.query}
                 db.execute('INSERT INTO research_candidates(id,project_id,run_id,bucket,provider,url,doi,title,publisher,year,state,payload_json,fetch_json,evidence_id,reject_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,?,?)',
                            (uuid.uuid4().hex, pid, rid, it.bucket, it.provider, key_url, key_doi, c.get('title'), c.get('publisher'), c.get('year'),
                             c['state'], jsonstr(c), now(), now()))
@@ -967,7 +1217,8 @@ async def research_run(pid: str, req: ResearchRun, project=Depends(authorize)):
             audit(db, pid, 'RESEARCH_QUERY_RUN', {'bucket': it.bucket, 'provider': it.provider, 'query': (it.query or it.indicator or '')[:120],
                                                   'status': res['status'], 'results': len(res.get('results', [])), 'new_candidates': added})
         summary.append({'bucket': it.bucket, 'provider': it.provider, 'query': it.query or it.indicator, 'status': res['status'],
-                        'error': res.get('error'), 'count': len(res.get('results', [])), 'new_candidates': added})
+                        'error': res.get('error'), 'count': len(res.get('results', [])), 'new_candidates': added, 'subcriterion_id': it.subcriterion_id,
+                        'recoverable': res['status'] in ('TIMEOUT', 'OFFLINE', 'RATE_LIMITED', 'PROVIDER_ERROR')})
     return {'runs': summary, 'notice': 'Candidates are not evidence. Inspect a source, pick an exact passage, then add it to the ledger.'}
 
 
@@ -994,14 +1245,17 @@ async def _fetch_into(pid, cid, url, query):
     try:
         f = await research.safe_fetch(url)
         ps = research.passages(f['text'], query or '')
-        fetch = {**{k: f[k] for k in ('requested_url', 'final_url', 'redirects', 'content_type', 'meta', 'sha256', 'retrieved_at', 'chars', 'paywall_suspected')},
+        fetch = {**{k: f.get(k) for k in ('requested_url', 'final_url', 'redirects', 'content_type', 'meta', 'sha256', 'retrieved_at', 'chars', 'paywall_suspected',
+                                           'truncated', 'truncation_note', 'reserved_domain')},
                  'passages': ps, 'text': f['text'], 'ranking_note': 'Passages ranked by query-term overlap: an exploratory heuristic, not relevance or truth.'}
         state, err = 'FETCHED', None
     except FetchError as exc:
-        fetch, state, err = {'error': exc.message, 'http': exc.http, 'attempted_at': now()}, 'FETCH_FAILED', exc.message
+        fetch, state, err = {'error': exc.message, 'error_code': exc.code, 'advice': exc.advice, 'http': exc.http, 'attempted_at': now(),
+                             'recoverable': exc.code not in ('BLOCKED_ADDRESS',), 'tls_verification': 'ON (never disabled)'}, 'FETCH_FAILED', exc.message
     with conn() as db:
         db.execute('UPDATE research_candidates SET state=?, fetch_json=?, updated_at=? WHERE id=?', (state, jsonstr(fetch), now(), cid))
-        audit(db, pid, 'SOURCE_INSPECTED', {'candidate_id': cid, 'state': state, 'error': err, 'final_url': fetch.get('final_url')})
+        audit(db, pid, 'SOURCE_INSPECTED', {'candidate_id': cid, 'state': state, 'error': err, 'error_code': fetch.get('error_code'),
+                                            'final_url': fetch.get('final_url'), 'truncated': fetch.get('truncated')})
         return _cand(qone(db, 'SELECT * FROM research_candidates WHERE id=?', (cid,)))
 
 
@@ -1052,7 +1306,12 @@ async def candidate_reject(pid: str, cid: str, req: RejectReq, project=Depends(a
 
 class AddFromCandidate(BaseModel):
     excerpt: str | None = Field(default=None, max_length=1200)
-    use: str = Field(default='PASSAGE', pattern='^(PASSAGE|ABSTRACT_METADATA|STRUCTURED_DATUM)$')
+    use: str = Field(default='PASSAGE', pattern='^(PASSAGE|ABSTRACT_METADATA|STRUCTURED_DATUM|FOUNDER_PASTE)$')
+    subcriterion_id: str | None = Field(default=None, max_length=60, pattern='^[a-z_]{3,60}$')
+    source_type: str | None = Field(default=None, max_length=40, pattern='^[A-Z_]{3,40}$')
+    organization: str | None = Field(default=None, max_length=200)
+    relevance_checks: dict | None = None
+    paste_confirm: bool = False
     claim: str = Field(min_length=8, max_length=800)
     dimension: str = Field(pattern='^(desirability|demand|competition|feasibility|viability)$')
     direction: str = Field(default='UNSURE', pattern='^(SUPPORTS|CONTRADICTS|UNSURE)$')
@@ -1079,7 +1338,21 @@ async def candidate_add(pid: str, cid: str, req: AddFromCandidate, project=Depen
         payload = json.loads(raw['payload_json'])
         fetch = json.loads(raw['fetch_json']) if raw['fetch_json'] else None
         meta = (fetch or {}).get('meta') or {}
-        if req.use == 'PASSAGE':
+        _check_link(req.subcriterion_id, req.source_type)
+        founder_supplied = False
+        if req.use == 'FOUNDER_PASTE':
+            if not raw['url'] and not payload.get('url'):
+                raise HTTPException(422, 'A pasted excerpt needs the source URL it came from.')
+            if not req.paste_confirm or not req.excerpt or len(req.excerpt.strip()) < 12:
+                raise HTTPException(422, 'Paste the exact passage (12+ characters) and confirm you copied it from this URL yourself.')
+            if fetch and fetch.get('text') and research.excerpt_in(fetch['text'], req.excerpt):
+                url_status, ex_status, excerpt = 'URL_ACCESSIBLE', 'EXCERPT_MATCHED', req.excerpt.strip()
+                note = 'Pasted passage was found in the fetched page text, so it is verified.'
+            else:
+                founder_supplied = True
+                url_status, ex_status, excerpt = 'FOUNDER_SUPPLIED', 'FOUNDER_SUPPLIED_UNVERIFIED', req.excerpt.strip()
+                note = 'FOUNDER-SUPPLIED excerpt: FounderOS could not fetch or match it at the URL, so it was never automatically verified.'
+        elif req.use == 'PASSAGE':
             if raw['state'] != 'FETCHED' or not fetch or not fetch.get('text'):
                 raise HTTPException(409, 'Inspect (fetch) the source first; only passages from the fetched page can be verified.')
             if not req.excerpt or not research.excerpt_in(fetch['text'], req.excerpt):
@@ -1100,23 +1373,35 @@ async def candidate_add(pid: str, cid: str, req: AddFromCandidate, project=Depen
             excerpt, url_status, ex_status = payload['datum'], 'URL_ACCESSIBLE', 'STRUCTURED_DATUM'
             note = 'Structured datum returned by the World Bank API. ' + payload.get('limitation', '')
         injection = safety.looks_like_injection(excerpt + ' ' + req.claim)
-        limits = LIMITS['SECONDARY_BACKGROUND'] + ' ' + note
+        if fetch and fetch.get('truncated') and req.use == 'PASSAGE':
+            note += ' ' + (fetch.get('truncation_note') or '')
+        url_for_review = (fetch or {}).get('final_url') or raw['url'] or payload.get('url')
+        state, reason, rflags = review.decide(req.relevance_checks, claim=req.claim, excerpt=excerpt, url=url_for_review,
+                                              verified=ex_status in ('EXCERPT_MATCHED', 'STRUCTURED_DATUM'), founder_supplied=founder_supplied,
+                                              metadata_only=ex_status == 'METADATA_ONLY')
+        stype = req.source_type or ('ACADEMIC_METADATA' if ex_status == 'METADATA_ONLY' else 'OFFICIAL_STATISTIC' if ex_status == 'STRUCTURED_DATUM'
+                                    else 'ACADEMIC_PASSAGE' if raw['provider'] in ('crossref', 'openalex') else None)
+        if raw['provider'] in ('crossref', 'openalex') and ex_status == 'METADATA_ONLY':
+            stype = 'ACADEMIC_METADATA'
+        limits = LIMITS['SECONDARY_BACKGROUND'] + ' ' + note + (' ' + ' '.join(rflags) if rflags else '')
         if injection:
             limits = 'EXCLUDED: instruction-like text detected (possible prompt injection). ' + limits
         url = (fetch or {}).get('final_url') or raw['url'] or payload.get('url')
         dedupe = stable_hash([raw['doi'] or urlparse(url or '').hostname, urlparse(url or '').path.rstrip('/'), norm(excerpt)])
         eid, dup = insert_evidence(db, pid, kind='SECONDARY_BACKGROUND', dimension=req.dimension, claim=req.claim, direction=req.direction,
-                                   relevance=req.relevance, independence='INDEPENDENT_SOURCE_FOUNDER_SELECTED', url_status=url_status,
+                                   relevance=review.legacy_relevance(state, req.relevance), independence='INDEPENDENT_SOURCE_FOUNDER_SELECTED', url_status=url_status,
                                    excerpt_status=ex_status, limitations=limits, dedupe_key=dedupe, url=raw['url'] or payload.get('url'),
                                    title=raw['title'] or meta.get('title'), publisher=req.publisher or raw['publisher'] or meta.get('publisher'),
                                    author=meta.get('author'), published_on=req.published_on or meta.get('published_on') or (str(raw['year']) if raw['year'] else None),
                                    retrieved_at=(fetch or {}).get('retrieved_at') or (now() if req.use == 'STRUCTURED_DATUM' else None), excerpt=excerpt,
                                    geography=req.geography or payload.get('geography'), injection=injection, criterion_id=req.criterion_id,
                                    direction_id=req.direction_id, source_hash=(fetch or {}).get('sha256'), candidate_id=cid, doi=raw['doi'],
-                                   provider=raw['provider'], final_url=(fetch or {}).get('final_url'))
+                                   provider=raw['provider'], final_url=(fetch or {}).get('final_url'), subcriterion_id=req.subcriterion_id,
+                                   source_type=stype, review_state=state, review_reason=reason, relevance_checks=req.relevance_checks,
+                                   organization=req.organization, meta={'truncated': bool((fetch or {}).get('truncated')), 'use': req.use})
         db.execute('UPDATE research_candidates SET state=?, evidence_id=?, updated_at=? WHERE id=?', ('EVIDENCE_ADDED', eid, now(), cid))
     return {'evidence_id': eid, 'excerpt_status': ex_status, 'duplicate_of': dup['id'] if dup else None, 'injection_flag': injection,
-            'limitations': limits}
+            'limitations': limits, 'review_state': state, 'review_reason': reason, 'review_flags': rflags, 'source_type': stype}
 
 
 # Legacy v0.4 endpoints kept for compatibility (bibliographic discovery only).
@@ -1324,24 +1609,35 @@ async def submit_result(pid: str, sid: str, req: ExperimentResult, project=Depen
             raise HTTPException(422, f'Results collected before the pre-registration date ({x["locked_at"][:10]}) are not accepted as pre-registered.')
         crit = criteria_of(x['payload'])
         outcome = evaluate_result(crit, req.sample_size, req.positives)
+        simulated = bool(x['payload'].get('simulated'))
+        kind = 'SIMULATED_RESULT' if simulated else 'PRE_REGISTERED_EXPERIMENT_RESULT'
+        if simulated:
+            outcome['caveats'] = ['SIMULATED / NOT COUNTED: this was a labelled demo, not real customer behaviour. It never counts toward any verdict.'] + outcome['caveats']
+        meta = {'recruitment_method': req.recruitment_method, 'exclusions': req.exclusions, 'limitations': req.limitations,
+                'denominator': req.sample_size, 'numerator': req.positives, 'consent_confirmed': req.consent_confirmed,
+                'collected_from': str(req.collected_from), 'collected_to': str(req.collected_to),
+                'locked_success_pct': crit['success_threshold_pct'], 'locked_adverse_pct': crit['adverse_threshold_pct'],
+                'threshold_origin': crit.get('threshold_origin'), 'simulated': simulated}
         eid = uuid.uuid4().hex
         db.execute('''INSERT INTO evidence(id,project_id,kind,dimension,claim_id,claim,direction,source_url,title,publisher,author,published_on,retrieved_at,excerpt,
                       url_status,excerpt_status,relevance,independence,method,sample_size,positives,segment,geography,collected_from,collected_to,consent_confirmed,
-                      experiment_id,experiment_version,outcome,rate_pct,adverse,positive_signals,negative_signals,dedupe_key,duplicate_of,injection_flag,limitations,created_at,direction_id)
-                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                   (eid, pid, 'PRE_REGISTERED_EXPERIMENT_RESULT', crit['dimension'] or 'demand', crit['claim_id'], crit['hypothesis'],
+                      experiment_id,experiment_version,outcome,rate_pct,adverse,positive_signals,negative_signals,dedupe_key,duplicate_of,injection_flag,limitations,created_at,direction_id,
+                      meta_json,source_type,review_state)
+                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                   (eid, pid, kind, crit['dimension'] or 'demand', crit['claim_id'], crit['hypothesis'],
                     {'PASS': 'SUPPORTS', 'FAIL': 'CONTRADICTS'}.get(outcome['outcome'], 'UNSURE'), None, None, None, None, None, None, None,
                     'NOT_APPLICABLE', 'NOT_APPLICABLE', 'CLAIM_RELEVANT', 'FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED', req.method, req.sample_size,
                     req.positives, crit['target_segment'], None, str(req.collected_from), str(req.collected_to), int(req.consent_confirmed),
                     sid, x['version'], outcome['outcome'], outcome['rate_pct'], int(outcome['adverse']), req.positive_signals, req.negative_signals,
-                    stable_hash([sid, x['version']]), None, 0, ' '.join(outcome['caveats']) + ' ' + outcome['explanation'], now(), crit.get('direction_id')))
+                    stable_hash([sid, x['version']]), None, 0, ' '.join(outcome['caveats']) + ' ' + outcome['explanation'], now(), crit.get('direction_id'),
+                    jsonstr(meta), 'SIMULATED_RESULT' if simulated else 'FOUNDER_CUSTOMER_RESEARCH', 'EXCLUDED' if simulated else None))
         db.execute('UPDATE experiments SET result_evidence_id=? WHERE series_id=? AND version=?', (eid, sid, x['version']))
         invalidate_runs(db, pid, 'experiment result recorded', phases=('validate',))
-        audit(db, pid, 'EXPERIMENT_RESULT_RECORDED', {'experiment_id': sid, 'version': x['version'], 'evidence_id': eid, 'outcome': outcome['outcome'],
+        audit(db, pid, 'EXPERIMENT_RESULT_RECORDED', {'experiment_id': sid, 'version': x['version'], 'evidence_id': eid, 'outcome': outcome['outcome'], 'simulated': simulated,
                                                       'reading': criteria.READING.get(outcome['outcome']), 'n': req.sample_size,
                                                       'positives': req.positives, 'criteria_hash': x['criteria_hash']})
     return {'evidence_id': eid, 'experiment_id': sid, 'version': x['version'], 'locked_criteria': crit, 'locked_at': x['locked_at'],
-            'reading': criteria.READING.get(outcome['outcome']), **outcome,
+            'reading': 'SIMULATED_NOT_COUNTED' if simulated else criteria.READING.get(outcome['outcome']), **outcome, 'simulated': simulated, 'result_meta': meta,
             'notice': 'Founder-reported. Compared in code against the criteria locked BEFORE collection. One result does not validate the business.'}
 
 

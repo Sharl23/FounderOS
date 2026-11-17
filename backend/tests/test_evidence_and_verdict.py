@@ -20,7 +20,7 @@ def test_three_sector_growth_articles_do_not_validate(client, project, fetch_ok)
     ids = []
     for i, dim in enumerate(('desirability', 'competition', 'viability')):
         ids.append(add(client, pid, h, dimension=dim, claim=f'Egypt edtech sector grew strongly in report {i}',
-                       url=f'https://example.org/report{i}', excerpt=f'The sector grew by a large margin in year {i}')['id'])
+                       url=f'https://testonly-publisher.org/report{i}', excerpt=f'The sector grew by a large margin in year {i}')['id'])
     v = run(client, pid, h, 'validate')
     g = v['gate']
     assert g['verdict'] == 'NEEDS_EVIDENCE'
@@ -59,10 +59,10 @@ def test_unverified_mismatched_and_duplicate_sources_do_not_count(client, projec
     async def fake(url, excerpt):
         return next(results)
     monkeypatch.setattr(main, 'verify_excerpt', fake)
-    a = add(client, pid, h, claim='Unreachable claim number one', url='https://example.org/a', excerpt='Some text from the page A')
-    b = add(client, pid, h, claim='Mismatched claim number two', url='https://example.org/b', excerpt='Quote that is not there')
-    c = add(client, pid, h, claim='Matched claim number three', url='https://example.org/c', excerpt='A real matching passage here')
-    d = add(client, pid, h, claim='Matched claim number three again', url='https://example.org/c/', excerpt='A real  matching passage here')
+    a = add(client, pid, h, claim='Unreachable claim number one', url='https://testonly-publisher.org/a', excerpt='Some text from the page A')
+    b = add(client, pid, h, claim='Mismatched claim number two', url='https://testonly-publisher.org/b', excerpt='Quote that is not there')
+    c = add(client, pid, h, claim='Matched claim number three', url='https://testonly-publisher.org/c', excerpt='A real matching passage here')
+    d = add(client, pid, h, claim='Matched claim number three again', url='https://testonly-publisher.org/c/', excerpt='A real  matching passage here')
     assert a['url_status'] == 'UNVERIFIED' and b['excerpt_status'] == 'NOT_MATCHED'
     assert d['duplicate_of'] == c['id']
     g = run(client, pid, h, 'validate')['gate']
@@ -188,7 +188,7 @@ def test_offline_no_sources_gives_honest_unknowns(client, project, no_fetch):
     """G4: nothing invented."""
     pid, h = project
     approved_discovery(client, pid, h)
-    e = add(client, pid, h, claim='Some market statistic from a report', url='https://example.org/stat', excerpt='A passage I copied')
+    e = add(client, pid, h, claim='Some market statistic from a report', url='https://testonly-publisher.org/stat', excerpt='A passage I copied')
     assert e['url_status'] == 'UNVERIFIED'
     g = run(client, pid, h, 'validate')['gate']
     assert g['verdict'] == 'NEEDS_EVIDENCE'
@@ -221,7 +221,12 @@ def test_skeptic_flags_overclaims_but_verdict_is_backend(client, monkeypatch, tm
         v = run(c, pid, h, 'validate')
         assert v['gate']['verdict'] == 'NEEDS_EVIDENCE'  # model praise changes nothing
         issues = ' '.join(f['issue'] for f in v['report']['_skeptic_flags'])
-        assert 'OVER-CLAIM' in issues and 'UNSOURCED NUMBER' in issues
+        assert 'OVER-CLAIM' in issues
+        # v0.8: the invented "50 EGP/month" is caught earlier, by the discovery guard, and scrubbed before validation sees it.
+        disc = next(r for r in c.get(f'/api/projects/{pid}', headers=h).json()['phase_runs'] if r['phase'] == 'discover')
+        q = disc['report']['_quality']
+        assert any(i['kind'] == 'INVENTED_NUMBER' and '50' in i['text'] for i in q['first_pass_issues'])
+        assert '50 EGP' not in ' '.join(disc['report']['hypotheses'])
 
 
 def test_pure_function_safety_block_overrides_everything():

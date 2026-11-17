@@ -54,6 +54,13 @@ class Direction(BaseModel):
     value: str
 
 
+class CheckJudgeOutput(BaseModel):
+    check_id: str
+    rating: str
+    evidence_ids: list[str] = Field(default_factory=list)
+    reasoning: str = ''
+
+
 class JudgeOutput(BaseModel):
     criterion_id: str
     proposed_score: int | None = None
@@ -127,6 +134,12 @@ class EvidenceAdd(BaseModel):
     relevance: Literal['CLAIM_RELEVANT', 'IRRELEVANT', 'UNSURE'] = 'UNSURE'
     criterion_id: str | None = Field(default=None, pattern='^(D0[3-7]|V0[1-3])$')
     direction_id: str | None = Field(default=None, pattern='^[A-C]$')
+    # v0.8: granular rubric link, source typing, explicit relevance review, founder-supplied paste
+    subcriterion_id: str | None = Field(default=None, max_length=60, pattern='^[a-z_]{3,60}$')
+    source_type: str | None = Field(default=None, max_length=40, pattern='^[A-Z_]{3,40}$')
+    organization: str | None = Field(default=None, max_length=200)
+    relevance_checks: dict | None = None
+    founder_supplied_excerpt: bool = False
     # secondary sources
     url: str | None = Field(default=None, max_length=2000)
     excerpt: str | None = Field(default=None, max_length=1600)
@@ -195,6 +208,12 @@ class ExperimentDraft(BaseModel):
     time_window_days: int | None = Field(default=None, ge=1, le=365)
     near_miss_band: float | None = Field(default=None, ge=0, le=0.5)
     direction_id: str | None = Field(default=None, pattern='^[A-C]$')
+    # v0.8: honesty fields. A simulated test is allowed only as a labelled demo and never counts.
+    simulated: bool = False
+    recruitment_method: str | None = Field(default=None, max_length=600)
+    exclusions: str | None = Field(default=None, max_length=600)
+    limitations: str | None = Field(default=None, max_length=600)
+    participants_adults_only: bool = False
 
     @model_validator(mode='after')
     def thresholds(self):
@@ -220,6 +239,9 @@ class ExperimentResult(BaseModel):
     consent_confirmed: bool
     positive_signals: str | None = Field(default=None, max_length=1000)
     negative_signals: str | None = Field(default=None, max_length=1000)
+    recruitment_method: str | None = Field(default=None, max_length=600)
+    exclusions: str | None = Field(default=None, max_length=600)
+    limitations: str | None = Field(default=None, max_length=600)
 
     @model_validator(mode='after')
     def sane(self):

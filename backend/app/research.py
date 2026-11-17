@@ -29,7 +29,7 @@ from bs4 import BeautifulSoup
 
 from . import safety
 
-UA = 'FounderOS/0.7 (open-source local research assistant; contact: see repository)'
+UA = 'FounderOS/0.8 (open-source local research assistant; contact: see repository)'
 PROVIDERS = {
     'crossref': {'name': 'Crossref', 'covers': 'Scholarly publication metadata (title, DOI, publisher, year; abstract when deposited).',
                  'does_not_cover': 'Market size, competitors, prices, customer behaviour. Metadata is not a study finding.',
@@ -68,10 +68,37 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+FETCH_ADVICE = {
+    'TIMEOUT': 'The site did not answer in time (retried once). Try again later, try the publisher\'s canonical page, or paste the passage yourself with its URL.',
+    'TLS_VERIFY_FAILED': 'The site\'s HTTPS certificate could not be verified, so FounderOS did not read it. Certificate checks stay on. Use another copy of the page (publisher, DOI landing page) or paste the passage yourself.',
+    'DNS_FAILED': 'The address could not be resolved (offline, or the domain does not exist). Check the URL.',
+    'BLOCKED_ADDRESS': 'Private, local or non-HTTPS addresses are blocked for safety. Use a public https:// page.',
+    'HTTP_DENIED': 'The site refused access (login, paywall or bot protection). Open it in your browser and paste the passage with its URL.',
+    'HTTP_NOT_FOUND': 'The page does not exist at that address. Check the URL or find the canonical page.',
+    'HTTP_ERROR': 'The site returned an error. Try again later or use another copy of the page.',
+    'UNSUPPORTED_TYPE': 'Only HTML and plain-text pages are read (PDFs and images are not). Find an HTML version, or paste the passage with its URL.',
+    'TOO_MANY_REDIRECTS': 'The page redirected too many times. Try the final address directly.',
+    'NETWORK': 'Network error (retried once). Check your connection, then try again.',
+}
+
+
 class FetchError(Exception):
-    def __init__(self, status, message, http=None):
+    def __init__(self, status, message, http=None, code='NETWORK'):
         super().__init__(message)
-        self.status, self.message, self.http = status, message, http
+        self.status, self.message, self.http, self.code = status, message, http, code
+        self.advice = FETCH_ADVICE.get(code, '')
+
+
+def _is_tls_error(exc) -> bool:
+    import ssl
+    e = exc
+    for _ in range(6):
+        if e is None:
+            break
+        if isinstance(e, ssl.SSLError) or 'CERTIFICATE_VERIFY_FAILED' in str(e) or 'certificate verify failed' in str(e).lower():
+            return True
+        e = e.__cause__ or e.__context__
+    return False
 
 
 # ----------------------------------------------------------------------------- SSRF-guarded fetch
@@ -124,8 +151,28 @@ def _sanitize(html: str) -> tuple[str, dict]:
     return text, meta
 
 
-async def safe_fetch(url: str, *, max_bytes=800_000, max_redirects=3, timeout=8.0, client_factory=None) -> dict:
-    """GET a public HTTPS page. Every redirect hop is re-validated against the SSRF rules."""
+async def safe_fetch(url: str, *, max_bytes=800_000, max_redirects=3, timeout=8.0, client_factory=None, retries=1) -> dict:
+    """GET a public HTTPS page. Every redirect hop is re-validated against the SSRF rules.
+
+    TLS verification is always on (httpx default). Pages larger than `max_bytes` are TRUNCATED safely
+    (reading stops at the cap; passages and excerpt checks use only the part read, and the result says so).
+    Timeouts and transient network errors are retried once; TLS, blocked-address and HTTP errors are not.
+    """
+    attempt = 0
+    while True:
+        try:
+            return await _fetch_once(url, max_bytes=max_bytes, max_redirects=max_redirects, timeout=timeout, client_factory=client_factory)
+        except FetchError as exc:
+            if exc.code in ('TIMEOUT', 'NETWORK') and attempt < retries:
+                attempt += 1
+                await asyncio.sleep(0.5)
+                continue
+            if attempt:
+                exc.message += f' (after {attempt + 1} attempts)'
+            raise
+
+
+async def _fetch_once(url, *, max_bytes, max_redirects, timeout, client_factory):
     hops = []
     current = url
     factory = client_factory or (lambda: httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False))
@@ -133,39 +180,52 @@ async def safe_fetch(url: str, *, max_bytes=800_000, max_redirects=3, timeout=8.
         try:
             check_public_url(current)
         except ValueError as exc:
-            raise FetchError('FETCH_FAILED', f'Blocked: {exc}' + (f' (redirect from {hops[-1]})' if hops else '')) from exc
+            code = 'DNS_FAILED' if 'could not be resolved' in str(exc) else 'BLOCKED_ADDRESS'
+            raise FetchError('FETCH_FAILED', f'Blocked: {exc}' + (f' (redirect from {hops[-1]})' if hops else ''), code=code) from exc
+        truncated = False
         try:
             async with factory() as client:
                 async with client.stream('GET', current, headers={'User-Agent': UA, 'Accept': 'text/html,text/plain;q=0.9'}) as resp:
                     if 300 <= resp.status_code < 400:
                         loc = resp.headers.get('location')
                         if not loc:
-                            raise FetchError('FETCH_FAILED', f'Redirect without location (HTTP {resp.status_code})', resp.status_code)
+                            raise FetchError('FETCH_FAILED', f'Redirect without location (HTTP {resp.status_code})', resp.status_code, code='HTTP_ERROR')
                         hops.append(current)
                         current = urljoin(current, loc)
                         continue
                     if resp.status_code != 200:
-                        raise FetchError('FETCH_FAILED', f'HTTP {resp.status_code}' + (' (access denied or paywall)' if resp.status_code in (401, 402, 403) else ''), resp.status_code)
+                        code = 'HTTP_DENIED' if resp.status_code in (401, 402, 403, 429) else 'HTTP_NOT_FOUND' if resp.status_code in (404, 410) else 'HTTP_ERROR'
+                        raise FetchError('FETCH_FAILED', f'HTTP {resp.status_code}' + (' (access denied or paywall)' if code == 'HTTP_DENIED' else ''), resp.status_code, code=code)
                     ctype = resp.headers.get('content-type', '').split(';')[0].strip().lower()
                     if ctype not in ('text/html', 'text/plain', 'application/xhtml+xml'):
-                        raise FetchError('FETCH_FAILED', f'Content type {ctype or "unknown"} is not inspected (HTML/plain text only)')
+                        raise FetchError('FETCH_FAILED', f'Content type {ctype or "unknown"} is not inspected (HTML/plain text only)', code='UNSUPPORTED_TYPE')
                     chunks, n = [], 0
                     async for chunk in resp.aiter_bytes():
+                        room = max_bytes - n
+                        if len(chunk) >= room:
+                            chunks.append(chunk[:room])
+                            n += room
+                            truncated = True
+                            break
                         n += len(chunk)
-                        if n > max_bytes:
-                            raise FetchError('FETCH_FAILED', f'Page exceeds the {max_bytes // 1000} KB safe download limit')
                         chunks.append(chunk)
                     raw = b''.join(chunks).decode(resp.encoding or 'utf-8', 'replace')
+        except FetchError:
+            raise
         except httpx.TimeoutException as exc:
-            raise FetchError('FETCH_FAILED', 'Timed out') from exc
+            raise FetchError('FETCH_FAILED', 'Timed out', code='TIMEOUT') from exc
         except httpx.HTTPError as exc:
-            raise FetchError('FETCH_FAILED', f'Network error: {str(exc)[:120]} (offline?)') from exc
+            if _is_tls_error(exc):
+                raise FetchError('FETCH_FAILED', 'TLS certificate verification failed (the page was not read; verification stays on)', code='TLS_VERIFY_FAILED') from exc
+            raise FetchError('FETCH_FAILED', f'Network error: {str(exc)[:120]}', code='NETWORK') from exc
         text, meta = _sanitize(raw) if ctype != 'text/plain' else (raw, {})
         paywall = len(text) < 1500 or bool(re.search(r'\b(purchase (this )?article|subscribe to (read|continue)|access through your institution|sign in to read|buy this article)\b', text, re.I))
         return {'requested_url': url, 'final_url': current, 'redirects': hops, 'content_type': ctype, 'text': text[:300_000],
                 'meta': meta, 'sha256': hashlib.sha256(text.encode()).hexdigest(), 'retrieved_at': now(), 'chars': len(text),
-                'paywall_suspected': paywall}
-    raise FetchError('FETCH_FAILED', f'More than {max_redirects} redirects')
+                'paywall_suspected': paywall, 'truncated': truncated, 'bytes_read': n,
+                'truncation_note': (f'Page larger than {max_bytes // 1000} KB: only the first {max_bytes // 1000} KB were read. Passages and excerpt checks cover that part only.' if truncated else None),
+                'reserved_domain': bool(re.search(r'(^|\.)(example\.(com|net|org|edu)|example|test|invalid)$', (urlparse(current).hostname or ''), re.I))}
+    raise FetchError('FETCH_FAILED', f'More than {max_redirects} redirects', code='TOO_MANY_REDIRECTS')
 
 
 def norm(s):
@@ -202,7 +262,18 @@ def passages(text: str, query: str, k: int = 8) -> list[dict]:
 
 
 # ----------------------------------------------------------------------------- providers
-async def _get_json(url, params, provider, headers=None, timeout=8.0, max_bytes=400_000, client_factory=None):
+async def _get_json(url, params, provider, headers=None, timeout=8.0, max_bytes=400_000, client_factory=None, retries=1):
+    r = await _get_json_once(url, params, provider, headers, timeout, max_bytes, client_factory)
+    if r['status'] in ('TIMEOUT', 'OFFLINE') and retries:
+        await asyncio.sleep(0.5)
+        r2 = await _get_json_once(url, params, provider, headers, timeout, max_bytes, client_factory)
+        if r2['status'] in ('TIMEOUT', 'OFFLINE'):
+            r2['error'] = (r2.get('error') or '') + ' Retried once.'
+        return r2
+    return r
+
+
+async def _get_json_once(url, params, provider, headers=None, timeout=8.0, max_bytes=400_000, client_factory=None):
     until = _backoff.get(provider, 0)
     if until > time.time():
         return {'status': 'RATE_LIMITED', 'error': f'{PROVIDERS[provider]["name"]} asked us to slow down; retry in {int(until - time.time())} s.'}
@@ -227,8 +298,10 @@ async def _get_json(url, params, provider, headers=None, timeout=8.0, max_bytes=
                     buf.append(chunk)
         return {'status': 'OK', 'data': json.loads(b''.join(buf))}
     except httpx.TimeoutException:
-        return {'status': 'OFFLINE', 'error': 'Timed out (offline or provider slow).'}
+        return {'status': 'TIMEOUT', 'error': f'{PROVIDERS[provider]["name"]} did not answer within {timeout:g} s. Recoverable: try again later or use another provider.'}
     except (httpx.HTTPError, OSError) as exc:
+        if _is_tls_error(exc):
+            return {'status': 'TLS_VERIFY_FAILED', 'error': 'TLS certificate verification failed; the response was not read. Verification stays on.'}
         return {'status': 'OFFLINE', 'error': f'Network unavailable: {str(exc)[:100]}'}
     except ValueError:
         return {'status': 'PROVIDER_ERROR', 'error': 'Invalid JSON'}
@@ -328,12 +401,15 @@ def _c(s, n=60):
 
 
 def plan(brief: dict, jurisdiction: dict) -> dict:
-    seg = _c(brief.get('target_customers') or 'target customers', 50)
-    prob = _c(brief.get('problem') or brief.get('idea_summary') or 'customer problem', 60)
-    topic = _c(brief.get('idea_summary') or brief.get('problem') or 'digital product', 60)
-    work = _c(brief.get('current_workaround') or '', 40)
+    # v0.8: queries come from STRUCTURED fields as whole key words (never a truncated slice of raw text).
+    from .rubric import keyphrase
+    seg = keyphrase(re.sub(r'\(.*?\)', '', brief.get('target_customers') or ''), 3) or 'target customers'
+    prob = keyphrase(brief.get('problem'), 4) or keyphrase(brief.get('idea_summary'), 4) or 'customer problem'
+    topic = keyphrase(brief.get('idea_summary') or brief.get('problem'), 4) or 'digital product'
+    work = keyphrase(brief.get('current_workaround'), 3)
     country = jurisdiction.get('country')
-    place = _c(brief.get('target_market') or country or '', 40)
+    tm = ((brief.get('fields') or {}).get('target_market') or {}).get('typed') or {}
+    place = tm.get('city') or country or keyphrase(brief.get('target_market'), 2)
     student = bool(re.search(r'student|universit|college', seg + ' ' + topic, re.I))
 
     def web(q):

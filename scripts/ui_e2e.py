@@ -42,12 +42,12 @@ _real_fetch = research.safe_fetch
 
 
 async def fake_fetch(url, **k):   # TEST_ONLY
-    if 'example.org' in url:
+    if 'testonly-publisher.org' in url:
         from tests.test_research_v7 import Client, Resp
         orig = research.check_public_url
-        research.check_public_url = lambda u: 'example.org'
+        research.check_public_url = lambda u: 'testonly-publisher.org'
         try:
-            return await _real_fetch(url, client_factory=lambda: Client({'example.org': Resp(200, PAGE.encode())}))
+            return await _real_fetch(url, client_factory=lambda: Client({'testonly-publisher.org': Resp(200, PAGE.encode())}))
         finally:
             research.check_public_url = orig
     raise research.FetchError('FETCH_FAILED', 'HTTP 403 (access denied or paywall)', 403)
@@ -170,7 +170,7 @@ with sync_playwright() as p:
     page.wait_for_selector('text=searches returned results')
     page.click('[data-f="unreviewed"]')
     check(page.locator('.source').count() >= 2, 'candidates listed as source cards')
-    page.fill('#i-url', 'https://example.org/survey')
+    page.fill('#i-url', 'https://testonly-publisher.org/survey')
     page.fill('#i-q', 'engineering students missed deadline')
     page.click('#insp-btn')
     page.wait_for_selector('text=passages offered from the actual page text')

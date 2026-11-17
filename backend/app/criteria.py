@@ -130,8 +130,10 @@ def evidence_quality(e: dict, brief: dict | None, cfg: dict, live_experiments: d
             flags.append('Geography not stated: relevance to the target market unknown.')
         elif target and not any(w in target for w in re.findall(r'[a-z]{4,}', geo)) and not any(w in geo for w in re.findall(r'[a-z]{4,}', target)):
             flags.append(f'Geography "{e.get("geography")}" does not match target market "{(brief or {}).get("target_market")}".')
-        if e.get('relevance') != 'CLAIM_RELEVANT':
+        if e.get('relevance') != 'CLAIM_RELEVANT' and e.get('review_state') != 'ACCEPTED_RELEVANT':
             flags.append('Relevance to the claim not confirmed by the founder.')
+        if e.get('url_status') == 'FOUNDER_SUPPLIED':
+            flags.append('Founder-supplied excerpt: the page could not be fetched, so it was NOT automatically verified.')
         stale = any(f.startswith('Published ') for f in flags)
         offmarket = any(f.startswith('Geography "') for f in flags)
         if stale and offmarket:
@@ -194,11 +196,9 @@ def _money(s):
 def _days(s):
     if s is None:
         return None
-    t = str(s).lower()
-    m = re.search(r'(\d+(\.\d+)?)\s*(day|week|month|year)', t)
-    if not m:
-        return None
-    return float(m.group(1)) * {'day': 1, 'week': 7, 'month': 30, 'year': 365}[m.group(3)]
+    from .brief_extract import duration
+    r = duration(str(s))
+    return r[0] if r else None
 
 
 def hard_limits(brief: dict, experiments: list[dict]) -> dict:
@@ -387,9 +387,43 @@ def _x05(rows, counted, excluded):
 
 
 # ----------------------------------------------------------------------------- Discover gate
+def _gsum(r):
+    return {k: r.get(k) for k in ('id', 'status', 'score', 'basis', 'evidence_ids', 'supporting_ids', 'contradicting_ids', 'independent_organisations',
+                                  'sources_required', 'caps', 'question')}
+
+
+def granular_signature(granular: dict | None):
+    return sorted((r['id'], r['status']) for r in (granular or {}).get('checks', []))
+
+
+def _with_granular(row: dict, granular: dict | None) -> dict:
+    """Fold the team rubric's granular checks into D03–D07. Code aggregation only; UNKNOWN never becomes a number."""
+    if not granular:
+        return row
+    agg = granular['dimensions'].get(row['id'])
+    if not agg:
+        return row
+    row['details']['granular'] = [_gsum(r) for r in granular['checks'] if r['dimension'] == row['id']]
+    row['details']['granular_summary'] = agg
+    if agg['score'] is not None:
+        ids = sorted({i for r in granular['checks'] if r['dimension'] == row['id'] for i in r.get('evidence_ids') or []})
+        prev = (row['status'], row['score'])
+        row.update(status='SCORED', score=agg['score'], unknown=False, evidence_ids=ids,
+                   reasoning=f'Aggregated from {agg["known"]} of {agg["checks"]} rated team-rubric checks ({agg["counts"]["STRONG"]} strong, '
+                             f'{agg["counts"]["MIXED"]} mixed, {agg["counts"]["WEAK"]} weak); {agg["unknown"]} unknown. {agg["rule"]}')
+        row['details']['score_source'] = 'GRANULAR_RUBRIC'
+        if prev[0] == 'SCORED':
+            row['caveats'].append(f'A dimension-level judgment ({prev[1]}) also exists; the granular aggregate is used.')
+    else:
+        row['details']['score_source'] = 'DIMENSION_JUDGE' if row['status'] == 'SCORED' else 'NONE'
+        if row['status'] != 'SCORED':
+            row['reasoning'] = (row['reasoning'] + f' Team rubric: {agg["known"]} of {agg["checks"]} checks rated; at least {agg["min_known"]} are needed for a dimension score.').strip()
+    return row
+
+
 def evaluate_discover(*, brief: dict, brief_version: int, safety: dict | None, safety_ack: bool, discovery: dict | None,
                       discovery_run_id: str | None, evidence: list[dict], experiments: list[dict], judgments: dict, cfg: dict,
-                      approvals_scope: str = 'RESEARCH_ONLY', blocked_actions: int = 0) -> dict:
+                      approvals_scope: str = 'RESEARCH_ONLY', blocked_actions: int = 0, granular: dict | None = None) -> dict:
     quality = prepare(brief, evidence, experiments, cfg)
     rows = []
     st = (safety or {}).get('status')
@@ -398,14 +432,33 @@ def evaluate_discover(*, brief: dict, brief_version: int, safety: dict | None, s
                      reasoning={'FAIL': 'Hard stop (non-overridable).', 'REVIEW_REQUIRED': 'Flagged; founder research-only acknowledgment needed.',
                                 'PASS': 'No hard stop' + (' (flags acknowledged for research only).' if st == 'REVIEW_REQUIRED' else '.'), 'UNKNOWN': 'Screen not run.'}[d01],
                      details={'safety_status': st, 'counts': (safety or {}).get('counts')}))
-    prov = brief.get('provenance', {})
-    missing = [f for f in ('target_customers', 'problem', 'current_workaround') if not brief.get(f)]
-    inferred = [f for f in ('target_customers', 'problem', 'current_workaround') if brief.get(f) and prov.get(f) == 'INFERRED_UNCONFIRMED']
-    rows.append(_row('D02', status='FAIL' if missing else 'PASS', unknown=False,
-                     reasoning=('Missing: ' + ', '.join(missing) + '. Answer the clarification on the Brief page.') if missing else 'Customer, pain and current workaround are named.',
-                     caveats=[f'{f} is model-inferred and unconfirmed' for f in inferred], details={'missing': missing, 'inferred_unconfirmed': inferred}))
+    if brief.get('fields'):
+        from .brief_extract import d02 as _d02
+        dd = _d02(brief['fields'])
+        parts = []
+        if dd['missing']:
+            parts.append('Not stated: ' + ', '.join(dd['missing']) + '.')
+        if dd['model_suggested_unconfirmed']:
+            parts.append('Only suggested by the model, not confirmed by you: ' + ', '.join(dd['model_suggested_unconfirmed']) + '.')
+        if dd['parser_failed']:
+            parts.append('The parser failed on: ' + ', '.join(dd['parser_failed']) + ' (this is a software fault, not a missing answer).')
+        rows.append(_row('D02', status=dd['status'], unknown=False,
+                         reasoning=(' '.join(parts) + ' Answer the question on the Brief page.') if parts else 'Customer, pain and current workaround are captured in your own words or answers.',
+                         caveats=[f'{f} was found in your text; please confirm it' for f in dd['stated_in_text_please_confirm']],
+                         details={**dd, 'brief_version': brief_version}))
+    else:  # briefs created before v0.8 (no typed fields)
+        prov = brief.get('provenance', {})
+        missing = [f for f in ('target_customers', 'problem', 'current_workaround') if not brief.get(f)]
+        inferred = [f for f in ('target_customers', 'problem', 'current_workaround') if brief.get(f) and prov.get(f) == 'INFERRED_UNCONFIRMED']
+        rows.append(_row('D02', status='FAIL' if missing else 'PASS', unknown=False,
+                         reasoning=('Missing: ' + ', '.join(missing) + '. Answer the clarification on the Brief page.') if missing else 'Customer, pain and current workaround are named.',
+                         caveats=[f'{f} is model-inferred and unconfirmed' for f in inferred], details={'missing': missing, 'inferred_unconfirmed': inferred, 'legacy_brief': True}))
     for cid in SCORED_DISCOVER:
-        rows.append(_scored(cid, brief, evidence, quality, judgments))
+        rows.append(_with_granular(_scored(cid, brief, evidence, quality, judgments), granular))
+    if granular:
+        d01row = rows[0]
+        d01row['details']['granular'] = [_gsum(r) for r in granular['checks'] if r['dimension'] == 'D01']
+        d01row['details']['granular_summary'] = granular['dimensions']['D01']
     hl = hard_limits(brief, experiments)
     d06 = next(r for r in rows if r['id'] == 'D06')
     d06['details']['hard_limits'] = hl
@@ -478,14 +531,19 @@ def evaluate_discover(*, brief: dict, brief_version: int, safety: dict | None, s
                               'permission_if_approved': 'VALIDATION_RESEARCH_ONLY'}))
     allrows = rows + cross
     allrows.append(_x05(allrows, counted, excluded))
-    return _wrap('discover', allrows, exit_, reasons, brief_version, safety, cfg, evidence, quality, discovery_run_id, experiments)
+    body = _wrap('discover', allrows, exit_, reasons, brief_version, safety, cfg, evidence, quality, discovery_run_id, experiments, granular)
+    if granular:
+        body['rubric'] = {'version': granular['version'], 'file_sha256': granular['file_sha256'], 'dimensions': granular['dimensions'], 'priority': granular['priority']}
+    return body
 
 
-def _wrap(phase, rows, exit_, reasons, brief_version, safety, cfg, evidence, quality, run_id, experiments):
+def _wrap(phase, rows, exit_, reasons, brief_version, safety, cfg, evidence, quality, run_id, experiments, granular=None):
     fingerprint = {'phase': phase, 'brief_version': brief_version, 'safety': (safety or {}).get('status'),
                    'safety_policy': (safety or {}).get('policy_hash'), 'criteria_policy': POLICY_HASH, 'config': stable_hash(cfg),
                    'run_id': run_id, 'evidence': sorted((e['id'], quality[e['id']]['grade']) for e in evidence),
                    'experiments': sorted((x['id'], x['version'], x['status'], x.get('result_evidence_id')) for x in experiments)}
+    if granular is not None:
+        fingerprint['rubric'] = granular_signature(granular)
     body = {'phase': phase, 'exit': exit_, 'reasons': reasons, 'criteria': rows,
             'unknown_count': sum(1 for r in rows if r['unknown']),
             'criteria_version': VERSION, 'criteria_policy_hash': POLICY_HASH, 'config': cfg, 'config_hash': stable_hash(cfg),
@@ -534,7 +592,32 @@ def experiment_design_check(p: dict, brief: dict) -> dict:
     blocks = safety.find_blocks(text)
     items['no_prohibited_tactic'] = {'ok': not blocks, 'why': 'No fake sign-ups, impersonation, payments or other never-rules.',
                                      'findings': [b['rule_id'] for b in blocks]}
-    return {'status': 'PASS' if all(v['ok'] for v in items.values()) else 'FAIL', 'items': items}
+    sim_words = bool(SIMULATION.search(text))
+    if p.get('simulated'):
+        items['labelled_simulation'] = {'ok': True, 'why': 'SIMULATED / NOT COUNTED: a demo only. Its result is stored apart from real results and never counts as demand.'}
+    else:
+        items['real_action_not_simulated'] = {'ok': not sim_words, 'why': 'The test describes a simulated or hypothetical action. Rewrite it as a real, voluntary action, or mark it SIMULATED / NOT COUNTED.'}
+    if involves_minors(brief, p):
+        seg = p.get('target_segment') or ''
+        adult_seg = bool(re.search(r'(?i)\b(parents?|guardians?|teachers?|school (staff|administrators?|leaders?)|principals?|adults?|tutors?|caregivers?)\b', seg))
+        child_contact = bool(re.search(r'(?i)\b(children|kids|pupils|minors|students under 18|k-?12 students)\b[^.]{0,40}\b(sign\w*|join\w*|contact\w*|message\w*|survey\w*|interview\w*|recruit\w*)\b|'
+                                       r'\b(contact\w*|message\w*|survey\w*|interview\w*|recruit\w*|dm)\b[^.]{0,40}\b(children|kids|pupils|minors)\b', text + ' ' + seg))
+        items['adults_only_with_minors'] = {'ok': bool(p.get('participants_adults_only')) and adult_seg and not child_contact,
+                                           'why': 'This venture involves minors: test only with consenting adults (parents, guardians, teachers) in a research-only setting, '
+                                                  'confirm adults-only, and never recruit or contact children. FounderOS collects no personal data about anyone.'}
+    return {'status': 'PASS' if all(v['ok'] for v in items.values()) else 'FAIL', 'items': items, 'simulated': bool(p.get('simulated'))}
+
+
+SIMULATION = re.compile(r'(?i)\b(simulat\w*|hypothetical (sign|wait|user|customer|participant|buyer|parent)\w*|mock (sign|wait|user|customer|purchase)\w*|'
+                        r'fake (sign|wait|user|customer|purchase|data)\w*|pretend\w*|dummy (data|users?|participants?)|synthetic (users?|data|participants?|customers?)|'
+                        r'role[- ]?play\w*|imaginary (users?|customers?))\b')
+_MINORS = re.compile(r'(?i)\b(children|kids|child|k-?12|minors?|pupils?|primary school|secondary school|high[- ]school students|teen(ager)?s?|under[- ]18|schoolchildren)\b')
+
+
+def involves_minors(brief: dict, p: dict | None = None) -> bool:
+    txt = ' '.join(str((brief or {}).get(k) or '') for k in ('original_idea_text', 'idea_summary', 'problem', 'target_customers'))
+    txt += ' ' + ' '.join(str((p or {}).get(k) or '') for k in ('hypothesis', 'target_segment'))
+    return bool(_MINORS.search(txt))
 
 
 def target_setting_check(p: dict, evidence_ids_accepted: set) -> dict:

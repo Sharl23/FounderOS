@@ -198,8 +198,8 @@ def test_no_judge_calls_without_evidence_and_one_call_per_criterion_cached(clien
         return 'URL_ACCESSIBLE', 'EXCERPT_MATCHED', '2026-11-16T00:00:00+00:00', 'test'
     monkeypatch.setattr(main, 'verify_excerpt', matched)
     for dim in ('desirability', 'demand'):
-        assert client.post(f'/api/projects/{pid}/evidence', headers=h, json={'kind': 'SECONDARY_BACKGROUND', 'dimension': dim, 'claim': 'TEST_ONLY claim',
-                           'url': f'https://example.org/{dim}', 'excerpt': 'students report missing deadlines', 'direction': 'SUPPORTS',
+        assert client.post(f'/api/projects/{pid}/evidence', headers=h, json={'kind': 'SECONDARY_BACKGROUND', 'dimension': dim, 'claim': 'TEST_ONLY students miss deadlines',
+                           'url': f'https://testonly-publisher.org/{dim}', 'excerpt': 'students report missing deadlines', 'direction': 'SUPPORTS',
                            'relevance': 'CLAIM_RELEVANT', 'geography': 'Egypt', 'published_on': '2024', 'publisher': 'TEST_ONLY'}).status_code == 200
     r = client.post(f'/api/projects/{pid}/criteria/evaluate', headers=h).json()
     judged = [c[1]['criterion']['id'] for c in fake.calls if c[0] == 'JudgeOutput']
@@ -222,8 +222,8 @@ def test_adversarial_judge_cannot_change_gate_or_cite_fakes(client, monkeypatch)
     async def matched(url, excerpt):
         return 'URL_ACCESSIBLE', 'EXCERPT_MATCHED', '2026-11-16T00:00:00+00:00', 'test'
     monkeypatch.setattr(main, 'verify_excerpt', matched)
-    client.post(f'/api/projects/{pid}/evidence', headers=h, json={'kind': 'SECONDARY_BACKGROUND', 'dimension': 'desirability', 'claim': 'TEST_ONLY claim',
-                'url': 'https://example.org/a', 'excerpt': 'students report missing deadlines', 'direction': 'SUPPORTS', 'relevance': 'CLAIM_RELEVANT',
+    client.post(f'/api/projects/{pid}/evidence', headers=h, json={'kind': 'SECONDARY_BACKGROUND', 'dimension': 'desirability', 'claim': 'TEST_ONLY students miss deadlines',
+                'url': 'https://testonly-publisher.org/a', 'excerpt': 'students report missing deadlines', 'direction': 'SUPPORTS', 'relevance': 'CLAIM_RELEVANT',
                 'geography': 'Egypt', 'published_on': '2024', 'publisher': 'TEST_ONLY'})
     e = client.post(f'/api/projects/{pid}/criteria/evaluate', headers=h).json()['evaluation']
     d03 = next(r for r in e['criteria'] if r['id'] == 'D03')

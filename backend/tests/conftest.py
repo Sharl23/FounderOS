@@ -3,7 +3,7 @@ import datetime
 import pytest
 from fastapi.testclient import TestClient
 from app import main
-from app.schemas import RefinedBrief, DiscoveryReport, ValidationReport, JudgeOutput
+from app.schemas import RefinedBrief, DiscoveryReport, ValidationReport, JudgeOutput, CheckJudgeOutput
 
 TODAY = datetime.date.today().isoformat()
 
@@ -13,8 +13,11 @@ class FakeModel:
     model = 'TEST FAKE MODEL (never used at runtime)'
     last_latency_ms = 0
 
-    def __init__(self, praise=False, judge=None, flags=None):
+    def __init__(self, praise=False, judge=None, flags=None, discovery=None, check_judge=None, validation=None):
         self.praise = praise
+        self.discovery = discovery      # callable(context) -> DiscoveryReport kwargs, TEST_ONLY
+        self.check_judge = check_judge  # callable(context) -> CheckJudgeOutput kwargs, TEST_ONLY
+        self.validation = validation    # callable(context) -> ValidationReport | raises, TEST_ONLY
         self.calls = []
         self.judge = judge          # callable(context) -> dict, TEST_ONLY
         self.flags = flags or []    # TEST_ONLY model risk flags
@@ -29,6 +32,15 @@ class FakeModel:
                                 target_customers='University students', target_market='Cairo', questions=['What is your budget?'],
                                 current_workaround='WhatsApp reminders', assumptions=['Students might need better planning'],
                                 risk_flags=self.flags)
+        if output_type is DiscoveryReport and self.discovery:
+            return DiscoveryReport(**self.discovery(context))
+        if output_type is CheckJudgeOutput:
+            if self.check_judge:
+                return CheckJudgeOutput(**self.check_judge(context))
+            ids = [e['id'] for e in context['accepted_evidence']]
+            return CheckJudgeOutput(check_id=context['check']['id'], rating='MIXED', evidence_ids=ids[:1], reasoning='TEST_ONLY judge.')
+        if output_type is ValidationReport and self.validation:
+            return self.validation(context)
         if output_type is DiscoveryReport:
             return DiscoveryReport(problem_statement='Students might struggle with assignments',
                                    target_customers=['Egyptian university students'], value_proposition='Plan tasks clearly',
@@ -82,6 +94,8 @@ def fetch_ok(monkeypatch):
 
 
 def make_project(client, idea='An AI planner for students who struggle with deadlines', **fields):
+    # v0.8: a model-suggested market is never promoted to a confirmed field, so tests state the market as the founder would.
+    fields.setdefault('target_market', 'Cairo, Egypt')
     r = client.post('/api/projects', json={'idea': idea, **fields})
     assert r.status_code == 201, r.text
     d = r.json()

@@ -181,7 +181,7 @@ def test_official_source_can_hard_stop_only_when_verified_and_official(client, m
                 'retrieved_at': '2026-11-17T00:00:00+00:00'}
     monkeypatch.setattr(main.research, 'safe_fetch', page)
     # Blog (non-official domain): stored, but cannot create a hard stop.
-    b = client.post(f'/api/projects/{pid}/safety/sources', headers=h, json={'rule_id': 'illegal_in_target_market', 'url': 'https://someblog.example.com/x',
+    b = client.post(f'/api/projects/{pid}/safety/sources', headers=h, json={'rule_id': 'illegal_in_target_market', 'url': 'https://someblog.testonly-site.com/x',
                                                                            'excerpt': 'Betting and gambling services are prohibited', 'finding': 'PROHIBITS'}).json()
     assert b['official_domain'] is False and b['safety_status'] == 'REVIEW_REQUIRED'
     # Invented quote on an official domain: not matched => no hard stop.

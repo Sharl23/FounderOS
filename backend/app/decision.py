@@ -82,9 +82,20 @@ def exclusion_reason(e: dict, live_experiments: dict) -> str | None:
     if e.get('relevance') == 'IRRELEVANT':
         return 'Marked IRRELEVANT to the claim.'
     kind = e['kind']
+    if kind == 'SIMULATED_RESULT':
+        return 'SIMULATED / NOT COUNTED: a simulated or demo action is never customer behaviour.'
+    from .rubric import is_reserved_url
+    if is_reserved_url(e.get('final_url') or e.get('source_url')):
+        return 'Reserved documentation domain (e.g. example.com): placeholder text, never evidence about customers or markets.'
+    if e.get('review_state') == 'EXCLUDED':
+        return 'Excluded by the relevance review: ' + (e.get('review_reason') or 'it does not support the claim.')
+    if e.get('review_state') == 'CONTEXT_ONLY':
+        return 'Context only: the relevance review did not confirm that this source supports the claim for your market and customer.'
     if kind == 'SECONDARY_BACKGROUND':
         if e.get('excerpt_status') == 'METADATA_ONLY':
             return 'METADATA_ONLY: bibliographic metadata/abstract, not an inspected passage. Context only, not counted.'
+        if e.get('url_status') == 'FOUNDER_SUPPLIED':
+            return None if e.get('excerpt_status') == 'FOUNDER_SUPPLIED_UNVERIFIED' else 'Founder-supplied excerpt without provenance.'
         if e.get('url_status') != 'URL_ACCESSIBLE':
             return 'UNVERIFIED: source URL could not be retrieved.'
         if e.get('excerpt_status') not in ('EXCERPT_MATCHED', 'STRUCTURED_DATUM'):

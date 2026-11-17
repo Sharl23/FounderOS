@@ -96,14 +96,24 @@ COLUMNS_V7 = {
 }
 
 
+# v0.8: granular rubric links, source typing, relevance review, simulated results, decision references.
+COLUMNS_V8 = {
+    'evidence': [('subcriterion_id', 'TEXT'), ('source_type', 'TEXT'), ('review_state', 'TEXT'), ('review_reason', 'TEXT'),
+                 ('relevance_checks_json', 'TEXT'), ('organization', 'TEXT'), ('meta_json', 'TEXT')],
+    'research_runs': [('subcriterion_id', 'TEXT'), ('error_code', 'TEXT')],
+    'decisions': [('rubric_version', 'TEXT'), ('rubric_hash', 'TEXT'), ('discover_evaluation_version', 'INTEGER')],
+}
+
+
 def migrate(db):
     db.executescript(SCHEMA_V7)
-    for table, cols in COLUMNS_V7.items():
+    for table, cols in list(COLUMNS_V7.items()) + list(COLUMNS_V8.items()):
         have = {r[1] for r in db.execute(f'PRAGMA table_info({table})')}
         for name, typ in cols:
             if name not in have:
                 db.execute(f'ALTER TABLE {table} ADD COLUMN {name} {typ}')
     db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v7', now()))
+    db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v8', now()))
 
 
 def init_db():
@@ -112,6 +122,7 @@ def init_db():
     with sqlite3.connect(path, timeout=20) as db:
         db.executescript(SCHEMA)
         migrate(db)
+        db.commit()   # close the implicit migration transaction before switching journal mode (restart-safe)
         db.execute('PRAGMA journal_mode=WAL')
 
 

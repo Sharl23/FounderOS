@@ -11,7 +11,10 @@ def test_full_founder_journey_persists_and_gates(client, project):
     r = refine(client, pid, h)
     brief = r['brief']
     assert brief['original_idea_text'].startswith('An AI planner')
-    assert brief['provenance']['target_customers'] == 'INFERRED_UNCONFIRMED'
+    # v0.8: found in the founder's own words (with a span), not merely inferred by the model.
+    assert brief['provenance']['target_customers'] == 'STATED_IN_TEXT'
+    assert brief['fields']['target_customers']['spans'][0]['source'] == 'idea'
+    assert brief['fields']['current_workaround']['status'] == 'MODEL_SUGGESTED_UNCONFIRMED' and brief['current_workaround'] is None
     assert brief['provenance']['budget'] == 'UNKNOWN' and brief['budget'] is None
     assert len(brief['questions']) <= 3
     assert r['safety']['status'] == 'ALLOW_DISCOVERY'
@@ -59,7 +62,7 @@ def test_stop_is_enforced(client, project):
     assert client.post(f'/api/projects/{pid}/phases/validate/run', headers=h).status_code == 409
     assert client.post(f'/api/projects/{pid}/refine', headers=h).status_code == 409
     assert client.post(f'/api/projects/{pid}/evidence', headers=h, json={'kind': 'SECONDARY_BACKGROUND', 'claim': 'anything at all here',
-                                                                        'url': 'https://example.org/x', 'excerpt': 'twelve characters here'}).status_code == 409
+                                                                        'url': 'https://testonly-publisher.org/x', 'excerpt': 'twelve characters here'}).status_code == 409
 
 
 def test_revision_feedback_reaches_next_run_and_old_run_is_stale(client, project):

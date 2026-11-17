@@ -1,0 +1,1758 @@
+# FounderOS Phase-1 team rubric: 67 granular checks (12 ethics + 6 problem + 5 demand + 15 competition + 15 feasibility + 14 viability).
+# `checks` and `provenance` are the team-supplied data contract, copied without rewriting (parsed from the v0.8 contract).
+# team_data_sha256 = sha256 of canonical JSON {checks, provenance}; the loader recomputes it on startup and refuses to run on mismatch.
+# The 12 ethics checks are ENFORCED by policy/safety_rules.yaml (same IDs, same question/fail_if); here they are registered for traceability under D01.
+version: rubric-phase1-2026-11-17.v8-1
+team_data_sha256: 0bbdf49d850a9a81e6f9b906fd759ca46c08fa7e5c36998a9c1020d3f6f7dd9f
+provenance_note: "All book/chapter/page/supporting_passage/basis entries are team-supplied references (page: \"not visible\"). FounderOS has NOT independently checked these quotations against the books. A supporting passage is the RATIONALE for a criterion, never evidence that a venture satisfies it."
+dimension_map:
+  Ethics and legality screen: D01
+  Problem and customer: D03
+  Demand signals: D04
+  Competition and alternatives: D05
+  Feasibility and founder fit: D06
+  Viability, first look: D07
+checks:
+- id: illegal_in_target_market
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: "Identify the founder's target jurisdiction from the brief, then cite one official source (statute, regulator page or government guidance) stating whether the core product or its revenue method is banned or needs a licence; if none exists, record the search queries and jurisdiction."
+  judge_instruction:
+    question: Is the core product, or its main way of earning money, prohibited by law in the target market?
+    fail_if: An official source shows the activity is banned in the target market, or requires a licence the founder cannot obtain; a blog post or forum is not a source.
+- id: regulated_or_sensitive_area
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Match the idea to sensitive categories (children, personal or special-category data, or any regulated activity), then cite one regulator page or piece of legislation describing the rules that apply in the target market.
+  judge_instruction:
+    question: Does the product operate in a legal area that is sensitive or regulated?
+    fail_if: "The product handles children's data, personal or special-category data, or a regulated activity, so pause the run, state what is uncertain, recommend professional advice, and continue only after the founder approves."
+- id: must_have_pain
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources, such as forum threads, reviews or industry reports, where people in the target market describe this problem and state how badly they need it solved.
+  judge_instruction:
+    question: Do people in the target market treat this problem as a must-have?
+    weak: Sources show the problem as a minor annoyance, or no one describes it as needing a fix.
+    mixed: Some sources show urgency while others treat the problem as nice-to-have, or the evidence is thin.
+    strong: Several independent sources show people ranking this problem as essential and seeking or paying for a fix.
+- id: current_workaround_pain
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing how the target customer handles this problem today, including doing nothing.
+  judge_instruction:
+    question: Does the way customers handle this problem today show acute pain?
+    weak: Most customers do nothing about the problem or use a free workaround without complaint.
+    mixed: Some customers use a costly or frustrating workaround while others do nothing.
+    strong: Customers spend money, time or effort on workarounds and complain about them in independent sources.
+- id: narrow_early_adopter
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: "Identify the narrowest group in the target market that feels this problem most strongly, then cite two independent sources describing that group's defining characteristics."
+  judge_instruction:
+    question: Does the brief name a narrow early-adopter group instead of a mainstream audience?
+    weak: The brief targets everyone or a broad mainstream audience.
+    mixed: The brief names a segment that is still broad, with no defining characteristics.
+    strong: The brief names a specific group defined by concrete characteristics that sources confirm.
+- id: paying_customer_identified
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing who pays for comparable products in the target market and who only uses them.
+  judge_instruction:
+    question: Is the person who pays for the product identified separately from the people who only use it?
+    weak: The brief treats every user as the buyer, or names no buyer.
+    mixed: The brief names a buyer, but sources do not confirm that this buyer holds the budget.
+    strong: The brief names the buyer, distinguishes other user roles, and a source confirms the buyer pays for similar products.
+- id: reachable_path_to_customers
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - skills
+  - budget
+  - time
+  - target_market
+  research_instruction: Find two independent sources showing where members of the target group gather or can be contacted, such as communities, publications, directories or platforms.
+  judge_instruction:
+    question: Is there an identifiable path to reach the target group?
+    weak: No place, community or channel for reaching the group is found.
+    mixed: Reach routes exist but are hard, costly or unconfirmed for this specific group.
+    strong: "Sources show specific channels that already reach this group and fit the founder's skills, budget and time."
+- id: problem_framed_from_customer_view
+  phase: 1
+  type: Problem and customer
+  kind: scored
+  brief_fields:
+  - idea
+  research_instruction: Find two independent sources in which customers describe this problem in their own words, without reference to any particular product.
+  judge_instruction:
+    question: "Is the problem described in the customers' own terms rather than as a need for the founder's solution?"
+    weak: "The problem statement is a description of the founder's product or feature."
+    mixed: The problem is stated partly in customer terms but still points to the solution.
+    strong: "The problem is stated entirely from the customer's point of view, with sources quoting customers describing it."
+- id: current_alternatives_in_use
+  phase: 1
+  type: Demand signals
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources documenting the tools, products or manual methods that people in the target market use today to deal with this problem.
+  judge_instruction:
+    question: Do people in the target market use identifiable alternatives for this problem today?
+    weak: No alternatives in active use are found, or the sources show only that people ignore the problem.
+    mixed: Alternatives are named but the evidence of real use is thin or comes from one source.
+    strong: Independent sources document named alternatives in active use by the target market.
+- id: paid_alternatives_exist
+  phase: 1
+  type: Demand signals
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing what the target market pays for existing alternatives, or showing that those alternatives are free.
+  judge_instruction:
+    question: Do people in the target market pay for existing solutions to this problem?
+    weak: Every existing alternative is free, or no paid alternative is found.
+    mixed: Paid alternatives exist but the evidence that customers buy them is thin.
+    strong: Independent sources show paid alternatives with active paying customers in the target market.
+- id: customer_own_words
+  phase: 1
+  type: Demand signals
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources, such as forums, reviews or community posts, where target customers describe their workflow and this problem in their own words, and record the exact terms they use.
+  judge_instruction:
+    question: Do target customers describe this problem in consistent terms of their own?
+    weak: No customer descriptions are found, or each source describes the problem differently.
+    mixed: Some customers describe the problem in similar terms but the sample is small or mixed.
+    strong: Several independent sources show customers using the same terms for the problem and their workflow.
+- id: action_over_stated_interest
+  phase: 1
+  type: Demand signals
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing what target customers have done about this problem, such as purchases, trials, sign-ups or ongoing use, as opposed to what they say about it.
+  judge_instruction:
+    question: Do the sources show customers acting on the problem rather than only saying it matters?
+    weak: The evidence is opinions, survey answers or stated interest with no recorded action.
+    mixed: Some actions are recorded but they are isolated or come from one source.
+    strong: Independent sources show repeated customer actions on this problem, such as purchases, trials or ongoing use.
+- id: raw_counts_discounted
+  phase: 1
+  type: Demand signals
+  kind: scored
+  brief_fields:
+  - idea
+  research_instruction: List every demand figure cited for this idea, then identify which come from raw traffic or download counts and which come from specific customer actions.
+  judge_instruction:
+    question: Do the cited demand figures come from specific customer actions instead of raw traffic counts?
+    weak: The figures are only page views, downloads or similar raw counts.
+    mixed: The figures mix raw counts with some specific customer actions.
+    strong: The figures track specific actions by identified target customers, with raw counts given no weight.
+- id: physical_goods_exclusion
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  research_instruction: Read the brief to identify what the customer receives, then cite one independent source confirming whether that deliverable is digital or physical.
+  judge_instruction:
+    question: Is the main thing the customer receives a physical good?
+    fail_if: The core offering is a physical item, or revenue depends on making, selling or shipping physical items.
+- id: financial_crypto_exclusion
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  research_instruction: Read the brief to list every way the product touches money, then cite one regulator page or reputable publication that classifies each function as financial, crypto or neither.
+  judge_instruction:
+    question: Does the product trade, lend, give investing advice, issue tokens, or move or manage money for users?
+    fail_if: "The core function involves trading, lending, investing advice, tokens, or any handling or management of users' money."
+- id: health_legal_advice_exclusion
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  research_instruction: Read the brief to identify what the product tells users to do, then cite one independent source classifying that output as health advice, legal advice or neither.
+  judge_instruction:
+    question: Does the product diagnose, treat, interpret symptoms, or tell people what the law requires of them?
+    fail_if: The product gives health or legal guidance that a user acts on, whatever label the founder gives it.
+- id: advice_in_disguise
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find how the brief describes the product and how comparable live products describe themselves, then cite one independent source on whether such products count as health, money or legal advice.
+  judge_instruction:
+    question: Does the product give advice a user acts on for their health, money or legal position, even when it is labeled educational or a tracker?
+    fail_if: The output of the product is advice a user acts on for their health, money or legal position, so pause the run and escalate to the founder in plain language instead of approving.
+- id: income_promise_dependency
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Read the brief to identify how the product attracts customers and earns revenue, then cite one independent source on rules or guidance for income claims in the target market.
+  judge_instruction:
+    question: Does the idea depend on promising income to the founder or to customers?
+    fail_if: The idea sells or markets itself on a promise of income or a guaranteed financial outcome.
+- id: fake_proof_dependency
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Read the brief to identify how the product obtains reviews, sign-ups, testimonials and urgency, then cite one consumer-protection source that prohibits fabricated versions of them.
+  judge_instruction:
+    question: Does the idea depend on faked reviews, sign-ups, testimonials or urgency?
+    fail_if: The business logic needs fabricated reviews, sign-ups, testimonials or urgency in order to work.
+- id: impersonation_dependency
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Read the brief to identify whose name, voice or brand the product speaks in, then cite one independent source on impersonation rules in the target market.
+  judge_instruction:
+    question: Does the idea depend on impersonating a person or an organization?
+    fail_if: The product speaks as, or poses as, a real person, company or brand without being that person, company or brand.
+- id: money_or_credentials_dependency
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  research_instruction: Read the brief to identify whether the product needs payments, balances or login credentials in order to function, then cite one independent source on the handling rules for whatever you find.
+  judge_instruction:
+    question: Does the idea require the system to move money or store credentials?
+    fail_if: The product only works if the system moves money, holds funds, or stores passwords, keys or card details.
+- id: harm_to_people
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Read the brief to identify who uses the product and who it acts on, then cite one regulator, court record or reputable report on whether that function is harmful or unlawful in the target market.
+  judge_instruction:
+    question: Is the product designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or intellectual property theft?
+    fail_if: "The product's purpose matches any of the listed harms, whatever the size of the market."
+- id: founder_values_conflict
+  phase: 1
+  type: Ethics and legality screen
+  kind: knockout
+  brief_fields:
+  - idea
+  - values
+  research_instruction: "Quote the founder's values field word for word, then quote the part of the idea that touches each stated value; no web source is needed."
+  judge_instruction:
+    question: Does the idea clash with a value the founder wrote in the brief?
+    fail_if: The idea or the way it must be run betrays a stated value, so pause the run and surface the mismatch to the founder.
+- id: substitutes_in_use
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find three independent sources listing every product, service or manual method that target customers use today to meet the same need, whatever its technology or industry.
+  judge_instruction:
+    question: Is the competitive set defined by the customer need instead of by product type?
+    weak: "Only products of the same type as the founder's idea are listed, or the list has no sources."
+    mixed: Some alternatives from other industries or manual methods are listed, but the list is clearly incomplete.
+    strong: Sources map direct competitors, adjacent products and manual workarounds that meet the same need.
+- id: direct_competitors_mapped
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find three independent sources, such as official product pages, reviews or industry reports, that identify the direct competitors serving the same customer group and describe what each offers.
+  judge_instruction:
+    question: Are the direct competitors for this customer group identified with evidence?
+    weak: Competitors are asserted without sources, or none are documented.
+    mixed: Some direct competitors are documented but their offers or customers are not described.
+    strong: Several direct competitors are documented with their offer, price and target customer from independent sources.
+- id: competitor_target_segments
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources per leading competitor, such as product pages, pricing pages or advertising, that show which customer group each competitor serves.
+  judge_instruction:
+    question: "Do the leading competitors target a different customer group from the founder's?"
+    weak: "The leading competitors already serve the founder's target group in the same way."
+    mixed: "The leading competitors partly overlap with the founder's target group."
+    strong: The products, prices and messages of the leading competitors show they serve a different group.
+- id: competitor_weak_points
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: "Find three independent sources, such as customer reviews, forum threads or comparison articles, in which customers describe weaknesses in the leading competitors' products or services."
+  judge_instruction:
+    question: "Do customers report weaknesses in existing offers that the founder's idea addresses?"
+    weak: "Customers report no consistent weaknesses, or the weaknesses reported do not touch the founder's idea."
+    mixed: "Some weaknesses are reported but they come from one source or only partly match the founder's idea."
+    strong: "Independent sources repeatedly report weaknesses in existing offers that the founder's idea directly addresses."
+- id: price_gaps
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  - budget
+  research_instruction: Collect the public prices of at least three competitors or substitutes from their own pages and list the price points each one covers.
+  judge_instruction:
+    question: Is there an open price point or pricing model that competitors leave unserved?
+    weak: "Competitors already cover every price point and pricing model that suits the founder's idea."
+    mixed: A gap exists in the prices but the evidence that customers want that price point is thin.
+    strong: "Sourced competitor prices show a clear open price point or pricing model that fits the founder's idea."
+- id: underserved_segment
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: "Find two independent sources showing which customer groups existing offers serve poorly or ignore, and check whether the founder's target group is one of them."
+  judge_instruction:
+    question: "Does the founder's target group count as unserved or underserved by existing offers?"
+    weak: "Existing offers already serve the founder's target group well."
+    mixed: Existing offers serve the target group in part, with gaps that are only partly documented.
+    strong: Independent sources show that existing offers leave the target group unserved or underserved.
+- id: incumbent_differentiation_level
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Compare the offers of at least three existing competitors using their own pages and two independent reviews, and record whether customers see them as meaningfully different from each other.
+  judge_instruction:
+    question: Are existing offers in this market similar to each other?
+    weak: Existing offers are clearly distinct from each other and customers choose among them on real differences.
+    mixed: Existing offers differ on some features but resemble each other on the main benefit.
+    strong: Existing offers are close copies of each other, which leaves room for a distinct offer.
+- id: dominant_player_edge
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  research_instruction: "Find two independent sources on the market share or user base of the largest competitors, then state the edge the founder's brief claims over them."
+  judge_instruction:
+    question: Does the founder hold a stated edge over the dominant players?
+    weak: One or a few players dominate the market and the brief names no edge over them.
+    mixed: One or a few players dominate the market and the brief names an edge that no source supports.
+    strong: The market has no dominant player, or a sourced edge in the brief gives the founder a way into the market.
+- id: retaliation_risk
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - budget
+  research_instruction: Find two independent sources on how the leading competitors have responded to past entrants, such as price cuts, copied features, acquisitions or legal action.
+  judge_instruction:
+    question: "Would the leading competitors retaliate effectively against the founder's entry?"
+    weak: Leading competitors have a record of striking back hard and the idea attacks their core business.
+    mixed: "Leading competitors have responded to some past entrants and the founder's idea overlaps with part of their business."
+    strong: Leading competitors have ignored similar entrants and the idea sits in an area they treat as peripheral.
+- id: substitution_threat
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources on new technologies or new approaches that solve the same customer problem in a different way.
+  judge_instruction:
+    question: "Can a new kind of solution make the founder's offer obsolete?"
+    weak: A credible new kind of solution for the same problem already exists and is gaining adopters.
+    mixed: Early-stage substitutes exist with limited adoption, or sources disagree on their strength.
+    strong: "Searches find no credible new kind of solution that makes the founder's offer obsolete."
+- id: entry_barriers_for_newcomers
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  - time
+  research_instruction: Find two independent sources on the barriers a new entrant faces in this market, such as entry costs, protected technology, customer switching costs and access to distribution channels.
+  judge_instruction:
+    question: "Can an entrant with the founder's resources overcome the barriers to entry?"
+    weak: The barriers need skills, money or time that the brief shows the founder lacks.
+    mixed: "Some barriers are within the founder's reach and others are unclear or unsourced."
+    strong: "Sourced barriers are low or fall within the founder's stated skills, budget and time."
+- id: difference_hard_to_copy
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  research_instruction: Find two independent sources showing whether competitors copied comparable differentiating features in this market and how quickly they did so.
+  judge_instruction:
+    question: "Is the founder's intended difference hard for competitors to copy?"
+    weak: The difference is a feature competitors can copy quickly with existing resources.
+    mixed: The difference takes some effort to copy but rests on no unique skill or asset.
+    strong: The difference rests on a skill or asset that the founder holds and competitors lack.
+- id: difference_valued_by_customers
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: "Find two independent sources, such as reviews, forum threads or surveys, showing that target customers value the benefit that the founder's difference delivers."
+  judge_instruction:
+    question: "Does the founder's intended difference give a highly valued benefit to many customers?"
+    weak: No source shows customers valuing the benefit the difference delivers.
+    mixed: Some sources show customers valuing the benefit but the group shown is small or narrow.
+    strong: Independent sources show a large group of target customers valuing the benefit the difference delivers.
+- id: price_war_exposure
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  research_instruction: Read the brief to find how the idea wins customers, then find two independent sources on the cost structures and price levels of the leading competitors.
+  judge_instruction:
+    question: Does the idea depend on beating competitors on price?
+    weak: The idea depends on lower prices and the brief shows no cost advantage over competitors.
+    mixed: The idea leans on price and the brief claims a cost advantage that no source supports.
+    strong: The idea does not depend on price, or a sourced cost advantage supports a low price.
+- id: market_maturity_crowding
+  phase: 1
+  type: Competition and alternatives
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources on the growth stage of this market and on how many competitors have entered it in recent years.
+  judge_instruction:
+    question: Is this market at an early stage instead of a crowded, mature one?
+    weak: Sources describe a mature market with severe competition, price wars or excess capacity.
+    mixed: Sources describe a growing market that already has many competitors.
+    strong: Sources describe an early-stage market with few competitors.
+- id: skills_match_product
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  research_instruction: Find two independent sources, such as job listings, founder guides or technical documentation, that list the skills needed to build and run this kind of digital product.
+  judge_instruction:
+    question: "Do the founder's stated skills cover the skills this product needs?"
+    weak: The brief lists skills that cover little of what the sources say the product needs.
+    mixed: The brief lists skills that cover the core needs but leave important ones uncovered.
+    strong: The brief lists skills that cover the core needs and the sources confirm the match.
+- id: market_understanding
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - target_market
+  research_instruction: Find two independent sources describing how buyers in the target market behave, then compare them with what the brief says about that market.
+  judge_instruction:
+    question: Does the brief show that the founder understands the target market?
+    weak: The brief shows no direct knowledge of the target market and repeats general claims.
+    mixed: The brief shows some knowledge of the market but omits or contradicts points the sources raise.
+    strong: The brief shows specific knowledge of the market that the sources confirm.
+- id: skill_gaps_fillable
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - skills
+  - budget
+  research_instruction: Find two independent sources showing where founders obtain each missing skill, such as co-founder platforms, freelancers or advisers, and what that help costs.
+  judge_instruction:
+    question: Can the founder fill each skill gap with a realistic source of help?
+    weak: The brief shows large skill gaps with no way to fill them within the budget.
+    mixed: The brief shows skill gaps and a way to fill some of them.
+    strong: The brief names each skill gap and a sourced way to fill it within the budget.
+- id: help_network_available
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - skills
+  research_instruction: Quote every contact, adviser, mentor or community the brief names, then find one independent source on communities where founders in this field get help.
+  judge_instruction:
+    question: Does the founder have people to call on for missing knowledge?
+    weak: The brief names no contacts, advisers or communities.
+    mixed: The brief names contacts or communities but none links clearly to the skill gaps.
+    strong: The brief names contacts or communities that match the skill gaps.
+- id: critical_resources_available
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  - time
+  research_instruction: List the 6 to 12 most critical nonfinancial resources the idea needs, then find one independent source on the availability of each.
+  judge_instruction:
+    question: Are the most critical nonfinancial resources available to the founder?
+    weak: Several critical resources are unavailable or cannot be confirmed.
+    mixed: Most critical resources are available but a few are unconfirmed.
+    strong: Sources confirm that every critical resource is available.
+- id: specialized_talent_available
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  research_instruction: Find two independent sources, such as job boards or salary surveys, showing how easy it is to find and afford people with the specialized skills this product needs.
+  judge_instruction:
+    question: Can people with the specialized skills this product needs be found?
+    weak: Sources show that few people have these skills or that hiring them costs more than the budget covers.
+    mixed: Sources show that people with these skills exist but cost or access is unclear.
+    strong: Sources show that people with these skills are available at a cost the budget covers.
+- id: no_blocking_patent
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  research_instruction: Search a patent database for the core features of the product and cite each filed patent that covers them, or record the search terms if none is found.
+  judge_instruction:
+    question: Is the product free of an existing patent that blocks it?
+    weak: A filed patent covers a core feature of the product.
+    mixed: A filed patent overlaps part of the product or the search results are unclear.
+    strong: The search finds no filed patent that covers a core feature.
+- id: regulatory_barriers_manageable
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  - budget
+  research_instruction: Find two official sources, such as regulator pages or government guidance, on the rules that apply to this product in the target market.
+  judge_instruction:
+    question: Do the rules for this product leave a workable route to launch?
+    weak: Rules block the product or demand licences the founder cannot obtain.
+    mixed: Rules apply and the founder can meet them only with effort that the brief does not plan for.
+    strong: No rule creates a barrier, or the brief shows a plan to meet each rule.
+- id: startup_cash_within_budget
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - budget
+  research_instruction: Find two independent sources, such as start-up cost guides or vendor price pages, that give the costs of building and launching this kind of product, then add them into a total.
+  judge_instruction:
+    question: "Does the total cash needed before the first sale fit the founder's budget?"
+    weak: The total cost before the first sale exceeds the stated budget.
+    mixed: The total fits the stated budget but only by a thin margin.
+    strong: The total fits comfortably within the stated budget.
+- id: unexpected_costs_buffer
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - budget
+  research_instruction: Find two independent sources on the overruns and hidden costs that founders meet when building this kind of product.
+  judge_instruction:
+    question: "Does the founder's budget leave room for unexpected costs?"
+    weak: The budget equals the estimated cost with no room for overruns.
+    mixed: The budget leaves some room but less than the overruns in the sources.
+    strong: The budget leaves room that matches or exceeds the overruns in the sources.
+- id: cash_source_explained
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - budget
+  research_instruction: "Quote the brief's statement of funding sources, then find one independent source on whether those sources can supply the amount needed."
+  judge_instruction:
+    question: Does the brief explain where the start-up cash comes from?
+    weak: The brief gives only a cursory answer, such as investors or a loan, with no detail.
+    mixed: The brief names a source of cash with partial detail on amount or repayment.
+    strong: The brief names each source of cash with its amount and a plan to repay any borrowed money.
+- id: own_funds_cover_first_version
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - budget
+  research_instruction: Find two independent sources giving the cost of building a first working version of this kind of product with low-cost or free tools.
+  judge_instruction:
+    question: Can the founder pay for the first version from personal funds or bootstrapping?
+    weak: "The first version costs more than the founder's funds and no low-cost route exists."
+    mixed: A low-cost route exists but it needs skills or time that the brief does not confirm.
+    strong: "Sources show a low-cost route that the founder's funds, skills and time cover."
+- id: breakeven_time_fit
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - budget
+  - time
+  research_instruction: Find two independent sources on how long comparable products take to reach break-even, then compare that period with the budget and time in the brief.
+  judge_instruction:
+    question: Can the founder sustain the business until it breaks even?
+    weak: Comparable products take longer to break even than the budget and time in the brief can sustain.
+    mixed: Break-even time sits close to the limit of the budget and time in the brief.
+    strong: Comparable products break even well within the budget and time in the brief.
+- id: time_commitment_fit
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - time
+  research_instruction: Find two independent sources on the weekly effort needed to build and launch comparable digital products.
+  judge_instruction:
+    question: "Does the founder's available time match the effort the product needs?"
+    weak: The effort described in the sources far exceeds the time in the brief.
+    mixed: The effort described in the sources fits the time in the brief only if the scope shrinks.
+    strong: The effort described in the sources fits within the time in the brief.
+- id: build_parts_manageable
+  phase: 1
+  type: Feasibility and founder fit
+  kind: scored
+  brief_fields:
+  - idea
+  - skills
+  - time
+  research_instruction: Find two independent sources, such as technical documentation or descriptions of similar products, that list the components this product needs.
+  judge_instruction:
+    question: Is the product simple enough for the founder to build and test part by part?
+    weak: The product needs many components that call for skills or time the brief lacks.
+    mixed: The product needs several components and the brief covers most of them.
+    strong: The product needs few components and the brief covers all of them.
+- id: revenue_streams_named
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: List every way the brief says the product earns money, then find two independent sources showing that comparable products charge in those ways.
+  judge_instruction:
+    question: Does the idea have a named way to charge that comparable products also use?
+    weak: The brief names no way to charge, or the way named is not used by any comparable product.
+    mixed: The brief names a way to charge but sources show it only on one comparable product or in a different form.
+    strong: The brief names each way to charge and independent sources show comparable products charging the same way.
+- id: known_model_precedent
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  research_instruction: Identify which established business model the idea resembles, then find two independent sources on firms that use that model and how they earn money from it.
+  judge_instruction:
+    question: Does the idea follow a business model that other firms already use to earn money?
+    weak: No established model fits the idea and the brief gives no other account of how it earns money.
+    mixed: An established model fits in part, but the sources show few firms earning money with it.
+    strong: An established model fits the idea and sources show several firms earning money with it.
+- id: comparable_firms_revenue
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find three independent sources, such as industry reports, company statements or news stories, that give sales or profit figures for comparable businesses.
+  judge_instruction:
+    question: Do comparable businesses show evidence of earning revenue?
+    weak: No sales or profit figures for comparable businesses are found.
+    mixed: Figures exist for one or two comparable businesses, or only for much larger firms.
+    strong: Independent sources give sales or profit figures for several comparable businesses of a relevant size.
+- id: buyers_show_willingness_to_pay
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources, such as pre-orders, crowdfunding results, paid waitlists or reviews of paid alternatives, that show people in the target market paying for something that solves this problem.
+  judge_instruction:
+    question: Is there evidence that people in the target market pay for a solution to this problem?
+    weak: No payment is found, only interest, opinions or free sign-ups.
+    mixed: Some payment is documented but it is a single case or a small amount.
+    strong: Independent sources document repeated payments by people in the target market for a solution to this problem.
+- id: payer_identified
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing who pays for comparable products in this market, and compare that with the person the brief treats as the buyer.
+  judge_instruction:
+    question: Does the brief name the party that actually pays?
+    weak: The brief names no payer, or names a user who does not hold the budget.
+    mixed: The brief names a payer but sources do not confirm that this party pays for comparable products.
+    strong: The brief names the payer and sources confirm that this party pays for comparable products.
+- id: enough_payers_at_price
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  - budget
+  research_instruction: Find two independent sources on the number of people in the target market who pay the price the brief proposes, or a similar price, for comparable products.
+  judge_instruction:
+    question: Are there enough buyers who pay at the proposed price level?
+    weak: Sources show few buyers at this price level or give no figures.
+    mixed: Sources show buyers at this price level but the group is small or narrow.
+    strong: Sources show a sizeable group of buyers paying at or above the proposed price level.
+- id: price_vs_substitutes
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Collect the public prices of three substitutes, including cheaper ones, from their own pages and compare each with the price the brief proposes.
+  judge_instruction:
+    question: Is the proposed price reasonable next to what customers pay for substitutes?
+    weak: The proposed price is far above the price of substitutes with no stated extra value.
+    mixed: The proposed price is above the price of substitutes and the extra value is stated but unproven.
+    strong: The proposed price is in line with substitutes, or above them with sourced evidence of extra value.
+- id: free_alternatives_threat
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources, such as forums, community sites or free tools, that show people in the target market solving this problem for free.
+  judge_instruction:
+    question: Is the product free of strong free alternatives?
+    weak: Sources show free alternatives that people already use widely for this problem.
+    mixed: Free alternatives exist but they are limited or less convenient than the proposed product.
+    strong: Searches find no free alternative that people use for this problem.
+- id: charge_not_easily_bypassed
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  research_instruction: Read the brief to find the point where the customer pays, then find two independent sources on whether users of similar platforms avoid paying by dealing with each other directly.
+  judge_instruction:
+    question: Can the founder keep customers from avoiding the charge?
+    weak: Customers can complete the transaction without the founder and sources show this happening on similar products.
+    mixed: Customers can avoid the charge but the brief gives a reason they would not.
+    strong: The charge sits inside the product so customers cannot avoid it, or the brief shows a sourced way to keep them paying.
+- id: price_covers_costs
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - budget
+  research_instruction: Find two independent sources on the delivery costs of comparable products, then compare them with the price the brief proposes.
+  judge_instruction:
+    question: Does the proposed price leave the product profitable?
+    weak: Sourced costs are equal to or above the proposed price.
+    mixed: The proposed price exceeds sourced costs by a thin margin, or cost data is partial.
+    strong: The proposed price exceeds sourced costs by a clear margin.
+- id: cost_structure_understood
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - budget
+  research_instruction: "Quote the brief's statements about costs, then find one independent source describing the main cost categories of comparable products."
+  judge_instruction:
+    question: Does the brief show the main costs of running the product?
+    weak: The brief names no costs.
+    mixed: The brief names some costs but omits major categories that the source lists.
+    strong: The brief names the major cost categories and says whether costs are mostly fixed or variable.
+- id: free_tier_converts
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: If the brief offers a free version, find two independent sources on how comparable products turn free users into paying ones; if it offers none, record that.
+  judge_instruction:
+    question: Does a free version lead to paying customers?
+    weak: The brief offers a free version with no path to payment, or sources show free users rarely pay.
+    mixed: The brief names a path from free to paid but sources on comparable products are thin.
+    strong: Sources show comparable products turning free users into paying ones, or the brief offers no free version.
+- id: recurring_revenue
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources on whether customers of comparable products pay again, through subscriptions or repeat purchases, and on how many stop paying.
+  judge_instruction:
+    question: Do customers of comparable products pay on a recurring basis?
+    weak: Comparable products rely on one-time payments, or sources show many customers stopping.
+    mixed: Some comparable products earn recurring payments but sources show notable losses of customers.
+    strong: Sources show comparable products keeping customers who pay again and again.
+- id: existing_paying_habit
+  phase: 1
+  type: Viability, first look
+  kind: scored
+  brief_fields:
+  - idea
+  - target_market
+  research_instruction: Find two independent sources showing whether people in the target market already spend money on this kind of solution today or would have to adopt a new habit to buy it.
+  judge_instruction:
+    question: Do customers already spend money on this kind of solution?
+    weak: Sources show that customers would have to adopt a new behavior to buy the product.
+    mixed: Customers spend on a related solution but would change their habits to buy this one.
+    strong: Sources show customers already spending money on this kind of solution.
+provenance:
+- id: illegal_in_target_market
+  book: Criteria Types for the Agent Workflow (Sharl, Nov 16, 2026)
+  chapter: "Phase 1: Discover, The ethics screen, in three tiers"
+  page: not visible
+  supporting_passage: Illegal in the target market, built on deceiving or harming people
+  basis: Illegality in the target market is the first hard-stop tier. The quote comes from the criteria document, not the ethics chapter.
+- id: regulated_or_sensitive_area
+  book: Criteria Types for the Agent Workflow (Sharl, Nov 16, 2026)
+  chapter: "Phase 1: Discover, The ethics screen, in three tiers"
+  page: not visible
+  supporting_passage: Legal but sensitive or regulated areas, such as health, money, children or personal data
+  basis: Legal but sensitive areas go to the founder as a flag, not an automatic rejection. The quote comes from the criteria document, not the ethics chapter.
+- id: must_have_pain
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 3: Get Ready to Interview Customers (section: Decouple the Problem From the Solution)"
+  page: not visible
+  supporting_passage: An early adopter is a customer who ranks one or more of the problems you’re solving as a must-have and will generally pay to have it solved.
+  basis: A problem counts as real when customers rank it as a must-have worth paying to solve.
+- id: current_workaround_pain
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 2: Create Your Lean Canvas (section: Solution)"
+  page: not visible
+  supporting_passage: Doing nothing could also be a viable alternative for a customer if the pain is not acute enough.
+  basis: How customers cope today, including doing nothing, shows how acute the pain is.
+- id: narrow_early_adopter
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 2: Create Your Lean Canvas (section: Problem and Customer Segments)"
+  page: not visible
+  supporting_passage: Your objective is to define an early adopter - not a mainstream customer.
+  basis: The customer group must be narrowed to a specific early adopter instead of a broad mainstream audience.
+- id: paying_customer_identified
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 2: Create Your Lean Canvas (section: Brainstorm Possible Customers)"
+  page: not visible
+  supporting_passage: A customer is a someone that pays for your product.
+  basis: The customer is the person who pays, which differs from other user roles, so the brief must identify who that is.
+- id: reachable_path_to_customers
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 2: Create Your Lean Canvas (section: Prioritize Where to Start)"
+  page: not visible
+  supporting_passage: Building a path to customers is one of the harder aspects of building a successful product.
+  basis: A customer segment is more promising when there is an easier path to reach it.
+- id: problem_framed_from_customer_view
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 3: Get Ready to Interview Customers (section: Decouple the Problem From the Solution)"
+  page: not visible
+  supporting_passage: Customers don’t care about your solution. They care about their problems.
+  basis: "The problem must be understood from the customer's viewpoint before any solution is considered."
+- id: current_alternatives_in_use
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 4: The Problem Interview (section: What is the Problem Interview exit criteria?)"
+  page: not visible
+  supporting_passage: can describe how customers solve this problem today
+  basis: Real demand shows when you can say how customers already handle the problem.
+- id: paid_alternatives_exist
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 5: The Solution Interview (section: Do You Have a Problem Worth Solving?, Refine pricing)"
+  page: not visible
+  supporting_passage: If their current solutions are FREE, how can you provide more value to justify them paying?
+  basis: Whether current solutions cost money or are free decides whether customers have a reason to pay for another.
+- id: customer_own_words
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 4: The Problem Interview (section: Do You Understand the Problem?, Pay attention to words customers use)"
+  page: not visible
+  supporting_passage: The best way to uncover the “key” words to use in your UVP is by listening closely to how customers describe their workflow.
+  basis: The words customers use to describe their workflow are a signal of how they frame the problem.
+- id: action_over_stated_interest
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 8: Get Ready to Measure (section: The Need for Actionable Metrics)"
+  page: not visible
+  supporting_passage: Metrics let you measure what customers do.
+  basis: What customers do is stronger evidence than what they tell you, so demand evidence should record actions.
+- id: raw_counts_discounted
+  book: Running Lean, Ash Maurya
+  chapter: "Chapter 8: Get Ready to Measure (section: What is an Actionable Metric?)"
+  page: not visible
+  supporting_passage: vanity metrics (like web hits or number of downloads)
+  basis: Raw counts such as web hits or downloads document a state but give no insight, so they should not carry demand claims.
+- id: physical_goods_exclusion
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: Physical goods. The system covers digital products only.
+  basis: The hackathon excludes physical goods outright, so any idea whose core offering is physical stops at the first screen.
+- id: financial_crypto_exclusion
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: This covers trading, lending, investing advice, tokens and anything that moves or manages money.
+  basis: Financial and crypto products are an excluded family, defined by the functions they perform with money.
+- id: health_legal_advice_exclusion
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: An app that diagnoses, treats, interprets symptoms or tells people what the law requires of them is excluded.
+  basis: Products that give health or legal advice are excluded, judged by what the product does.
+- id: advice_in_disguise
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: does the product give advice a person might act on for their health, money or legal position?
+  basis: Border cases are decided by whether people would act on the advice, not by the label the product carries, and unsure cases go to the founder.
+- id: income_promise_dependency
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: Promising income to the founder or to customers.
+  basis: An idea whose core value rests on promised income hits the must-never wall.
+- id: fake_proof_dependency
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: Faking reviews, sign-ups, testimonials or urgency.
+  basis: An idea that only works through fabricated social proof or urgency is rejected under the must-never list.
+- id: impersonation_dependency
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: Impersonating any person or organization.
+  basis: An idea whose core value depends on posing as someone else is rejected under the must-never list.
+- id: money_or_credentials_dependency
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: Moving money or storing credentials.
+  basis: An idea that needs the system to hold funds or secrets is rejected under the must-never list.
+- id: harm_to_people
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 3: The Hard Walls"
+  page: not visible
+  supporting_passage: products designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or clear intellectual property theft are rejected regardless of market size.
+  basis: A harm wall beyond the hackathon brief rejects products built to hurt people; the chapter labels this wall a proposed assumption.
+- id: founder_values_conflict
+  book: The Gate at the Edge of the Map, an ethics documentary for approving or rejecting a venture idea (Open-Source Agentic Venture Builders, MADS × CSEA AI Hackathon, Fall 2026)
+  chapter: "Chapter 2: The Cast"
+  page: not visible
+  supporting_passage: Values are an ethical input, not decoration. An idea that betrays the founder’s own stated values is a mismatch the system must surface.
+  basis: "The founder's written values are an ethical input, so a clash between idea and values must be flagged to the founder."
+- id: substitutes_in_use
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.1.1, Different ways of defining markets)"
+  page: not visible
+  supporting_passage: ‘substitutes in use’, i.e. all the products and services which may meet the same customer needs and problems
+  basis: Competition should be defined by the customer need met, so alternatives from other technologies and industries count as competitors.
+- id: direct_competitors_mapped
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 5: Competitor Analysis (section 5.2, The dimensions of competitor analysis)"
+  page: not visible
+  supporting_passage: innermost are the direct competitors within the strategic group
+  basis: Competitor analysis starts with the direct competitors that serve the same customers in the same way.
+- id: competitor_target_segments
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 5: Competitor Analysis (section 5.2.2, Competitors’ target markets)"
+  page: not visible
+  supporting_passage: The broad markets and more specific market segments competitors choose to compete in can often be inferred from an analysis of the products and services they are offering
+  basis: "What competitors sell, and how, shows which customer groups they serve, so overlap with the founder's group can be checked."
+- id: competitor_weak_points
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 5: Competitor Analysis (section 5.2.2, Competitors’ supporting marketing mix)"
+  page: not visible
+  supporting_passage: Detailed analysis of competitors’ products and services, particularly through the eyes of customers, can be used to highlight competitor weaknesses.
+  basis: Customer views of existing offers reveal weaknesses that a new entrant can address.
+- id: price_gaps
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 5: Competitor Analysis (section 5.2.2, Competitors’ supporting marketing mix)"
+  page: not visible
+  supporting_passage: Analysis of competitor pricing strategies may identify gaps in the market.
+  basis: Mapping competitor prices shows price points that no one serves.
+- id: underserved_segment
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 7: Segmentation and Positioning Principles (section 7.8, The benefits of segmenting markets)"
+  page: not visible
+  supporting_passage: It helps to identify gaps in the market, i.e. unserved or underserved segments.
+  basis: Room for a new offer shows up as customer segments that existing offers leave unserved or underserved.
+- id: incumbent_differentiation_level
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.3.3, Competitive factors: Degree of differentiation)"
+  page: not visible
+  supporting_passage: Markets where there is little differentiation between product offerings offer significant opportunities to companies that can achieve differentiation.
+  basis: When existing offers look alike, a distinct offer has more room to stand out.
+- id: dominant_player_edge
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.3.3, Competitive factors: Competitive intensity)"
+  page: not visible
+  supporting_passage: Entry into markets dominated by one or a few key players requires some form of competitive edge over them that can be used to secure a beachhead.
+  basis: A market with dominant players is open to an entrant only if the entrant holds a clear edge over them.
+- id: retaliation_risk
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 5: Competitor Analysis (section 5.2.4, Predicting competitors’ future strategies)"
+  page: not visible
+  supporting_passage: What will provoke the greatest and most effective retaliation by the competitor?
+  basis: An entrant should judge how strongly and how well existing competitors would hit back before choosing where to compete.
+- id: substitution_threat
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.3.3, Competitive factors: Threat of substitution)"
+  page: not visible
+  supporting_passage: In all markets there is a threat that new solutions to the customers’ original problems will be found that will make the company’s offerings obsolete.
+  basis: "New ways of solving the customer's problem can make an offer obsolete, so this threat counts against room in the market."
+- id: entry_barriers_for_newcomers
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.3.2, Economic and technological factors: Barriers to entry)"
+  page: not visible
+  supporting_passage: Markets where there are substantial barriers to entry (e.g. protected technology or high switching costs for customers)
+  basis: High entry barriers help incumbents and block aspirants, so an entrant must judge whether it can afford to overcome them.
+- id: difference_hard_to_copy
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 10: Creating Sustainable Competitive Advantage (section 10.4.1, Deciding on the bases for product differentiation)"
+  page: not visible
+  supporting_passage: The third consideration in choosing a way of differentiating the product from the competition is the ease with which that differentiation can be copied.
+  basis: A difference leaves lasting room in the market only if competitors cannot copy it quickly.
+- id: difference_valued_by_customers
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 7: Segmentation and Positioning Principles (section 7.1, Principles of competitive positioning)"
+  page: not visible
+  supporting_passage: a difference should create a highly valued benefit for significant numbers of customers
+  basis: A difference from competitors creates a strong position only when many customers value the benefit it brings.
+- id: price_war_exposure
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 10: Creating Sustainable Competitive Advantage (section 10.4.3, Price differentiation)"
+  page: not visible
+  supporting_passage: Without a cost advantage, starting a price war can be a disastrous course to follow.
+  basis: Competing on lower price works only when the entrant has a real cost advantage over competitors.
+- id: market_maturity_crowding
+  book: Marketing Strategy and Competitive Positioning, 8th edition, Graham Hooley, Brigitte Nicoulaud, John Rudd and Nick Lee
+  chapter: "Chapter 9: Selecting Market Targets (section 9.3.1, Market factors: Stage of industry evolution)"
+  page: not visible
+  supporting_passage: markets in the early stages of evolution are generally more attractive as they offer more future potential and are less likely to be crowded by current competitors
+  basis: Early-stage markets leave more room for an entrant because fewer competitors are already in them.
+- id: skills_match_product
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Appendix: First Screen, Part 4)"
+  page: not visible
+  supporting_passage: Founder’s or founders’ skills as they relate to the proposed new venture’s product or service
+  basis: "The chapter's template rates a venture by how well the founder's skills relate to the product."
+- id: market_understanding
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Management Prowess)"
+  page: not visible
+  supporting_passage: the extent to which the management team or solo entrepreneur understands the markets in which the firm will participate
+  basis: "Founders' grasp of their markets is named as one of the two most important parts of management ability."
+- id: skill_gaps_fillable
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Partnering for Success: Finding the Right Business Partner)"
+  page: not visible
+  supporting_passage: Make an honest assessment of the skills and experience you bring to the business and the gaps that remain.
+  basis: Founders should list their skill gaps honestly and fill them, for example with a partner.
+- id: help_network_available
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Management Prowess)"
+  page: not visible
+  supporting_passage: Managers with extensive professional and social networks have an advantage in that they are able to reach out to colleagues and friends
+  basis: Founders with wide networks can get help to cover gaps in experience or knowledge.
+- id: critical_resources_available
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Resource Sufficiency)"
+  page: not visible
+  supporting_passage: list the 6 to 12 most critical nonfinancial resources that it will need to move its business idea forward
+  basis: "The chapter's test of resource sufficiency is a list of the critical nonfinancial resources and a check that each is available."
+- id: specialized_talent_available
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Resource Sufficiency)"
+  page: not visible
+  supporting_passage: does not have labor pool that includes people with the skill sets the firm needs, a serious resource sufficiency problem exists
+  basis: A venture that cannot find people with the skills it needs has a serious resource problem.
+- id: no_blocking_patent
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Resource Sufficiency)"
+  page: not visible
+  supporting_passage: see if a patent has already been filed for its product
+  basis: A quick patent search shows whether someone has already filed protection over the product idea.
+- id: regulatory_barriers_manageable
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Organizational Feasibility Analysis: Resource Sufficiency)"
+  page: not visible
+  supporting_passage: Some prospective businesses are also subject to regulatory issues that must be investigated and discerned.
+  basis: Rules that apply to a product must be investigated before launch because they can block it.
+- id: startup_cash_within_budget
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Financial Feasibility Analysis: Total Start-Up Cash Needed)"
+  page: not visible
+  supporting_passage: the total cash needed to prepare the business to make its first sale
+  basis: A venture is feasible only if the founder can cover the total cash needed before the first sale.
+- id: unexpected_costs_buffer
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Financial Feasibility Analysis: Total Start-Up Cash Needed)"
+  page: not visible
+  supporting_passage: Murphy’s Law is prevalent in the start-up world—things will go wrong!
+  basis: Start-ups meet unexpected expenses, so the cash estimate needs room for them.
+- id: cash_source_explained
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Financial Feasibility Analysis: Total Start-Up Cash Needed)"
+  page: not visible
+  supporting_passage: a more thoughtful account is required of how you will provide for your initial cash needs
+  basis: A vague claim of future investors or loans is not enough, so the founder must explain where start-up cash comes from.
+- id: own_funds_cover_first_version
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Appendix: First Screen, Part 5)"
+  page: not visible
+  supporting_passage: Ability to fund initial product (or service) development and/or initial start-up expenses from personal funds or via bootstrapping
+  basis: The template rates a venture by whether the founder can pay for early development from personal funds or bootstrapping.
+- id: breakeven_time_fit
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (A Feasibility Analysis Template)"
+  page: not visible
+  supporting_passage: the money that would need to be raised and the extended time to break even for the business
+  basis: A long time to break even, together with the money to be raised, makes a plan unrealistic for a founder.
+- id: time_commitment_fit
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Financial Feasibility Analysis: Overall Financial Attractiveness)"
+  page: not visible
+  supporting_passage: "The existing alternatives for the entrepreneur's time and efforts"
+  basis: "The founder's time has other uses, so the effort the venture demands must be weighed against the time available (applied by extension; the chapter names no hour counts)."
+- id: build_parts_manageable
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Opening Profile: Owlet Baby Care)"
+  page: not visible
+  supporting_passage: Their task was to test each part separately, and then test how the parts interacted with one another.
+  basis: A product with many components needs each part and their interaction tested, so more parts mean more work for the founder (applied by extension from the Owlet example).
+- id: revenue_streams_named
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (The Barringer/Ireland Business Model Template: Financials, Revenue Streams)"
+  page: not visible
+  supporting_passage: A firm’s revenue streams describe the ways in which it makes money
+  basis: A venture needs at least one named way to earn money before its business model works.
+- id: known_model_precedent
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (General Categories of Business Models: Standard Business Models)"
+  page: not visible
+  supporting_passage: Standard business models depict existing plans or recipes firms can use to determine how they will create, deliver, and capture value for their stakeholders.
+  basis: Established business models show how other firms already capture money, so an idea that follows one has a precedent.
+- id: comparable_firms_revenue
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Financial Feasibility Analysis: Financial Performance of Similar Businesses)"
+  page: not visible
+  supporting_passage: estimating a proposed start-up’s potential financial performance by comparing it to similar, already established businesses
+  basis: The chapter tests financial promise by looking at how similar, existing businesses perform.
+- id: buyers_show_willingness_to_pay
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Opening Profile: Owlet Baby Care)"
+  page: not visible
+  supporting_passage: the interest validated the notion that they were onto something that parents saw as valuable and for which they were willing to pay
+  basis: Evidence that buyers will pay, such as requests to buy and crowdfunding, is the signal that validates a product (applied here to outside evidence).
+- id: payer_identified
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Product/Service Demand: Talking Face-to-Face with Potential Customers)"
+  page: not visible
+  supporting_passage: the actual customer, or the entity that will be paying the bill, is often an insurance company, hospital, or Medicare or Medicaid
+  basis: The user of a product is not always the one who pays, so the paying customer must be identified.
+- id: enough_payers_at_price
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (What Went Wrong? Peer-to-Peer Business Models)"
+  page: not visible
+  supporting_passage: there just weren’t enough people willing to pay that stiff of a fee for the service
+  basis: A product fails when too few people will pay the price charged, so the number of buyers at that price matters.
+- id: price_vs_substitutes
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (What Went Wrong? How Feasible Was the Keurig At-Home Soda Machine to Begin With?)"
+  page: not visible
+  supporting_passage: The machine debuted at $369. In comparison, the cheapest SodaStream model, which also allows people to make single serve sodas at home, costs $79.
+  basis: A price far above substitutes with no extra value contributed to a product failure, so the price should be compared with substitutes.
+- id: free_alternatives_threat
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (What Went Wrong? Peer-to-Peer Business Models)"
+  page: not visible
+  supporting_passage: it had competition from free alternatives, such as carpooling forums on college websites
+  basis: Free alternatives limited the growth of a paid service, so they count against the chance of charging.
+- id: charge_not_easily_bypassed
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (What Went Wrong? Peer-to-Peer Business Models)"
+  page: not visible
+  supporting_passage: some riders started cutting Ridejoy out once they got to know one another
+  basis: When customers can deal directly and skip the fee, a platform that charges a commission loses its revenue.
+- id: price_covers_costs
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Opening Profile: Owlet Baby Care)"
+  page: not visible
+  supporting_passage: They knew they needed a certain price point for their company to be profitable
+  basis: A price must reach a level at which the company is profitable (applied to desk research on costs).
+- id: cost_structure_understood
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (The Barringer/Ireland Business Model Template: Financials, Cost Structure)"
+  page: not visible
+  supporting_passage: identify whether the business is a cost-driven or value-driven business, identify the nature of the business’ costs, and identify the business’ major cost categories
+  basis: A business model should show what role costs play, whether they are fixed or variable, and where the major costs fall.
+- id: free_tier_converts
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 4: Developing an Effective Business Model (Introduction: the Dropbox freemium example)"
+  page: not visible
+  supporting_passage: by introducing users to its service through a free account, it will ultimately sign up more paid users
+  basis: A free version is a plausible way to charge only if it leads to paid users.
+- id: recurring_revenue
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (Table 3.6, Financial Feasibility)"
+  page: not visible
+  supporting_passage: High percentage of recurring revenue—meaning that once a firm wins a client, the client will provide recurring sources of revenue
+  basis: "Recurring revenue is a sign of financial attractiveness, and the chapter's churn discussion shows that losing subscribers weakens it."
+- id: existing_paying_habit
+  book: "Entrepreneurship: Successfully Launching New Ventures, Bruce R. Barringer and R. Duane Ireland"
+  chapter: "Chapter 3: Feasibility Analysis (What Went Wrong? How Feasible Was the Keurig At-Home Soda Machine to Begin With?)"
+  page: not visible
+  supporting_passage: Kold was asking people to change their behavior—something that is hard to do even if every other aspect of a product is perfect.
+  basis: A product is harder to sell when it asks people to start paying for something they have never bought.
+implementation_overlay:
+  origin: "FOUNDEROS_IMPLEMENTATION (TEAM_ASSUMPTION): derived from each research_instruction; not part of the team data and not hashed into team_data_sha256."
+  source_types:
+    CUSTOMER_VOICE: Forum threads, reviews, community posts where customers speak.
+    INDUSTRY_REPORT: Industry reports, reputable publications, news, guides, comparison articles.
+    OFFICIAL_SOURCE: Statute, regulator page, government guidance, court record.
+    COMPANY_PAGE: "A company's own product page, advertising, statement, documentation, or crowdfunding/pre-order page."
+    PRICING_PAGE: "A company's own public price list, dated at retrieval. Shows an advertised price, not purchases."
+    PATENT_RECORD: A filed patent record from a patent database.
+    TALENT_MARKET: Job listings, job boards, salary surveys, freelancer or co-founder platforms.
+    DIRECTORY_OR_COMMUNITY: A community, directory, publication or platform where the target group gathers.
+    ACADEMIC_PASSAGE: An exact, fetched passage from a paper. Background only.
+    OFFICIAL_STATISTIC: A dated national statistic (e.g. World Bank). Never segment-level.
+    FOUNDER_CUSTOMER_RESEARCH: Founder-run interviews/observations with consent. Founder-reported, not independently verified.
+    BRIEF: "The founder's own brief."
+  never_eligible:
+  - ACADEMIC_METADATA
+  - SIMULATED_RESULT
+  - BOOK_SUPPORTING_PASSAGE
+  rating_to_score:
+    WEAK: 2
+    MIXED: 3
+    STRONG: 4
+    note: 1 and 5 are reserved for dimension-level judgments (5 needs locked-test results). UNKNOWN and NOT_APPLICABLE never become numbers.
+  aggregation:
+    min_known_checks: 2
+    rule: Dimension score = mean of mapped granular ratings, rounded to 0.1, only when at least min_known_checks granular checks are WEAK/MIXED/STRONG. Otherwise the dimension falls back to its dimension-level judge (if any) or stays UNKNOWN.
+  checks:
+    illegal_in_target_market:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+    regulated_or_sensitive_area:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+    must_have_pain:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    current_workaround_pain:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    narrow_early_adopter:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - CUSTOMER_VOICE
+      - DIRECTORY_OR_COMMUNITY
+      - INDUSTRY_REPORT
+      - OFFICIAL_STATISTIC
+      - FOUNDER_CUSTOMER_RESEARCH
+      brief_condition: BROAD_SEGMENT
+    paying_customer_identified:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - COMPANY_PAGE
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+      brief_condition: NO_PAYER
+    reachable_path_to_customers:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - DIRECTORY_OR_COMMUNITY
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+    problem_framed_from_customer_view:
+      aggregates_into: D03
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - CUSTOMER_VOICE
+      - FOUNDER_CUSTOMER_RESEARCH
+    current_alternatives_in_use:
+      aggregates_into: D04
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    paid_alternatives_exist:
+      aggregates_into: D04
+      sources_required: 2
+      accepted_source_types:
+      - PRICING_PAGE
+      - COMPANY_PAGE
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+    customer_own_words:
+      aggregates_into: D04
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - FOUNDER_CUSTOMER_RESEARCH
+    action_over_stated_interest:
+      aggregates_into: D04
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    raw_counts_discounted:
+      aggregates_into: D04
+      sources_required: 0
+      accepted_source_types:
+      - ACADEMIC_PASSAGE
+      - BRIEF
+      - FOUNDER_CUSTOMER_RESEARCH
+      - INDUSTRY_REPORT
+    physical_goods_exclusion:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - BRIEF
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+      - OFFICIAL_SOURCE
+    financial_crypto_exclusion:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    health_legal_advice_exclusion:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    advice_in_disguise:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    income_promise_dependency:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    fake_proof_dependency:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    impersonation_dependency:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    money_or_credentials_dependency:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    harm_to_people:
+      aggregates_into: D01
+      sources_required: 1
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      - INDUSTRY_REPORT
+    founder_values_conflict:
+      aggregates_into: D01
+      sources_required: 0
+      accepted_source_types:
+      - BRIEF
+    substitutes_in_use:
+      aggregates_into: D05
+      sources_required: 3
+      accepted_source_types:
+      - COMPANY_PAGE
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    direct_competitors_mapped:
+      aggregates_into: D05
+      sources_required: 3
+      accepted_source_types:
+      - COMPANY_PAGE
+      - PRICING_PAGE
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+    competitor_target_segments:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - COMPANY_PAGE
+      - PRICING_PAGE
+    competitor_weak_points:
+      aggregates_into: D05
+      sources_required: 3
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+    price_gaps:
+      aggregates_into: D05
+      sources_required: 3
+      accepted_source_types:
+      - COMPANY_PAGE
+      - PRICING_PAGE
+    underserved_segment:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    incumbent_differentiation_level:
+      aggregates_into: D05
+      sources_required: 3
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - COMPANY_PAGE
+    dominant_player_edge:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    retaliation_risk:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    substitution_threat:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+      absence_claim_cap: "STRONG means \"no credible new kind of solution\"; a bounded search is not proof of absence."
+    entry_barriers_for_newcomers:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    difference_hard_to_copy:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    difference_valued_by_customers:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - FOUNDER_CUSTOMER_RESEARCH
+    price_war_exposure:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    market_maturity_crowding:
+      aggregates_into: D05
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    skills_match_product:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+      - TALENT_MARKET
+      - ACADEMIC_PASSAGE
+    market_understanding:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    skill_gaps_fillable:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - TALENT_MARKET
+      - DIRECTORY_OR_COMMUNITY
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    help_network_available:
+      aggregates_into: D06
+      sources_required: 1
+      accepted_source_types:
+      - BRIEF
+      - DIRECTORY_OR_COMMUNITY
+      brief_condition: NO_CONTACTS
+    critical_resources_available:
+      aggregates_into: D06
+      sources_required: 1
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    specialized_talent_available:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - TALENT_MARKET
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    no_blocking_patent:
+      aggregates_into: D06
+      sources_required: 1
+      accepted_source_types:
+      - PATENT_RECORD
+      absence_claim_cap: "STRONG means \"no filed patent covers a core feature\"; a bounded search is not proof of absence."
+    regulatory_barriers_manageable:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - OFFICIAL_SOURCE
+      absence_claim_cap: "STRONG can mean \"no rule creates a barrier\"; FounderOS never asserts legal clearance."
+    startup_cash_within_budget:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+      - PRICING_PAGE
+      - ACADEMIC_PASSAGE
+    unexpected_costs_buffer:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    cash_source_explained:
+      aggregates_into: D06
+      sources_required: 1
+      accepted_source_types:
+      - BRIEF
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    own_funds_cover_first_version:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    breakeven_time_fit:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    time_commitment_fit:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    build_parts_manageable:
+      aggregates_into: D06
+      sources_required: 2
+      accepted_source_types:
+      - COMPANY_PAGE
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    revenue_streams_named:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - COMPANY_PAGE
+      - PRICING_PAGE
+      - INDUSTRY_REPORT
+      brief_condition: NO_CHARGE_METHOD
+    known_model_precedent:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    comparable_firms_revenue:
+      aggregates_into: D07
+      sources_required: 3
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+      - ACADEMIC_PASSAGE
+    buyers_show_willingness_to_pay:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - COMPANY_PAGE
+      - FOUNDER_CUSTOMER_RESEARCH
+    payer_identified:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - COMPANY_PAGE
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - FOUNDER_CUSTOMER_RESEARCH
+      brief_condition: NO_PAYER
+    enough_payers_at_price:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+      - OFFICIAL_STATISTIC
+    price_vs_substitutes:
+      aggregates_into: D07
+      sources_required: 3
+      accepted_source_types:
+      - COMPANY_PAGE
+      - PRICING_PAGE
+    free_alternatives_threat:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - CUSTOMER_VOICE
+      - COMPANY_PAGE
+      absence_claim_cap: "STRONG means \"no free alternative is used\"; a bounded search is not proof of absence."
+    charge_not_easily_bypassed:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - CUSTOMER_VOICE
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+    price_covers_costs:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    cost_structure_understood:
+      aggregates_into: D07
+      sources_required: 1
+      accepted_source_types:
+      - BRIEF
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+      brief_condition: NO_COSTS
+    free_tier_converts:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - BRIEF
+      - INDUSTRY_REPORT
+      - COMPANY_PAGE
+      - ACADEMIC_PASSAGE
+    recurring_revenue:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
+    existing_paying_habit:
+      aggregates_into: D07
+      sources_required: 2
+      accepted_source_types:
+      - FOUNDER_CUSTOMER_RESEARCH
+      - INDUSTRY_REPORT
+      - ACADEMIC_PASSAGE
