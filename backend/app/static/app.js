@@ -1,4 +1,4 @@
-/* FounderOS v0.7 client. Every action below calls the real backend; nothing is simulated in the browser.
+/* FounderOS v0.8 client. Every action below calls the real backend; nothing is simulated in the browser.
    Routes: /projects, /projects/:id/{brief,safety,discovery,research,experiments,decision,audit}, /roadmap, /help */
 (() => {
   'use strict';
@@ -41,13 +41,18 @@
     NOT_CHECKED: 'Not checked', METADATA_ONLY: 'Metadata only', STRUCTURED_DATUM: 'Official datum', URL_ACCESSIBLE: 'Page reached', UNVERIFIED: 'Unverified',
     CONTEXT_ONLY: 'Context only', CONTEXT_WEAK: 'Context, weak', DIRECT_STATEMENT: 'Customer statement', DIRECT_BEHAVIOR: 'Customer behaviour',
     LOCKED_RESULT: 'Locked-test result', EXCLUDED: 'Excluded', READY: 'Model ready', MODEL_OOM_CPU: 'it ran out of RAM', MODEL_OOM_GPU: 'it ran out of GPU memory',
+    STATED_IN_TEXT: 'In your words, please confirm', FORM_FIELD: 'Typed by you', FOUNDER_CONFIRMED: 'Confirmed by you', MODEL_SUGGESTED_UNCONFIRMED: 'Model suggestion',
+    NOT_STATED: 'Not stated', PARSER_FAILED: 'Parser failed', WEAK: 'Weak', STRONG: 'Strong', ACCEPTED_RELEVANT: 'Accepted, relevant', PAGE_FETCHED: 'Page fetched',
+    FOUNDER_SUPPLIED_UNVERIFIED: 'Pasted by you, not verified', FOUNDER_SUPPLIED: 'Pasted by you', SIMULATED_NOT_COUNTED: 'Simulated, not counted', SIMULATED_RESULT: 'Simulated, not counted',
+    TIMEOUT: 'Timed out', TLS_VERIFY_FAILED: 'Certificate check failed', NOT_SCREENED: 'Not screened', NOT_GIVEN_OPTIONAL: 'None given (optional here)', PROVIDED: 'Given',
+    MISSING_BUT_REQUIRED: 'Missing (required)', HYPOTHESIS: 'Hypothesis',
     OLLAMA_UNREACHABLE: 'Ollama is not reachable', MODEL_NOT_FOUND: 'the model is not installed', MODEL_TIMEOUT: 'it timed out', MODEL_BAD_OUTPUT: 'its answer was malformed twice', MODEL_ERROR: 'Ollama returned an error', SUPPORTED: 'Supported', REFUTED: 'Refuted', MIXED: 'Mixed',
   };
   const TONE = {
-    clear: ['SUPPORTED', 'ALLOW_DISCOVERY', 'CLEAR', 'PASS', 'SCORED', 'GO_ON', 'CONTINUE_TESTING', 'HIT', 'LOCKED', 'APPROVED', 'EXCERPT_MATCHED', 'URL_ACCESSIBLE', 'OK', 'READY', 'EVIDENCE_ADDED', 'RANKED', 'STRUCTURED_DATUM', 'DIRECT_BEHAVIOR', 'LOCKED_RESULT', 'APPLIED', 'REPORTED'],
-    hold: ['MIXED', 'REVIEW_REQUIRED', 'REPEAT', 'NEEDS_EVIDENCE', 'NEAR_MISS', 'AWAITING_JUDGE', 'PENDING_APPROVAL', 'DRAFT', 'DRAFT_NOT_LOCKED', 'PIVOT', 'RANKED_WITH_TIE', 'CONTEXT_WEAK', 'METADATA_ONLY', 'RATE_LIMITED', 'REVISE_REQUESTED', 'PIVOT_REQUESTED', 'INSUFFICIENT', 'TOO_LITTLE_DATA', 'DIRECT_STATEMENT'],
-    stop: ['REFUTED', 'BLOCK', 'HARD_STOP', 'STOP', 'STOP_DO_NOT_LAUNCH', 'BLOCK_DO_NOT_LAUNCH', 'FAIL', 'CLEAR_MISS', 'FETCH_FAILED', 'REJECTED', 'STOPPED', 'NOT_MATCHED', 'OFFLINE', 'ACCESS_DENIED', 'PROVIDER_ERROR', 'EXCLUDED'],
-    info: ['CANDIDATE_METADATA', 'FETCHED', 'CONTEXT_ONLY', 'SUPERSEDED', 'ARCHIVED_PIVOT', 'INVALIDATED'],
+    clear: ['STRONG', 'ACCEPTED_RELEVANT', 'FORM_FIELD', 'FOUNDER_CONFIRMED', 'PROVIDED', 'SUPPORTED', 'ALLOW_DISCOVERY', 'CLEAR', 'PASS', 'SCORED', 'GO_ON', 'CONTINUE_TESTING', 'HIT', 'LOCKED', 'APPROVED', 'EXCERPT_MATCHED', 'URL_ACCESSIBLE', 'OK', 'READY', 'EVIDENCE_ADDED', 'RANKED', 'STRUCTURED_DATUM', 'DIRECT_BEHAVIOR', 'LOCKED_RESULT', 'APPLIED', 'REPORTED'],
+    hold: ['WEAK', 'STATED_IN_TEXT', 'MODEL_SUGGESTED_UNCONFIRMED', 'FOUNDER_SUPPLIED_UNVERIFIED', 'FOUNDER_SUPPLIED', 'TIMEOUT', 'MIXED', 'REVIEW_REQUIRED', 'REPEAT', 'NEEDS_EVIDENCE', 'NEAR_MISS', 'AWAITING_JUDGE', 'PENDING_APPROVAL', 'DRAFT', 'DRAFT_NOT_LOCKED', 'PIVOT', 'RANKED_WITH_TIE', 'CONTEXT_WEAK', 'METADATA_ONLY', 'RATE_LIMITED', 'REVISE_REQUESTED', 'PIVOT_REQUESTED', 'INSUFFICIENT', 'TOO_LITTLE_DATA', 'DIRECT_STATEMENT'],
+    stop: ['PARSER_FAILED', 'TLS_VERIFY_FAILED', 'SIMULATED_NOT_COUNTED', 'SIMULATED_RESULT', 'MISSING_BUT_REQUIRED', 'REFUTED', 'BLOCK', 'HARD_STOP', 'STOP', 'STOP_DO_NOT_LAUNCH', 'BLOCK_DO_NOT_LAUNCH', 'FAIL', 'CLEAR_MISS', 'FETCH_FAILED', 'REJECTED', 'STOPPED', 'NOT_MATCHED', 'OFFLINE', 'ACCESS_DENIED', 'PROVIDER_ERROR', 'EXCLUDED'],
+    info: ['NOT_GIVEN_OPTIONAL', 'PAGE_FETCHED', 'HYPOTHESIS', 'CANDIDATE_METADATA', 'FETCHED', 'CONTEXT_ONLY', 'SUPERSEDED', 'ARCHIVED_PIVOT', 'INVALIDATED'],
   };
   const tone = (code) => Object.keys(TONE).find((t) => TONE[t].includes(code)) || 'unknown';
   const label = (code) => LABEL[code] || String(code || '—').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
@@ -76,6 +81,14 @@
     if (!res.ok) throw new ApiError(res.status, data.detail ?? data);
     return data;
   }
+  let RUBRIC = null;   // team rubric catalogue (67 checks), fetched once
+  async function rubricCatalog() { if (!RUBRIC) RUBRIC = await api('/rubric'); return RUBRIC; }
+  const DIMNAME = { D01: 'Ethics and legality', D03: 'Problem and customer', D04: 'Demand signals', D05: 'Competition and alternatives', D06: 'Feasibility and founder fit', D07: 'Viability, first look' };
+  const SRC_TYPE = { CUSTOMER_VOICE: 'Customers in their own words (forum, review)', INDUSTRY_REPORT: 'Industry report or reputable publication', OFFICIAL_SOURCE: 'Statute, regulator or government page',
+    COMPANY_PAGE: "A company's own page", PRICING_PAGE: "A company's public price list", PATENT_RECORD: 'Patent record', TALENT_MARKET: 'Job, salary or freelancer listing',
+    DIRECTORY_OR_COMMUNITY: 'Community, directory or platform', ACADEMIC_PASSAGE: 'Passage from a paper (background)', OFFICIAL_STATISTIC: 'Official statistic', FOUNDER_CUSTOMER_RESEARCH: 'Your own customer research' };
+  const unknownText = (v) => (v == null || v === '' ? '<span class="faint">Unknown / not provided</span>' : esc(v));
+
   function errorHtml(e) {
     const d = e.detail;
     const status = e.status ? ` (HTTP ${e.status})` : '';
@@ -323,26 +336,47 @@
         <dl class="facts small">${Object.keys(FIELD).map((k) => `<dt>${FIELD[k]}</dt><dd>${intake[k] ? `${esc(intake[k])} <span class="prov EXPLICIT">Yours</span>` : '<span class="faint">Unknown</span>'}</dd>`).join('')}</dl>
         <div class="row" style="margin-top:14px"><button class="btn" id="refine-btn" ${stopped ? 'disabled' : ''}>Refine and check safety</button><span class="small muted">Runs on your computer. On a CPU this can take a minute or more.</span></div></section>`;
     } else {
-      const p = b.payload, prov = p.provenance || {};
-      const PL = { EXPLICIT: 'Yours', INFERRED_UNCONFIRMED: 'Inferred, confirm it', UNKNOWN: 'Unknown' };
-      right = `<section class="panel" aria-labelledby="sb-h"><header><h2 id="sb-h">Structured brief</h2><span class="small muted">Version ${b.version}, ${esc(p.model === 'NOT_CALLED_SAFETY_BLOCK' ? 'model not called (hard stop found first)' : p.model || '')}</span></header>
-        <p class="small muted">${esc(p.idea_summary || '')}</p>
-        <form id="clarify-form">${Object.keys(FIELD).map((k) => `<div class="field-row"><span class="k">${FIELD[k]}</span><span class="prov ${prov[k] || 'UNKNOWN'}">${PL[prov[k] || 'UNKNOWN']}</span>
-          <div class="v ${p[k] ? '' : 'unknown'}">${p[k] ? esc(p[k]) : 'Not stated'}</div>
-          ${stopped ? '' : `<div class="v"><label class="sr-only" for="c-${k}">Correct ${FIELD[k]}</label><input id="c-${k}" name="${k}" placeholder="${prov[k] === 'EXPLICIT' ? 'Change it' : prov[k] === 'INFERRED_UNCONFIRMED' ? 'Confirm or correct' : 'Add it if you know'}" maxlength="1500">${prov[k] === 'INFERRED_UNCONFIRMED' ? `<button class="btn quiet small" type="button" data-confirm="${k}">Confirm as written</button>` : ''}</div>`}</div>`).join('')}
-        ${stopped ? '' : '<div class="row" style="margin-top:12px"><button class="btn secondary" type="submit" id="clarify-btn">Save as new version</button><span class="small muted">Saving re-runs the safety screen and retires approvals based on the old version.</span></div>'}
+      const p = b.payload, fields = p.fields || {};
+      const d02 = p.d02_preview;
+      const legacy = !p.fields;
+      const rowFor = (k) => {
+        const f = fields[k] || { status: (p.provenance || {})[k] === 'EXPLICIT' ? 'FORM_FIELD' : p[k] ? 'MODEL_SUGGESTED_UNCONFIRMED' : 'NOT_STATED', value: p[k], spans: [] };
+        const sp = (f.spans || [])[0];
+        const src = sp ? (sp.source === 'idea' ? `From your words: “${esc(sp.text)}”` : sp.source.startsWith('form') ? 'Typed in the form' : 'Your answer') : '';
+        const confirmable = !stopped && f.value && ['STATED_IN_TEXT', 'MODEL_SUGGESTED_UNCONFIRMED'].includes(f.status);
+        const placeholder = f.status === 'NOT_STATED' || f.status === 'PARSER_FAILED' ? 'Type your answer' : 'Type a correction';
+        return `<div class="field-row" data-field="${k}"><span class="k">${FIELD[k]}${['target_customers', 'problem', 'current_workaround'].includes(k) ? ' <span class="req" title="Needed for idea clarity (D02)">*</span>' : ''}</span>${chip(f.status)}
+          <div class="v ${f.value ? '' : 'unknown'}">${f.value ? esc(f.value) : f.status === 'PARSER_FAILED' ? 'The parser failed here. This is a software fault, not a missing answer.' : 'Not stated'}
+            ${src ? `<div class="small faint">${src}</div>` : ''}${f.status === 'MODEL_SUGGESTED_UNCONFIRMED' ? '<div class="small faint">Suggested by the local model; it is not in your words and does not count until you confirm it.</div>' : ''}
+            ${f.model_suggestion ? `<div class="small faint">The model suggested: “${esc(f.model_suggestion)}” (not used)</div>` : ''}${f.note && f.status !== 'MODEL_SUGGESTED_UNCONFIRMED' ? `<div class="small faint">${esc(f.note)}</div>` : ''}
+            ${f.question && !f.value ? `<div class="small question">${esc(f.question)}</div>` : ''}</div>
+          ${stopped ? '' : `<div class="v"><label class="sr-only" for="c-${k}">Answer or correct ${FIELD[k]}</label><input id="c-${k}" name="${k}" placeholder="${placeholder}" maxlength="1500">
+            ${confirmable ? `<label class="check small"><input type="checkbox" name="confirm" value="${k}"> Correct as written</label>` : ''}</div>`}</div>`;
+      };
+      const d02Box = d02 ? `<div class="notice ${d02.status === 'PASS' ? 'info' : 'warn'}" style="margin:0 0 14px"><b>Idea clarity (D02): ${d02.status === 'PASS' ? 'customer, pain and current workaround are captured' : 'not yet'}</b>
+          ${d02.missing.length ? `<p>Not stated yet: ${d02.missing.map((k) => FIELD[k].toLowerCase()).join(', ')}.</p>` : ''}
+          ${d02.model_suggested_unconfirmed.length ? `<p>Only suggested by the model: ${d02.model_suggested_unconfirmed.map((k) => FIELD[k].toLowerCase()).join(', ')}. Confirm or correct them.</p>` : ''}
+          ${d02.parser_failed.length ? `<p>The parser failed on: ${d02.parser_failed.map((k) => FIELD[k].toLowerCase()).join(', ')}. Type the answer instead.</p>` : ''}
+          ${d02.stated_in_text_please_confirm.length ? `<p class="small">Found in your words, please check: ${d02.stated_in_text_please_confirm.map((k) => FIELD[k].toLowerCase()).join(', ')}.</p>` : ''}</div>` : '';
+      right = `<section class="panel" aria-labelledby="sb-h"><header><h2 id="sb-h">Structured brief</h2><span class="small muted">Version ${b.version}${legacy ? ', created before v0.8' : ''}</span></header>
+        ${d02Box}
+        <p class="small muted">Values come from, in order: your answers, the form, then your own words (with the exact phrase shown). The model's suggestions never count until you confirm them.</p>
+        <form id="clarify-form">${Object.keys(FIELD).map(rowFor).join('')}
+        ${stopped ? '' : '<div class="row" style="margin-top:12px"><button class="btn" type="submit" id="clarify-btn">Save answers and confirmations</button><span class="small muted">Creates a new brief version, re-runs the safety screen and retires approvals based on the old version.</span></div>'}
         </form>
-        ${(p.questions || []).length ? `<div class="notice info" style="margin-top:14px"><b>The model asks</b><ul class="bullets">${p.questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></div>` : ''}
         ${(p.assumptions || []).length ? `<details class="adv"><summary>Model assumptions (not facts, ${p.assumptions.length})</summary><ul class="bullets small">${p.assumptions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></details>` : ''}
         ${stopped ? '' : '<div class="row" style="margin-top:12px"><button class="btn quiet small" id="refine-btn">Refine again with the model</button></div>'}
       </section>`;
     }
     const missing = b ? ['target_customers', 'problem', 'current_workaround', 'target_market'].filter((k) => !b.payload[k]) : [];
+    const spans = b && b.payload.fields ? Object.entries(b.payload.fields).filter(([k]) => k !== '_signals').flatMap(([k, f]) => (f.spans || []).filter((x) => x.source === 'idea').map((x) => ({ ...x, k }))) : [];
+    const marked = (() => { const t = s.project.original_idea; const ss = spans.slice().sort((a, c) => a.start - c.start); let out = '', i = 0;
+      for (const x of ss) { if (x.start < i) continue; out += esc(t.slice(i, x.start)) + `<mark title="${esc(FIELD[x.k])}">${esc(t.slice(x.start, x.end))}</mark>`; i = x.end; } return out + esc(t.slice(i)); })();
     const st = s.safety && s.safety.status;
     main.innerHTML = `${head('Your brief', 'Your original words on the left; the structured version the agents will use on the right. Nothing marked unknown is guessed later.')}
       ${stopped ? '<div class="notice warn">This venture was stopped by you. It is read-only.</div>' : ''}
       <div class="cols"><div class="brief-grid">
-        <section class="panel"><header><h2>Your words</h2><span class="small muted">Stored exactly</span></header><div class="original">${esc(s.project.original_idea)}</div></section>
+        <section class="panel"><header><h2>Your words</h2><span class="small muted">Stored exactly${spans.length ? '; highlighted phrases were used for fields' : ''}</span></header><div class="original">${marked}</div></section>
         ${right}
       </div>
       ${nextPanel('What happens next', [b ? (missing.length ? `Fill in: ${missing.map((k) => FIELD[k].toLowerCase()).join(', ')}. Idea clarity (D02) needs customer, pain and current workaround.` : 'Customer, pain and workaround are named.') : 'Refine the brief.',
@@ -355,13 +389,19 @@
     if (cf) {
       cf.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const answers = Object.fromEntries([...new FormData(cf)].filter(([, v]) => String(v).trim()));
-        if (!Object.keys(answers).length) { flash('<div class="notice warn">Type a change in at least one field, or use "Confirm as written".</div>'); return; }
-        await busy(document.getElementById('clarify-btn'), 'Saving', async () => { const r = await api(`/projects/${pid}/clarify`, { method: 'POST', pid, body: { answers } }); await render(); ok(`Saved as version ${r.version}. Safety re-screened: ${label(r.safety.status)}.`); });
-      });
-      cf.querySelectorAll('[data-confirm]').forEach((btn) => btn.onclick = async () => {
-        const k = btn.dataset.confirm;
-        await busy(btn, 'Confirming', async () => { await api(`/projects/${pid}/clarify`, { method: 'POST', pid, body: { answers: { [k]: b.payload[k] } } }); await render(); ok(`${FIELD[k]} confirmed as yours.`); });
+        const fd = new FormData(cf);
+        const confirm = fd.getAll('confirm');
+        const answers = Object.fromEntries([...fd].filter(([k, v]) => k !== 'confirm' && String(v).trim()));
+        const toConfirm = confirm.filter((k) => !answers[k]);
+        if (!Object.keys(answers).length && !toConfirm.length) { flash('<div class="notice warn">Type an answer, or tick “Correct as written” on at least one field.</div>'); return; }
+        await busy(document.getElementById('clarify-btn'), 'Saving', async () => {
+          let r = null;
+          if (Object.keys(answers).length) r = await api(`/projects/${pid}/clarify`, { method: 'POST', pid, body: { answers } });
+          if (toConfirm.length) r = await api(`/projects/${pid}/brief/confirm`, { method: 'POST', pid, body: { fields: toConfirm } });
+          await render();
+          const d = r.brief && r.brief.d02_preview;
+          ok(`Saved as brief version ${r.version}. Safety re-screened: ${label(r.safety.status)}.${d ? ` Idea clarity (D02): ${d.status === 'PASS' ? 'pass' : 'not yet'}.` : ''}`);
+        });
       });
     }
   };
@@ -440,8 +480,20 @@
       ${rows.map((r) => `<tr><td><b>${esc(r.name)}</b><div class="small faint">${esc(r.id)}, PDF p.${esc(r.pdf_page)}</div></td><td class="small">${esc(r.kind.replace('_', ' '))}</td>
         <td>${chip(r.status)}</td><td>${r.score != null ? `<span class="score">${r.score}</span><span class="small faint">/5</span>` : '<span class="faint">—</span>'}</td>
         <td class="small">${esc(r.reasoning)}${(r.caveats || []).length ? `<div class="faint">${r.caveats.map(esc).join(' ')}</div>` : ''}
-        ${(r.evidence_ids || []).length ? `<div>Evidence: ${r.evidence_ids.map((id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`).join(', ')}</div>` : ''}</td></tr>`).join('')}
+        ${(r.evidence_ids || []).length ? `<div>Evidence: ${r.evidence_ids.map((id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`).join(', ')}</div>` : ''}
+        ${granularBlock(r, pid)}</td></tr>`).join('')}
       </tbody></table></div>`;
+  }
+  function granularBlock(r, pid) {
+    const g = r.details && r.details.granular;
+    if (!g || !g.length) return '';
+    const sum = r.details.granular_summary || {};
+    const c = sum.counts || {};
+    const head = r.id === 'D01' ? `${g.length} ethics checks` : `${sum.known || 0} of ${g.length} team checks rated (${c.STRONG || 0} strong, ${c.MIXED || 0} mixed, ${c.WEAK || 0} weak), ${sum.unknown || 0} unknown`;
+    return `<details class="granular"><summary>${esc(head)}</summary>
+      <p class="small faint">${esc(sum.rule || '')}${r.details.score_source ? ` Score source: ${esc(label(r.details.score_source).toLowerCase())}.` : ''}</p>
+      <ul class="plain">${g.map((x) => `<li class="gcheck">${chip(x.status)} <a href="/projects/${pid}/research?tab=matrix&check=${esc(x.id)}" data-link>${esc(x.question)}</a>
+        <span class="faint">${esc(x.id)}${x.sources_required ? `, ${(x.independent_organisations || []).length}/${x.sources_required} sources` : ''}</span></li>`).join('')}</ul></details>`;
   }
 
   async function decideFlow(pid, run, rec, evalHash, action) {
@@ -495,12 +547,13 @@
     const tone2 = e ? ({ GO_ON: 'clear', STOP: 'stop', PIVOT: 'hold', REPEAT: 'hold', REVIEW_REQUIRED: 'hold' }[e.exit] || 'unknown') : 'unknown';
     const unknownN = e ? e.criteria.filter((c) => c.unknown).length : null;
     main.innerHTML = `${head('Discover', 'Hypotheses from your local model, then a gate decided by code from the evidence you have.', `<div class="row no-print">${runBtn}</div>`)}
+      <div class="notice info small"><b>Everything in the cards below is a hypothesis</b> written by the local model from your brief. None of it is evidence and no customer was contacted.</div>
       ${run.invalidated_reason ? `<div class="notice warn">This run is out of date: ${esc(run.invalidated_reason)}. Run it again.</div>` : ''}
       ${flags.length ? `<div class="notice error"><b>The agent proposed a prohibited tactic</b><p>${flags.map((f) => `${esc(RULE_NAME[f.rule_id] || f.rule_id)} in “${esc(f.text.slice(0, 120))}”`).join('; ')}. The gate asks you to revise.</p></div>` : ''}
       <div class="cols"><div class="stack">
         <div class="cards">
           <section class="card wide"><h3>Problem and customer <span class="small faint">hypothesis</span></h3><p>${esc(r.problem_statement)}</p>
-            <dl class="facts small"><dt>Who uses it</dt><dd>${esc(r.beachhead_user || '—')}</dd><dt>Who pays</dt><dd>${esc(r.beachhead_payer || '—')}</dd><dt>Target groups</dt><dd>${(r.target_customers || []).map(esc).join('; ')}</dd></dl></section>
+            <dl class="facts small"><dt>Who uses it</dt><dd>${unknownText(r.beachhead_user)}</dd><dt>Who pays</dt><dd>${unknownText(r.beachhead_payer)}</dd><dt>Target groups</dt><dd>${(r.target_customers || []).map(esc).join('; ')}</dd></dl></section>
           <section class="card"><h3>What they use today <span class="chip unknown" title="not sourced">Unverified</span></h3>${list(r.alternatives_unverified)}<p class="small faint">Listed by the model, not found by search. “None found” never means no competitors.</p></section>
           <section class="card"><h3>Value proposition</h3><p>${esc(r.value_proposition)}</p>${(r.opportunities || []).length ? `<h3 style="margin-top:10px">Opportunities</h3>${list(r.opportunities)}` : ''}</section>
           <section class="card"><h3>Feasibility for you</h3>${list(r.feasibility_notes)}</section>
@@ -509,6 +562,10 @@
           <section class="card"><h3>Candidate directions</h3>${(r.directions || []).length ? r.directions.map((d) => `<div class="dir"><span class="tag" aria-label="Direction ${esc(d.id)}">${esc(d.id)}</span><div><b>${esc(d.name)}</b><div class="small muted">${esc(d.segment)}: ${esc(d.value)}</div></div></div>`).join('') : '<p class="faint">None given.</p>'}</section>
           <section class="card"><h3>Most critical unknowns</h3>${list(r.unknowns)}<h3 style="margin-top:10px">Cheap tests it suggests</h3>${list(r.experiments)}</section>
         </div>
+        ${r._quality && ((r._quality.first_pass_issues || []).length || r._quality.degraded) ? `<section class="panel"><header><h2>Quality check on the model's output</h2>${chip(r._quality.degraded ? 'REVIEW_REQUIRED' : 'PASS', 'Code check')}</header>
+          <p class="small muted">Code compared the model's text with your brief: ${r._quality.attempts} attempt(s)${r._quality.degraded ? '; problems that remained after one retry were removed, not replaced' : ''}.</p>
+          <ul class="bullets small">${(r._quality.remaining_issues || []).map((i) => `<li>${esc(i.issue)}</li>`).join('') || '<li>The retry fixed the problems found in the first answer.</li>'}</ul>
+          ${(r._removed_directions || []).length ? `<p class="small">Removed directions: ${r._removed_directions.map((d) => `“${esc(d.name)}” (${esc(d.segment)})`).join('; ')}.</p>` : ''}</section>` : ''}
         ${(r._skeptic_flags || []).length ? `<details class="panel"><summary><b>Skeptic review</b> <span class="small muted">${r._skeptic_flags.length} over-claims or unsourced numbers in the agent's text</span></summary><ul class="bullets small">${r._skeptic_flags.map((f) => `<li>${esc(f.issue)}</li>`).join('')}</ul></details>` : ''}
         <section class="gate" data-tone="${tone2}" aria-labelledby="dg"><div class="gate-body">
           <div class="gate-kicker">Discover gate, decided by code (criterion D09), run v${run.version}</div>
@@ -563,21 +620,40 @@
   }
 
   // ---------------- Research
-  const RS_TABS = [['plan', 'Plan and run'], ['sources', 'Sources'], ['ledger', 'Evidence ledger'], ['customers', 'Your customer research']];
+  const RS_TABS = [['matrix', 'Criteria matrix'], ['plan', 'Plan and run'], ['sources', 'Sources'], ['ledger', 'Evidence ledger'], ['customers', 'Your customer research']];
+  const DIM_OF_D = { D03: 'desirability', D04: 'demand', D05: 'competition', D06: 'feasibility', D07: 'viability' };
+  const REL_Q = [['claim_supported', 'Does the passage itself support or challenge your claim, not just use the same words?', false],
+    ['geography', 'Is it about your target market (country or city)?', true], ['buyer_user', 'Is it about your customer or buyer group?', true],
+    ['method', 'Is the method credible for this claim (counted actions, official data, a real survey), not just opinion?', true], ['date', 'Is it dated and recent enough?', true]];
+  function relevanceFields(prefix) {
+    return `<fieldset class="relevance"><legend>Relevance review <span class="opt">(all five decide whether it counts)</span></legend>
+      <p class="help">Words appearing on the page is not the same as the claim being supported. Only “Yes” or “Not applicable” on all five makes a source count for a check.</p>
+      ${REL_Q.map(([k, q, na]) => `<div class="rq"><span>${esc(q)}</span><select name="rel.${k}" aria-label="${esc(q)}" id="${prefix}-${k}"><option value="UNSURE">Unsure</option><option value="YES">Yes</option><option value="NO">No</option>${na ? '<option value="NOT_APPLICABLE">Not applicable</option>' : ''}</select></div>`).join('')}</fieldset>`;
+  }
+  function collectRelevance(fd) {
+    const out = {}; let any = false;
+    for (const [k] of REL_Q) { const v = fd['rel.' + k]; if (v) { out[k] = v; any = true; } delete fd['rel.' + k]; }
+    return any ? out : null;
+  }
+  function checkOptions(cat, dim, selected) {
+    const groups = ['D03', 'D04', 'D05', 'D06', 'D07'].filter((d) => !dim || d === dim);
+    return `<option value="">Not linked to a team check</option>${groups.map((d) => `<optgroup label="${esc(DIMNAME[d])}">${cat.checks.filter((c) => c.dimension === d).map((c) => `<option value="${esc(c.id)}" ${c.id === selected ? 'selected' : ''}>${esc(c.judge_instruction.question.slice(0, 90))}</option>`).join('')}</optgroup>`).join('')}`;
+  }
+  const CLAIM_HELP = 'One sentence this source speaks to, in plain words. Good: “Small Cairo restaurants throw away unsold ingredients every week.” Not: “restaurants”, “AI”, or the page title.';
   VIEWS.research = async ({ pid }) => {
     const s = snap;
     crumb(s.project.name, 'Research');
     if (!s.brief) { main.innerHTML = `${head('Research', '')}<div class="empty"><h2>Refine the brief first</h2><p>The research plan is built from your brief.</p><a class="btn" href="/projects/${pid}/brief" data-link>Go to the brief</a></div>`; return; }
     const params = new URLSearchParams(location.search);
-    const tab = params.get('tab') || (params.get('ev') ? 'ledger' : 'plan');
-    const [plan, rs] = await Promise.all([api(`/projects/${pid}/research/plan`, { pid }), api(`/projects/${pid}/research`, { pid })]);
+    const tab = params.get('tab') || (params.get('ev') ? 'ledger' : 'matrix');
+    const [plan, rs] = await Promise.all([api(`/projects/${pid}/research/plan`, { pid }), api(`/projects/${pid}/research`, { pid }), rubricCatalog()]);
     const blocked = s.safety && s.safety.status === 'BLOCK';
     const ev = s.criteria.discover;
     main.innerHTML = `${head('Research', 'Gather sources, inspect the actual pages, and add exact passages to your evidence ledger. Finding a source is not verifying it, and a published article never proves demand for your product.')}
       ${blocked ? '<div class="notice error"><b>Hard stop.</b><p>No research runs for an idea that hits a hard stop.</p></div>' : ''}
       <div class="tabs" role="tablist">${RS_TABS.map(([k, n]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${n}${k === 'sources' ? `<span class="count">${rs.candidates.length}</span>` : k === 'ledger' ? `<span class="count">${s.evidence.length}</span>` : ''}</button>`).join('')}</div>
-      <div class="cols"><div id="tab-body"></div>
-      ${nextPanel('What happens next', ['Run the plan, or inspect pages you found yourself.', 'Add exact passages to the ledger; you choose what each one supports or challenges.',
+      <div class="${tab === 'matrix' ? '' : 'cols'}"><div id="tab-body"></div>
+      ${tab === 'matrix' ? '' : nextPanel('What happens next', ['Run the plan, or inspect pages you found yourself.', 'Add exact passages to the ledger; you choose what each one supports or challenges.',
         `Re-evaluate the Discover criteria${ev && ev.stale ? ' (evidence has changed)' : ''}.`, 'Then design a demand test: the only route to evidence of demand.'])}</div>
       <div class="row no-print" style="margin-top:16px"><button class="btn secondary" id="rs-eval" ${s.phase_runs.some((r) => r.phase === 'discover') ? '' : 'disabled'}>Re-evaluate Discover criteria</button>${ev && ev.stale ? chip('INVALIDATED', 'Evidence changed since the last evaluation') : ''}</div>
       ${actionbar([`/projects/${pid}/discovery`, 'Discover'], { href: `/projects/${pid}/experiments`, label: 'Continue to demand tests' })}`;
@@ -585,11 +661,94 @@
     const evb = document.getElementById('rs-eval');
     evb.onclick = () => busy(evb, 'Evaluating', async () => { const x = await api(`/projects/${pid}/criteria/evaluate`, { method: 'POST', pid }); await load(pid); ok(`Re-evaluated with ${x.judge_calls} judge call(s). Discover gate: ${label(x.evaluation.exit)}.`); });
     const body = document.getElementById('tab-body');
-    if (tab === 'plan') renderPlan(body, pid, plan, rs, blocked);
+    if (tab === 'matrix') await renderMatrix(body, pid, params.get('check'), blocked);
+    else if (tab === 'plan') renderPlan(body, pid, plan, rs, blocked);
     else if (tab === 'sources') renderSources(body, pid, rs, plan);
     else if (tab === 'ledger') renderLedger(body, pid, params.get('ev'));
     else renderCustomers(body, pid);
   };
+
+  async function renderMatrix(body, pid, focus, blocked) {
+    const [m, cat] = await Promise.all([api(`/projects/${pid}/rubric`, { pid }), rubricCatalog()]);
+    if (!m.checks.length) { body.innerHTML = `<div class="empty"><p>${esc(m.note || 'Refine the brief first.')}</p></div>`; return; }
+    const sel = m.checks.find((c) => c.id === focus) || m.checks.find((c) => c.id === (m.priority || [])[0]) || m.checks.find((c) => c.kind === 'scored');
+    const groups = ['D03', 'D04', 'D05', 'D06', 'D07', 'D01'];
+    const dimHead = (d) => { const a = m.dimensions[d] || {}; const c = a.counts || {};
+      return d === 'D01' ? `${c.HARD_STOP || 0} hard stop, ${c.REVIEW_REQUIRED || 0} review, ${c.CLEAR || 0} clear`
+        : `${a.score != null ? `score ${a.score}/5, ` : 'no score yet, '}${a.known || 0}/${a.checks} rated`; };
+    body.innerHTML = `<div class="matrix">
+      <nav class="mx-list" aria-label="Team rubric checks">
+        <p class="small muted">${m.coverage.total} team checks under the original dimensions. Rubric ${esc(m.version)}.</p>
+        ${(m.priority || []).length ? `<p class="small"><b>Highest decision risk first:</b> start with demand and problem checks.</p>` : ''}
+        ${groups.map((d) => `<details ${d === sel.dimension || (d !== 'D01' && !focus && d === 'D04') ? 'open' : ''}><summary><b>${esc(d)} ${esc(DIMNAME[d])}</b><span class="small faint">${esc(dimHead(d))}</span></summary>
+          <ul class="plain">${m.checks.filter((c) => c.dimension === d).map((c) => `<li><a href="/projects/${pid}/research?tab=matrix&check=${esc(c.id)}" data-link ${c.id === sel.id ? 'aria-current="true"' : ''}>${chip(c.status)}<span>${esc(c.question)}</span></a></li>`).join('')}</ul></details>`).join('')}
+      </nav>
+      <section class="panel mx-detail" aria-labelledby="mx-h">${checkDetail(sel, cat, pid, blocked)}</section></div>`;
+    wireCheck(body, sel, pid);
+  }
+  function checkDetail(c, cat, pid, blocked) {
+    const p = c.provenance || {};
+    const defs = c.kind === 'knockout' ? `<dt>Fails if</dt><dd>${esc(c.definitions.fail_if)}</dd>`
+      : ['weak', 'mixed', 'strong'].map((k) => `<dt>${chip(k.toUpperCase())}</dt><dd>${esc(c.definitions[k])}</dd>`).join('');
+    const evLink = (id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`;
+    const sr = c.search || {};
+    const types = (c.accepted_source_types || []).filter((t) => t !== 'BRIEF');
+    return `<header><div><div class="small faint">${esc(c.dimension)} ${esc(DIMNAME[c.dimension])} · ${esc(c.id)}</div><h2 id="mx-h">${esc(c.question)}</h2></div>${chip(c.status)}</header>
+      <p class="small">${esc(c.basis || '')}</p>${(c.caps || []).map((x) => `<p class="small notice warn">${esc(x)}</p>`).join('')}${c.reasoning ? `<p class="small muted">Judge: ${esc(c.reasoning)}</p>` : ''}
+      <dl class="facts small defs">${defs}</dl>
+      ${c.kind === 'knockout' ? `<p class="small">${esc(c.next_step || '')} <a href="/projects/${pid}/safety" data-link>Open the safety screen</a>.</p>` : `
+      <h3>What counts as evidence here</h3>
+      <p class="small">${esc(c.research_instruction)}</p>
+      <dl class="facts small"><dt>Sources required</dt><dd>${c.sources_required || 'none external'} independent organisation(s); <b>${(c.independent_organisations || []).length}</b> accepted${(c.independent_organisations || []).length ? ` (${c.independent_organisations.map(esc).join(', ')})` : ''}</dd>
+        <dt>Accepted source types</dt><dd>${types.map((t) => esc(SRC_TYPE[t] || t)).join('; ')}</dd>
+        ${c.absence_claim_cap ? `<dt>Limit</dt><dd>${esc(c.absence_claim_cap)}</dd>` : ''}
+        <dt>Supports</dt><dd>${(c.supporting_ids || []).length ? c.supporting_ids.map(evLink).join(', ') : '<span class="faint">none</span>'}</dd>
+        <dt>Challenges</dt><dd>${(c.contradicting_ids || []).length ? c.contradicting_ids.map(evLink).join(', ') : '<span class="faint">none</span>'}</dd>
+        ${(c.rejected || []).length ? `<dt>Not counted</dt><dd><ul class="plain">${c.rejected.map((x) => `<li>${evLink(x.id)}: ${esc(x.reason)}</li>`).join('')}</ul></dd>` : ''}
+        <dt>Searches tried</dt><dd>${(c.queries_tried || []).length ? c.queries_tried.map((q) => `${esc(q.provider)} “${esc(q.query)}”: ${chip(q.status, q.error)}`).join('<br>') : '<span class="faint">none yet</span>'}</dd>
+        <dt>Next step</dt><dd>${esc(c.next_step || '')}</dd></dl>
+      <div class="mx-actions">
+        <div><b class="small">Search for this check</b><p class="small"><code>${esc(sr.query || '')}</code></p><p class="small muted">${esc(sr.automated_note || '')}</p>
+          <div class="row">${(sr.automated_providers || []).length && !blocked ? `<button class="btn secondary small" id="mx-run">Search ${sr.automated_providers.map((x) => x === 'openalex' ? 'OpenAlex' : 'Crossref').join(' and ')}</button>` : ''}
+          ${(sr.manual_searches || []).map((x) => `<a class="btn quiet small" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>`).join('')}</div></div>
+        <div class="row">${(c.evidence_ids || []).length ? `<button class="btn small" id="mx-judge">Judge this check (one local-model call)</button>` : '<span class="why-disabled">Judging needs at least one accepted, linked source.</span>'}</div>
+      </div>
+      <details class="panel inset" ${blocked ? '' : ''}><summary><b>Add a source for this check</b></summary>
+        <form id="mx-add"><div class="grid2"><div class="field"><label for="mx-url">Page (https)</label><input id="mx-url" name="url" type="url" required placeholder="https://"></div>
+          <div class="field"><label for="mx-type">What kind of source is it?</label><select id="mx-type" name="source_type" required>${types.map((t) => `<option value="${t}">${esc(SRC_TYPE[t] || t)}</option>`).join('')}</select></div></div>
+        <div class="field"><label for="mx-ex">Exact passage, copied from the page</label><textarea id="mx-ex" name="excerpt" rows="3" required minlength="12" maxlength="1200"></textarea><p class="help">FounderOS fetches the page and checks these exact words are on it.</p></div>
+        <div class="field"><label for="mx-claim">Claim it bears on</label><input id="mx-claim" name="claim" required minlength="8" maxlength="800"><p class="help">${esc(CLAIM_HELP)}</p></div>
+        <div class="grid3"><div class="field"><label for="mx-pub">Publisher or organisation</label><input id="mx-pub" name="publisher" maxlength="200" placeholder="Who published it"></div>
+          <div class="field"><label for="mx-date">Published</label><input id="mx-date" name="published_on" maxlength="40" placeholder="2025 or 2025-03-01"></div>
+          <div class="field"><label for="mx-geo">Geography it describes</label><input id="mx-geo" name="geography" maxlength="120" placeholder="e.g. Egypt"></div>
+          <div class="field"><label for="mx-dir">Supports or challenges the check?</label><select id="mx-dir" name="direction"><option value="SUPPORTS">Supports</option><option value="CONTRADICTS">Challenges</option><option value="UNSURE">Unsure</option></select></div></div>
+        ${relevanceFields('mx')}
+        <label class="check small"><input type="checkbox" name="founder_supplied_excerpt"> If FounderOS cannot fetch the page (paywall, certificate or size error), keep it as a passage I copied myself. It will be labelled “pasted by you, not verified” and can never make a check strong on its own.</label>
+        <div class="row" style="margin-top:10px"><button class="btn secondary small" id="mx-add-btn">Fetch, verify and add</button></div></form></details>`}
+      <details class="adv"><summary>Why this check exists (team-supplied reference)</summary><dl class="facts small"><dt>Source</dt><dd>${esc(p.book)}</dd><dt>Chapter</dt><dd>${esc(p.chapter)}</dd><dt>Page</dt><dd>${esc(p.page)}</dd>
+        <dt>Passage</dt><dd>“${esc(p.supporting_passage)}”</dd><dt>Basis</dt><dd>${esc(p.basis)}</dd></dl>
+        <p class="small faint">Supplied by the team and not independently checked against the book. It is the reason for the check, never evidence that your venture meets it.</p></details>`;
+  }
+  function wireCheck(body, c, pid) {
+    const rerender = async () => { await load(pid); await VIEWS.research({ pid }); };
+    const run = body.querySelector('#mx-run');
+    if (run) run.onclick = () => busy(run, 'Searching', async () => {
+      const items = c.search.automated_providers.map((pr) => ({ bucket: { D03: 'PROBLEM', D04: 'MARKET', D05: 'COMPETITORS', D06: 'FEASIBILITY', D07: 'VIABILITY' }[c.dimension] || 'PROBLEM', provider: pr, query: c.search.query.slice(0, 160), subcriterion_id: c.id }));
+      const r = await api(`/projects/${pid}/research/run`, { method: 'POST', pid, body: { items } });
+      await rerender();
+      flash(`<div class="notice info">${r.runs.map((x) => `${esc(x.provider)}: ${esc(label(x.status))}${x.error ? ` (${esc(x.error)})` : ''}, ${x.new_candidates} new candidate(s)`).join('; ')}. Candidates are metadata about papers: open the Sources tab, inspect the page and pick a passage before anything can count.</div>`);
+    });
+    const j = body.querySelector('#mx-judge');
+    if (j) j.onclick = () => busy(j, 'Judging', async () => { const r = await api(`/projects/${pid}/rubric/judge`, { method: 'POST', pid, body: { only: c.id, max_calls: 1 } }); await rerender();
+      const x = r.judged[c.id] || {}; ok(x.valid ? `Judged: ${label(x.rating || 'UNKNOWN')}${(x.caps || []).length ? ' (capped by code)' : ''}.` : `Judge output rejected: ${x.rejected_reason || 'no eligible evidence'}. The check stays unknown.`); });
+    const f = body.querySelector('#mx-add');
+    if (f) f.addEventListener('submit', async (e) => { e.preventDefault(); if (!f.reportValidity()) return;
+      const fd = Object.fromEntries([...new FormData(f)].filter(([, v]) => String(v).trim()));
+      const rel = collectRelevance(fd);
+      const body2 = { ...fd, kind: 'SECONDARY_BACKGROUND', dimension: DIM_OF_D[c.dimension], subcriterion_id: c.id, relevance_checks: rel, founder_supplied_excerpt: !!fd.founder_supplied_excerpt, relevance: 'UNSURE' };
+      await busy(document.getElementById('mx-add-btn'), 'Fetching and checking', async () => { const r = await api(`/projects/${pid}/evidence`, { method: 'POST', pid, body: body2 }); await rerender();
+        flash(`<div class="notice ${r.review_state === 'ACCEPTED_RELEVANT' ? 'info' : 'warn'}"><b>Added to the ledger: ${esc(label(r.review_state || 'UNKNOWN'))}.</b><p>${esc(r.review_reason || '')} Page: ${esc(label(r.url_status))}, excerpt: ${esc(label(r.excerpt_status))}.${(r.review_flags || []).length ? ' ' + r.review_flags.map(esc).join(' ') : ''}</p></div>`); }); });
+  }
 
   function renderPlan(body, pid, plan, rs, blocked) {
     const prov = plan.providers;
@@ -656,8 +815,9 @@
     body.querySelectorAll('form[data-add]').forEach((form) => form.addEventListener('submit', async (e) => {
       e.preventDefault(); if (!form.reportValidity()) return;
       const fd = Object.fromEntries([...new FormData(form)].filter(([, v]) => String(v).trim()));
+      fd.relevance_checks = collectRelevance(fd); fd.paste_confirm = !!fd.paste_confirm;
       await busy(form.querySelector('button[type=submit]'), 'Adding', async () => { const r = await api(`/projects/${pid}/research/candidates/${form.dataset.add}/add`, { method: 'POST', pid, body: fd }); await load(pid); await refreshSources(pid, plan);
-        flash(`<div class="notice ${r.duplicate_of ? 'warn' : 'ok'}">Added to the ledger: ${esc(label(r.excerpt_status))}${r.duplicate_of ? '. Duplicate of an earlier source, so it is not counted twice' : ''}${r.injection_flag ? '. It contains instruction-like text and is excluded' : ''}. Re-evaluate the criteria to use it.</div>`); });
+        flash(`<div class="notice ${r.review_state === 'ACCEPTED_RELEVANT' ? 'info' : 'warn'}"><b>Added to the ledger: ${esc(label(r.excerpt_status))}, review ${esc(label(r.review_state || 'NOT_CHECKED').toLowerCase())}.</b><p>${esc(r.review_reason || '')}${r.duplicate_of ? ' Duplicate of an earlier source, so it is not counted twice.' : ''}${r.injection_flag ? ' It contains instruction-like text and is excluded.' : ''} Re-evaluate the criteria to use it.</p></div>`); });
     }));
   }
   async function refreshSources(pid, plan) { const rs = await api(`/projects/${pid}/research`, { pid }); await load(pid); renderSources(document.getElementById('tab-body'), pid, rs, plan); }
@@ -665,22 +825,31 @@
   function sourceCard(c, dirs) {
     const p = c.payload || {}, fx = c.fetch || {};
     const meta = [c.publisher || fx.meta && fx.meta.publisher, c.year && `published ${c.year}`, fx.meta && fx.meta.published_on && `dated ${fx.meta.published_on}`, p.geography, c.doi && `DOI ${c.doi}`].filter(Boolean);
+    const cat = RUBRIC || { checks: [] };
+    const typeOpts = Object.entries(SRC_TYPE).filter(([k]) => k !== 'FOUNDER_CUSTOMER_RESEARCH').map(([k, v]) => `<option value="${k}" ${(c.provider === 'crossref' || c.provider === 'openalex') && k === 'ACADEMIC_PASSAGE' ? 'selected' : ''}>${esc(v)}</option>`).join('');
     const addForm = (use, extra) => `<details class="adv"><summary>Add to ledger…</summary><form data-add="${c.id}"><input type="hidden" name="use" value="${use}">${extra}
-      <div class="grid2"><div class="field"><label>Claim this bears on</label><input name="claim" required minlength="8" maxlength="800" placeholder="e.g. Cairo engineering students often miss deadlines"></div>
+      <div class="field"><label>Claim this bears on</label><input name="claim" required minlength="8" maxlength="800" placeholder="e.g. Small Cairo restaurants throw away unsold ingredients every week"><p class="help">${esc(CLAIM_HELP)}</p></div>
+      <div class="grid2"><div class="field"><label>Team check it informs <span class="opt">(needed for the criteria matrix)</span></label><select name="subcriterion_id">${checkOptions(cat, null, p.subcriterion_id)}</select></div>
+      <div class="field"><label>What kind of source is it?</label><select name="source_type"><option value="">Not sure</option>${typeOpts}</select></div>
       <div class="field"><label>Dimension</label><select name="dimension">${Object.entries(DIM).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <div class="field"><label>Does it support or challenge the claim?</label><select name="direction"><option value="UNSURE">Unsure</option><option value="SUPPORTS">Supports</option><option value="CONTRADICTS">Challenges</option></select></div>
-      <div class="field"><label>Relevant to your exact segment?</label><select name="relevance"><option value="UNSURE">Unsure</option><option value="CLAIM_RELEVANT">Yes, relevant</option><option value="IRRELEVANT">No, context only</option></select></div>
       <div class="field"><label>Geography it describes</label><input name="geography" maxlength="120" value="${esc(p.geography || '')}" placeholder="e.g. Egypt"></div>
       <div class="field"><label>Candidate direction <span class="opt">(optional)</span></label><select name="direction_id"><option value="">None</option>${dirs.map((d) => `<option value="${esc(d.id)}">${esc(d.id)}: ${esc(d.name)}</option>`).join('')}</select></div></div>
+      ${relevanceFields('c' + c.id.slice(0, 6))}
       <button class="btn small" type="submit">Add to ledger</button></form></details>`;
     let inner = '';
     if (c.state === 'FETCHED' && fx.passages) {
       inner = `${fx.paywall_suspected ? '<div class="notice warn small">This looked like a paywall or a very short page. Read the full source yourself.</div>' : ''}
+        ${fx.truncated ? `<div class="notice warn small">${esc(fx.truncation_note)}</div>` : ''}${fx.reserved_domain ? '<div class="notice error small">This is a reserved documentation domain (like example.com). Its text is placeholder text and is always excluded.</div>' : ''}
         <p class="small muted">Passages from the fetched page, ordered by word overlap (a rough heuristic). Pick one; FounderOS stores it only if it is really on the page.</p>
         <form data-add="${c.id}"><input type="hidden" name="use" value="PASSAGE">${fx.passages.map((ps, i) => `<label class="passage check"><input type="radio" name="excerpt" value="${esc(ps.text)}" ${i === 0 && !ps.injection_flag ? 'checked' : ''} required><span>${esc(ps.text)}${ps.injection_flag ? ' <span class="chip stop">Instruction-like text</span>' : ''}</span></label>`).join('')}
         ${addForm('PASSAGE', '').replace(/^<details[^>]*><summary>[^<]*<\/summary><form[^>]*><input[^>]*>/, '').replace(/<\/form><\/details>$/, '')}</form>`;
     } else if (c.state === 'FETCH_FAILED') {
-      inner = `<p class="small">${chip('FETCH_FAILED')} ${esc(fx.error || '')}</p>${p.abstract ? `<details class="adv"><summary>Provider abstract (metadata only)</summary><blockquote>${esc(p.abstract)}</blockquote>${addForm('ABSTRACT_METADATA', '<p class="small muted">Added as metadata only: kept as context, never counted in scores.</p>')}</details>` : ''}`;
+      inner = `<p class="small">${chip(fx.error_code || 'FETCH_FAILED')} ${esc(fx.error || '')}</p>${fx.advice ? `<p class="small muted">${esc(fx.advice)}</p>` : ''}
+        ${fx.error_code === 'BLOCKED_ADDRESS' ? '' : `<div class="row"><button class="btn quiet small" data-fetch="${c.id}">Try again</button></div>
+        <details class="adv"><summary>Paste the passage yourself</summary>${addForm('FOUNDER_PASTE', `<div class="field"><label>Passage you copied from this page</label><textarea name="excerpt" rows="3" required minlength="12" maxlength="1200"></textarea></div>
+          <label class="check small"><input type="checkbox" name="paste_confirm" required> I copied this from the page above myself. It will be labelled “pasted by you, not verified”.</label>`).replace(/^<details[^>]*><summary>[^<]*<\/summary>/, '').replace(/<\/details>$/, '')}</details>`}
+        ${p.abstract ? `<details class="adv"><summary>Provider abstract (metadata only)</summary><blockquote>${esc(p.abstract)}</blockquote>${addForm('ABSTRACT_METADATA', '<p class="small muted">Added as metadata only: kept as context, never counted in scores.</p>')}</details>` : ''}`;
     } else if (c.state === 'CANDIDATE_METADATA') {
       inner = `${p.abstract ? `<p class="small muted">Provider abstract, metadata only:</p><blockquote>${esc(p.abstract.slice(0, 500))}${p.abstract.length > 500 ? '…' : ''}</blockquote>` : '<p class="small faint">Title and metadata only. Inspect the page to see what it actually says.</p>'}
         <div class="row">${c.url ? `<button class="btn secondary small" data-fetch="${c.id}">Inspect the page</button>` : ''}<button class="btn quiet small" data-reject="${c.id}">Reject</button></div>
@@ -702,8 +871,9 @@
     const q = (s.criteria.discover && s.criteria.discover.evaluation && s.criteria.discover.evaluation.quality) || {};
     body.innerHTML = s.evidence.length ? `<section class="panel"><header><h2>Evidence ledger</h2><span class="small muted">Immutable; add a challenging record instead of editing</span></header>
       <ul class="plain">${s.evidence.map((e) => { const g = q[e.id];
-        return `<li id="ev-${e.id}" ${focus === e.id ? 'style="background:var(--accent-tint);padding-left:8px"' : ''}><div class="row" style="justify-content:space-between"><b>${esc(e.claim)}</b><span class="row">${g ? chip(g.grade, g.exclusion || g.flags.join(' ')) : ''}${chip(e.excerpt_status !== 'NOT_APPLICABLE' ? e.excerpt_status : e.independence === 'FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED' ? 'DIRECT_STATEMENT' : 'UNKNOWN')}</span></div>
-          <div class="meta small muted">${esc(e.kind.replace(/_/g, ' ').toLowerCase())}, ${esc(DIM[e.dimension] || e.dimension)}, ${e.direction === 'SUPPORTS' ? 'supports' : e.direction === 'CONTRADICTS' ? 'challenges' : 'direction unsure'}${e.direction_id ? `, direction ${esc(e.direction_id)}` : ''}${e.criterion_id ? `, criterion ${esc(e.criterion_id)}` : ''}, id ${short(e.id)}</div>
+        return `<li id="ev-${e.id}" ${focus === e.id ? 'style="background:var(--accent-tint);padding-left:8px"' : ''}><div class="row" style="justify-content:space-between"><b>${esc(e.claim)}</b><span class="row">${e.review_state ? chip(e.review_state, e.review_reason) : ''}${g ? chip(g.grade, g.exclusion || g.flags.join(' ')) : ''}${chip(e.excerpt_status !== 'NOT_APPLICABLE' ? e.excerpt_status : e.independence === 'FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED' ? 'DIRECT_STATEMENT' : 'UNKNOWN')}</span></div>
+          <div class="meta small muted">${esc(e.kind.replace(/_/g, ' ').toLowerCase())}, ${esc(DIM[e.dimension] || e.dimension)}, ${e.direction === 'SUPPORTS' ? 'supports' : e.direction === 'CONTRADICTS' ? 'challenges' : 'direction unsure'}${e.direction_id ? `, direction ${esc(e.direction_id)}` : ''}${e.criterion_id ? `, criterion ${esc(e.criterion_id)}` : ''}${e.subcriterion_id ? `, check <a href="/projects/${pid}/research?tab=matrix&check=${esc(e.subcriterion_id)}" data-link>${esc(e.subcriterion_id)}</a>` : ''}${e.source_type ? `, ${esc((SRC_TYPE[e.source_type] || e.source_type).toLowerCase())}` : ''}, id ${short(e.id)}</div>
+          ${e.review_reason ? `<div class="small muted">Review: ${esc(e.review_reason)}</div>` : ''}
           ${e.excerpt ? `<blockquote>${esc(e.excerpt)}</blockquote>` : ''}
           ${e.source_url ? `<div class="url small"><a href="${esc(e.final_url || e.source_url)}" target="_blank" rel="noopener noreferrer">${esc(e.final_url || e.source_url)}</a> ${esc([e.publisher, e.published_on, e.geography].filter(Boolean).join(', '))}${e.retrieved_at ? `, retrieved ${when(e.retrieved_at)}` : ''}</div>` : ''}
           ${e.method ? `<div class="small">${esc(e.method)}: n=${esc(e.sample_size)}${e.positives != null ? `, ${esc(e.positives)} positive` : ''}, ${esc(e.collected_from)}${e.collected_to ? ` to ${esc(e.collected_to)}` : ''}. Founder-reported, not independently verified.</div>` : ''}
@@ -749,6 +919,7 @@
     const accepted = s.evidence.filter((e) => !e.duplicate_of && !e.injection_flag);
     const dirs = ((s.phase_runs.find((r) => r.phase === 'discover') || {}).report || {}).directions || [];
     const draft = store.get(`founderos_exp_${pid}`, null);
+    const minors = /\b(children|kids|child|k-?12|minors?|pupils?|teen(ager)?s?|under[- ]18|schoolchildren)\b/i.test(`${s.project.original_idea} ${s.brief.payload.target_customers || ''}`);
     main.innerHTML = `${head('Demand tests', 'The only way to learn whether people want this: watch what they do. You fix the pass mark before collecting any result, and code reads the result against it.')}
       <div class="cols"><div class="stack">
         ${sug && sug.kind === 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL' ? `<section class="panel"><header><h2>Suggested next test</h2>${chip('DRAFT', 'A suggestion, not a plan you approved')}</header>
@@ -774,7 +945,13 @@
             <div class="field"><label for="x-con">How people consent</label><input id="x-con" name="consent_method" required minlength="10" maxlength="600" value="I explain who I am and why I ask; joining is optional and they can withdraw."></div>
             <div class="field"><label for="x-act">What you will do yourself</label><textarea id="x-act" name="founder_actions" required minlength="10" maxlength="1200" rows="2"></textarea></div>
             <div class="field"><label for="x-pv">If it fails, which direction would you test next? <span class="opt">(optional)</span></label><input id="x-pv" name="pivot_alternative" maxlength="400"></div>
+            <div class="grid2"><div class="field"><label for="x-rec">How you will recruit people</label><input id="x-rec" name="recruitment_method" maxlength="600" placeholder="e.g. Visit 15 restaurants in Nasr City in person"></div>
+            <div class="field"><label for="x-exc">Who you will exclude, and why <span class="opt">(optional)</span></label><input id="x-exc" name="exclusions" maxlength="600" placeholder="e.g. Friends and family; chains with 50+ staff"></div></div>
+            <div class="field"><label for="x-lim">Known limitations <span class="opt">(optional)</span></label><input id="x-lim" name="limitations" maxlength="600" placeholder="e.g. One neighbourhood only; small sample"></div>
+            ${minors ? `<div class="notice warn small"><b>This venture involves children.</b><p>Test only with consenting adults (parents, guardians, teachers) in a research-only setting. Never recruit, message or survey children. FounderOS collects no personal data about anyone.</p>
+              <label class="check"><input type="checkbox" name="participants_adults_only"> Only consenting adults will take part; no child will be contacted.</label></div>` : '<input type="hidden" name="participants_adults_only" value="">'}
             <label class="check"><input type="checkbox" name="critical" checked> This test checks a critical assumption: a clear miss at the stop signal should mean stop or pivot.</label>
+            <label class="check"><input type="checkbox" name="simulated"> This is a demo or simulation, not a real test. It will be marked <b>SIMULATED / NOT COUNTED</b> and its result can never count as demand.</label>
             <div class="row" style="margin-top:12px"><button class="btn secondary" id="exp-save">Save draft</button><span class="small muted">Drafts are checked (V05) before you can lock them.</span></div></form></section>
         ${Object.values(series).reverse().map((rows) => expSeries(rows, pid)).join('') || '<div class="empty"><p>No tests yet. A planned test is never evidence.</p></div>'}
       </div>
@@ -784,7 +961,7 @@
     const f = document.getElementById('exp-form');
     const fill = (o) => { for (const [k, v] of Object.entries(o || {})) { const el = f.elements[k]; if (!el || v == null) continue; if (el.type === 'checkbox') el.checked = !!v; else el.value = v; } };
     if (draft) fill(draft);
-    f.addEventListener('input', () => { const d = Object.fromEntries(new FormData(f)); d.critical = f.elements.critical.checked; store.set(`founderos_exp_${pid}`, d); });
+    f.addEventListener('input', () => { const d = Object.fromEntries(new FormData(f)); d.critical = f.elements.critical.checked; d.simulated = f.elements.simulated.checked; store.set(`founderos_exp_${pid}`, d); });
     const us = document.getElementById('use-sug');
     if (us) us.onclick = () => { fill({ hypothesis: sug.hypothesis.slice(0, 600), target_segment: sug.target_segment.slice(0, 300), metric: sug.metric.slice(0, 400), consent_method: sug.consent_method.slice(0, 600),
       founder_actions: sug.founder_actions.join(' ').slice(0, 1200), min_sample: sug.suggested_criteria.min_sample, success_threshold_pct: sug.suggested_criteria.success_threshold_pct,
@@ -794,7 +971,8 @@
       const d = Object.fromEntries([...new FormData(f)].filter(([, v]) => String(v).trim()));
       const rev = d._revise; delete d._revise;
       for (const k of ['min_sample', 'success_threshold_pct', 'adverse_threshold_pct', 'time_window_days']) d[k] = Number(d[k]);
-      d.critical = f.elements.critical.checked; d.dimension = d.claim_id === 'C-PROB' ? 'desirability' : d.claim_id === 'C-VIAB' ? 'viability' : d.claim_id === 'C-COMP' ? 'competition' : 'demand';
+      d.critical = f.elements.critical.checked; d.simulated = f.elements.simulated.checked;
+      d.participants_adults_only = !!(f.elements.participants_adults_only && f.elements.participants_adults_only.checked); d.dimension = d.claim_id === 'C-PROB' ? 'desirability' : d.claim_id === 'C-VIAB' ? 'viability' : d.claim_id === 'C-COMP' ? 'competition' : 'demand';
       d.timebox_estimate = `ESTIMATE: ${d.time_window_days} days`;
       await busy(document.getElementById('exp-save'), 'Saving', async () => {
         const r = await api(rev ? `/projects/${pid}/experiments/${rev}/revise` : `/projects/${pid}/experiments`, { method: 'POST', pid, body: d });
@@ -822,21 +1000,31 @@
     const x = rows[rows.length - 1], p = x.payload, today = new Date().toISOString().slice(0, 10);
     const dc = x.design_check;
     const resultEv = x.result_evidence_id && snap.evidence.find((e) => e.id === x.result_evidence_id);
-    return `<section class="panel"><header><h2>${esc(p.hypothesis.slice(0, 90))}</h2>${chip(x.status)}</header>
+    return `<section class="panel ${p.simulated ? 'simulated' : ''}"><header><h2>${esc(p.hypothesis.slice(0, 90))}</h2><span class="row">${p.simulated ? chip('SIMULATED_NOT_COUNTED', 'A demo; never counts as demand') : ''}${chip(x.status)}</span></header>
+      ${p.simulated ? '<div class="notice error small"><b>SIMULATED / NOT COUNTED.</b> This is a demo. Its result is kept apart from real results and never counts toward any verdict.</div>' : ''}
       <dl class="facts small"><dt>Version</dt><dd>${x.version}${rows.length > 1 ? ` (earlier: ${rows.slice(0, -1).map((r) => `v${r.version} ${label(r.status).toLowerCase()}`).join(', ')})` : ''}</dd>
       <dt>Metric</dt><dd>${esc(p.metric)}</dd><dt>Pass mark</dt><dd>${p.success_threshold_pct}% of at least ${p.min_sample} people within ${p.time_window_days || '?'} days; stop signal ≤ ${p.adverse_threshold_pct}%; near miss within ${Math.round((p.near_miss_band || 0) * 100)}% below</dd>
       <dt>Number comes from</dt><dd>${esc(label(p.threshold_origin || 'NOT_SET'))}${p.benchmark_evidence_id ? ` (evidence ${short(p.benchmark_evidence_id)})` : ''}</dd>
-      ${x.locked_at ? `<dt>Locked</dt><dd>${when(x.locked_at)}</dd>` : ''}</dl>
+      <dt>Recruitment</dt><dd>${unknownText(p.recruitment_method)}</dd><dt>Exclusions</dt><dd>${unknownText(p.exclusions)}</dd><dt>Consent</dt><dd>${unknownText(p.consent_method)}</dd>
+      <dt>Limitations</dt><dd>${unknownText(p.limitations)}</dd>
+      ${x.locked_at ? `<dt>Locked</dt><dd>${when(x.locked_at)}</dd>` : '<dt>Locked</dt><dd><span class="faint">Not locked: a plan, not a result</span></dd>'}</dl>
       ${x.status === 'DRAFT' ? `<div class="gate-actions"><h3>Design check (V05)</h3><ul class="plain small">${Object.entries(dc.items).map(([k, v]) => `<li>${chip(v.ok ? 'PASS' : 'FAIL')} ${esc(k.replace(/_/g, ' '))}${v.ok ? '' : `: ${esc(v.why)}`}</li>`).join('')}</ul>
         <div class="row">${dc.status === 'PASS' ? `<button class="btn" data-lock="${x.id}" data-v="${x.version}">Lock this test</button>` : '<span class="why-disabled">Fix the failing checks to lock.</span>'}<button class="btn quiet small" data-revise="${x.id}">Edit</button></div></div>` : ''}
       ${x.status === 'LOCKED' && !x.result_evidence_id ? `<form data-result="${x.id}" class="gate-actions"><h3>Enter the real result</h3><div class="grid3">
         <div class="field"><label>People who took part</label><input name="sample_size" type="number" min="1" required></div><div class="field"><label>Of them, did the action</label><input name="positives" type="number" min="0" required></div>
         <div class="field"><label>Method</label><input name="method" required minlength="10" maxlength="600" placeholder="Waitlist form shared in 2 lectures"></div>
         <div class="field"><label>Collected from</label><input name="collected_from" type="date" min="${(x.locked_at || '').slice(0, 10)}" max="${today}" required></div><div class="field"><label>Collected to</label><input name="collected_to" type="date" max="${today}" required></div>
-        <div class="field"><label>Negative signals <span class="opt">(optional)</span></label><input name="negative_signals" maxlength="1000"></div></div>
+        <div class="field"><label>Negative signals <span class="opt">(optional)</span></label><input name="negative_signals" maxlength="1000"></div>
+        <div class="field"><label>How people were recruited</label><input name="recruitment_method" required minlength="5" maxlength="600" value="${esc(p.recruitment_method || '')}"></div>
+        <div class="field"><label>Who was excluded <span class="opt">(optional)</span></label><input name="exclusions" maxlength="600" value="${esc(p.exclusions || '')}"></div>
+        <div class="field"><label>Limitations <span class="opt">(optional)</span></label><input name="limitations" maxlength="600"></div></div>
         <label class="check"><input type="checkbox" name="consent_confirmed" required> Real participants who consented. Nothing invented.</label>
         <div class="row" style="margin-top:10px"><button class="btn">Submit result</button><button type="button" class="btn quiet small" data-revise="${x.id}">Change the test (new version)</button></div></form>` : ''}
-      ${x.reading ? `<div class="gate-actions"><p>${chip(x.reading)} ${esc(resultEv ? `${resultEv.positives}/${resultEv.sample_size} = ${resultEv.rate_pct}%` : '')}</p><p class="small muted">${esc(resultEv ? resultEv.limitations : '')}</p>
+      ${x.reading ? `<div class="gate-actions"><p>${chip(x.reading)} ${esc(resultEv ? `${resultEv.positives} of ${resultEv.sample_size} people did the action (${resultEv.rate_pct}%)` : '')}</p>
+        ${resultEv ? (() => { let m = {}; try { m = JSON.parse(resultEv.meta_json || '{}'); } catch (e) { m = {}; } return `<dl class="facts small"><dt>Denominator</dt><dd>${esc(resultEv.sample_size)}</dd><dt>Numerator</dt><dd>${esc(resultEv.positives)}</dd>
+          <dt>Dates</dt><dd>${esc(resultEv.collected_from)} to ${esc(resultEv.collected_to)}</dd><dt>Consent</dt><dd>${resultEv.consent_confirmed ? 'Confirmed by you' : 'Not confirmed'}</dd>
+          <dt>Recruitment</dt><dd>${unknownText(m.recruitment_method)}</dd><dt>Exclusions</dt><dd>${unknownText(m.exclusions)}</dd>
+          <dt>Locked pass mark / stop</dt><dd>${esc(p.success_threshold_pct)}% / ${esc(p.adverse_threshold_pct)}% (${esc(label(p.threshold_origin || 'NOT_SET'))})</dd><dt>Limitations</dt><dd>${unknownText(m.limitations)}</dd></dl>`; })() : ''}<p class="small muted">${esc(resultEv ? resultEv.limitations : '')}</p>
         <a href="/projects/${pid}/research?ev=${x.result_evidence_id}" data-link class="small">See it in the ledger</a> <button class="btn quiet small" data-revise="${x.id}">Repeat with new criteria</button></div>` : ''}
     </section>`;
   }
@@ -864,7 +1052,10 @@
       ${val.invalidated_reason ? `<div class="notice warn">This passport is out of date: ${esc(val.invalidated_reason)}. Run validation again.</div>` : ''}
       <div class="cols"><div class="stack">
         <section class="gate" data-tone="${tn}" aria-labelledby="vg"><div class="gate-body"><div class="gate-kicker">Verdict computed by code, not by the model (code ${esc(g.verdict)})</div>
-          <p class="verdict" id="vg">${esc(label(g.verdict))}</p><p class="why">${esc(g.headline)}</p><p><b>If you continue:</b> ${esc(g.recommendation)}</p>
+          <p class="verdict" id="vg">${esc(label(g.verdict))}</p>
+          ${g.explanation ? `<ul class="why plain">${g.explanation.lines.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p class="why">${esc(g.headline)}</p>`}
+          <p><b>If you continue:</b> ${esc(g.recommendation)}</p>
+          ${(g.simulated_results_not_counted || []).length ? `<p class="small">${chip('SIMULATED_NOT_COUNTED')} ${g.simulated_results_not_counted.length} simulated test(s) exist and are not counted.</p>` : ''}
           <p class="small muted">Allows: continue research ${g.permissions.continue_research ? 'yes' : 'no'}; build no; launch no; any external action no. ${esc(g.never)}</p>
           ${gateButtons({ ...val, phase: 'validate' }, pid, g.verdict)}
           ${dec ? `<p class="small">Your decision: ${chip(dec.action === 'APPROVE' ? 'APPROVED' : dec.action === 'STOP' ? 'STOPPED' : dec.action + '_REQUESTED')} ${when(dec.created_at)}${dec.feedback ? `, “${esc(dec.feedback)}”` : ''}${dec.acknowledged_risk ? ' (you chose a different course than the gate)' : ''}.</p>` : ''}
@@ -881,10 +1072,13 @@
           ${g.excluded_evidence.length ? `<section class="card wide"><h3>Not counted</h3><ul class="bullets small">${g.excluded_evidence.map((x) => `<li>${evLink(x.id)}: ${esc(x.reason)}</li>`).join('')}</ul></section>` : ''}
         </div>
         ${g.criteria ? `<section class="panel"><header><h2>Validate criteria</h2><span class="small muted">${esc(g.criteria.criteria_version)}, ${g.criteria.unknown_count} unknown</span></header>${criteriaTable(g.criteria.criteria, pid)}</section>` : ''}
-        <section class="panel"><header><h2>The validation agent's explanation</h2>${chip('INFO', 'AI text explaining a code verdict')}</header>
-          <p>${esc(r.summary)}</p><dl class="facts small"><dt>Research vs demand</dt><dd>${esc(r.market_research_vs_customer_demand)}</dd><dt>Risks</dt><dd>${(r.risks || []).map(esc).join('; ') || '—'}</dd>
-          <dt>Gaps</dt><dd>${(r.contradictions_or_gaps || []).map(esc).join('; ') || '—'}</dd><dt>Pricing ideas (untested)</dt><dd>${(r.pricing_hypotheses || []).map(esc).join('; ') || '—'}</dd>
-          <dt>Business model ideas (untested)</dt><dd>${(r.business_model_hypotheses || []).map(esc).join('; ') || '—'}</dd></dl>
+        <section class="panel"><header><h2>The local model's commentary</h2>${chip('HYPOTHESIS', 'AI text explaining a code verdict; checked against it')}</header>
+          <p class="small muted">Secondary to the verdict above. Code removes fragments and sentences that contradict the verdict, and rewrites “X does not exist” as “no evidence of X was recorded”.</p>
+          ${r._model_error ? `<div class="notice warn small">${esc(r._model_error)}</div>` : ''}
+          <p>${unknownText(r.summary)}</p><dl class="facts small"><dt>Research vs demand</dt><dd>${unknownText(r.market_research_vs_customer_demand)}</dd><dt>Risks</dt><dd>${unknownText((r.risks || []).join('; '))}</dd>
+          <dt>Gaps</dt><dd>${unknownText((r.contradictions_or_gaps || []).join('; '))}</dd><dt>Pricing ideas (untested)</dt><dd>${unknownText((r.pricing_hypotheses || []).join('; '))}</dd>
+          <dt>Business model ideas (untested)</dt><dd>${unknownText((r.business_model_hypotheses || []).join('; '))}</dd></dl>
+          ${(r._prose_checks || []).length ? `<details class="adv"><summary>${r._prose_checks.length} correction(s) made to the model's text</summary><ul class="bullets small">${r._prose_checks.map((n) => `<li>${esc(n.issue)} <span class="faint">Original: “${esc(n.original)}”</span></li>`).join('')}</ul></details>` : ''}
           ${(r._skeptic_flags || []).length ? `<div class="notice warn small"><b>Skeptic review flagged ${r._skeptic_flags.length} passage(s)</b><ul class="bullets">${r._skeptic_flags.map((f) => `<li>${esc(f.issue)}</li>`).join('')}</ul></div>` : ''}</section>
         <details class="adv"><summary>Advanced: hashes and raw verdict</summary><p class="small">Report <code>${esc(val.report_hash)}</code>, evidence snapshot <code>${esc(g.inputs.evidence_snapshot_hash)}</code>, decision policy ${esc(g.inputs.decision_policy)}, safety policy ${esc(g.inputs.safety_policy)}.</p><pre>${esc(JSON.stringify(g, null, 2))}</pre></details>
       </div>
@@ -901,10 +1095,17 @@
     const s = snap;
     crumb(s.project.name, 'Decision log');
     main.innerHTML = `${head('Decision log', 'Every founder decision, bound to the exact versions it was made on. The log is append-only in SQLite (application-level protection, not tamper-proof storage).')}
-      <section class="panel"><header><h2>Your decisions</h2></header>${s.decisions.length ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Phase</th><th>Decision</th><th>Gate said</th><th>Bound to</th><th>Reason</th></tr></thead><tbody>
-        ${s.decisions.map((d) => `<tr><td class="small">${when(d.created_at)}</td><td>${esc(d.phase)} v${d.run_version}</td><td>${chip(d.action === 'APPROVE' ? 'APPROVED' : d.action === 'STOP' ? 'STOPPED' : d.action + '_REQUESTED')}<div class="small faint">scope ${esc(d.scope.toLowerCase().replace('_', ' '))}</div></td>
-          <td>${chip(d.gate_recommendation)}</td><td class="small">brief v${d.brief_version}, safety ${esc(label(d.safety_status).toLowerCase())}, report <code>${short(d.report_hash)}</code>, criteria ${esc(d.criteria_version || 'pre-v7')}${d.evaluation_hash ? `, evaluation <code>${short(d.evaluation_hash)}</code>` : ''}${d.experiment_versions.length ? `, tests ${d.experiment_versions.map((x) => `${short(x.id, 6)} v${x.version}`).join(', ')}` : ''}</td>
-          <td class="small">${esc(d.feedback || '—')}${d.acknowledged_risk ? '<div class="faint">Chose a different course than the gate.</div>' : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="faint">No decisions yet.</p>'}</section>
+      <section class="panel"><header><h2>Your decisions</h2><span class="small muted">Newest first</span></header>${(s.decision_log || []).length ? `<ol class="decisions">
+        ${s.decision_log.map((d) => `<li class="decision"><div class="d-top"><div><b>${esc(d.phase === 'discover' ? 'Discover' : 'Validate')} run v${esc(d.run_version)}</b> <span class="small muted">${when(d.at)}</span></div>
+          ${chip(d.decision === 'APPROVE' ? 'APPROVED' : d.decision === 'STOP' ? 'STOPPED' : d.decision + '_REQUESTED')}</div>
+          <dl class="facts small">
+            <dt>Your decision</dt><dd>${esc(d.decision_label)}; scope ${esc(d.scope === 'RESEARCH_ONLY' ? 'research only' : d.scope.toLowerCase())}. Never enabled: ${esc(d.never_enabled.join(', '))}.</dd>
+            <dt>Gate said</dt><dd>${chip(d.gate_said)}${d.founder_overrode_gate ? ' <span class="small">You chose a different course and gave a reason.</span>' : ''}</dd>
+            <dt>Your reason</dt><dd>${d.reason ? `“${esc(d.reason)}”` : ''} ${chip(d.reason_status)}</dd>
+            <dt>Bound to</dt><dd>brief v${esc(d.bound_to.brief_version)}; safety ${esc(label(d.bound_to.safety_status).toLowerCase())} (policy <code>${short(d.bound_to.safety_policy_hash)}</code>); report <code>${short(d.bound_to.report_hash)}</code>;
+              criteria ${esc(d.bound_to.criteria_version)}; evaluation <code>${short(d.bound_to.evaluation_hash)}</code>${typeof d.bound_to.discover_evaluation_version === 'number' ? ` v${d.bound_to.discover_evaluation_version}` : ''}; rubric ${esc(d.bound_to.rubric_version)}
+              ${d.tests.length ? `; tests ${d.tests.map((x) => `${short(x.id, 6)} v${x.version} ${label(x.status).toLowerCase()}${x.simulated ? ' (simulated)' : ''}`).join(', ')}` : ''}
+              ${d.refs_not_stored.length ? `<div class="faint">Not stored for this record (it predates the field): ${esc(d.refs_not_stored.join(', '))}.</div>` : ''}</dd></dl></li>`).join('')}</ol>` : '<p class="faint">No decisions yet.</p>'}</section>
       <section class="panel" style="margin-top:18px"><header><h2>Timeline</h2><span class="small muted">Latest ${s.audit.length} events</span></header><ul class="timeline">
         ${s.audit.map((a) => `<li><time datetime="${esc(a.created_at)}">${when(a.created_at)}</time><div><b>${esc(a.event.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()))}</b><div class="small muted">${esc(Object.entries(a.details).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length)).slice(0, 6).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('; ').slice(0, 260))}</div></div></li>`).join('')}</ul></section>`;
   };

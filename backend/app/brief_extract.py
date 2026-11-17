@@ -206,7 +206,7 @@ def extract(idea: str) -> dict:
         m = next((c for c in cands if not solution.search(c.group(0))), cands[0])
         sent = m.group(0).strip()
         typed = {'pain_verified': False if _UNVERIFIED.search(text) else None}
-        note = 'The founder states the pain is not yet verified.' if typed['pain_verified'] is False else None
+        note = 'You said this pain is not yet verified.' if typed['pain_verified'] is False else None
         r = {'value': sent, 'status': 'STATED_IN_TEXT', 'spans': [{'source': 'idea', 'start': m.start(), 'end': m.end(), 'text': sent}], 'typed': typed}
         if note:
             r['note'] = note
