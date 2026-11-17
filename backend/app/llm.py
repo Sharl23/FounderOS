@@ -24,7 +24,9 @@ class ModelOutputError(Exception):
 
 
 ADVICE = {
-    'OLLAMA_UNREACHABLE': 'FounderOS cannot reach Ollama. Standard mode: wait for the "ollama" and "model-init" containers. Windows host mode: start the Ollama app on Windows, then check http://localhost:11434 in your browser.',
+    'OLLAMA_UNREACHABLE': ('FounderOS cannot reach Ollama at OLLAMA_URL. Default setup: install and start Ollama on this computer, run '
+                           '"ollama pull qwen2.5:1.5b-instruct", and check http://localhost:11434 in your browser. Container option: set '
+                           'OLLAMA_URL=http://ollama:11434 in .env and run "docker compose --profile ollama up". Phases 3-6 work without a model.'),
     'MODEL_NOT_FOUND': 'Ollama is running but the model is not installed. Run: ollama pull {model}',
     'MODEL_OOM_GPU': 'The GPU ran out of memory while loading the model (cudaMalloc failed). Close GPU-heavy apps, or force CPU mode by setting OLLAMA_NUM_GPU=0 in .env, then restart. FounderOS will not switch models for you.',
     'MODEL_OOM_CPU': 'The computer ran out of RAM while loading the model (e.g. "failed to allocate CPU_REPACK buffer"). Close memory-heavy apps (browsers with many tabs, games, IDEs), set OLLAMA_NUM_CTX=1024 in .env, and in Docker Desktop/WSL give the VM more memory. A smaller model is your explicit choice only.',
