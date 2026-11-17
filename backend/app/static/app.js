@@ -92,6 +92,9 @@
   function errorHtml(e) {
     const d = e.detail;
     const status = e.status ? ` (HTTP ${e.status})` : '';
+    if (d && typeof d === 'object' && d.code && /^(APPROVAL_|GATE_|CHECKOUT_)/.test(d.code)) {
+      return `<div class="notice error" role="alert"><b>${esc(d.message || d.code)}</b> <span class="small faint">${esc(d.code)}${status}</span></div>`;
+    }
     if (d && typeof d === 'object' && d.code) {
       return `<div class="notice error" role="alert"><b>The local model could not answer: ${esc(label(d.code))}${status}.</b> <span class="small faint">${esc(d.code)}</span>
         <p>${esc(d.advice || '')}</p><p class="small muted">${esc(d.note || '')} Details: ${esc(d.message || '')}</p></div>`;
@@ -171,14 +174,17 @@
     return 'todo';
   }
   const STEP_HINT = { done: 'done', attention: 'needs you', blocked: 'stopped', todo: '' };
+  const PHASE_NAV = [['1 Discover', [['brief', 'Brief'], ['safety', 'Safety'], ['discovery', 'Discover']]], ['2 Validate', [['research', 'Research'], ['experiments', 'Demand tests'], ['decision', 'Decision']]],
+    ['3 Build', [['build', 'Build Studio']]], ['4 Commercial setup', [['commercial', 'Commercial setup']]], ['5 Sell / deliver / get paid', [['sell', 'Sell and get paid']]], ['6 Operate and learn', [['operate', 'Operate and learn']]]];
   function renderNav(route) {
     const steps = document.getElementById('nav-steps');
     document.getElementById('nav-venture-title').hidden = !route.pid;
-    steps.innerHTML = route.pid ? STEPS.map(([k, name], i) => {
-      const st = stepState(snap, k);
-      return `<a href="/projects/${route.pid}/${k}" data-link data-state="${st}" ${route.view === k ? 'aria-current="page"' : ''}>
-        <span class="num" aria-hidden="true">${st === 'done' ? '✓' : i + 1}</span><span>${name}</span><span class="hint">${STEP_HINT[st]}</span></a>`;
-    }).join('') + `<a href="/projects/${route.pid}/audit" data-link ${route.view === 'audit' ? 'aria-current="page"' : ''}><span class="num" aria-hidden="true">≣</span><span>Decision log</span></a>` : '';
+    const link = (k, name, st, n) => `<a href="/projects/${route.pid}/${k}" data-link data-state="${st}" ${route.view === k ? 'aria-current="page"' : ''}>
+        <span class="num" aria-hidden="true">${st === 'done' ? '✓' : n}</span><span>${name}</span><span class="hint">${STEP_HINT[st] || ''}</span></a>`;
+    let n = 0;
+    steps.innerHTML = route.pid ? `<a href="/projects/${route.pid}/workflow" data-link ${route.view === 'workflow' ? 'aria-current="page"' : ''}><span class="num" aria-hidden="true">◇</span><span>Six phases</span></a>`
+      + PHASE_NAV.map(([ph, items]) => `<div class="nav-phase">Phase ${esc(ph)}</div>` + items.map(([k, name]) => link(k, name, STEPS.some(([x]) => x === k) ? stepState(snap, k) : 'todo', ++n)).join('')).join('')
+      + `<a href="/projects/${route.pid}/audit" data-link ${route.view === 'audit' ? 'aria-current="page"' : ''}><span class="num" aria-hidden="true">≣</span><span>Decision log</span></a>` : '';
     for (const [id, v] of [['nav-projects', 'projects'], ['nav-roadmap', 'roadmap'], ['nav-help', 'help']]) {
       const el = document.getElementById(id);
       if (route.view === v) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
@@ -1110,27 +1116,243 @@
         ${s.audit.map((a) => `<li><time datetime="${esc(a.created_at)}">${when(a.created_at)}</time><div><b>${esc(a.event.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()))}</b><div class="small muted">${esc(Object.entries(a.details).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length)).slice(0, 6).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('; ').slice(0, 260))}</div></div></li>`).join('')}</ul></section>`;
   };
 
+  // ---------------- Phases 3-6 (MOCKED / TEST MODE), approvals, six-phase overview
+  const tag = (code, text) => `<span class="chip ${tone(code)}">${esc(text)}</span>`;
+  const MOCK = '<span class="chip stop" title="Simulated, no real money or customers">MOCKED / TEST MODE</span>';
+  const money = (c, cur) => `${(c / 100).toFixed(2)} ${esc(cur || '')}`;
+  const GATE_TONE = { GO: 'PASS', DEMO_ONLY: 'REVIEW_REQUIRED', REPEAT: 'REPEAT', PIVOT: 'PIVOT', STOP: 'STOP', BLOCKED: 'BLOCKED' };
+  function gateBox(g, title) {
+    return `<div class="gate-slip"><div class="small muted">${esc(title || 'Gate')}</div><p class="verdict">${esc(g.outcome.replace('_', '-'))} ${tag(GATE_TONE[g.outcome] || 'INFO', 'decided by code')}</p>
+      <ul class="plain small">${(g.reasons || []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
+  }
+  // Founder approval: the server builds the payload from current state; the founder approves or rejects it here;
+  // the executing endpoint then consumes the approval server-side (stale or rejected approvals never run).
+  async function withApproval(pid, action, target, btn, execute) {
+    return busy(btn, 'Preparing approval', async () => {
+      const a = await api(`/projects/${pid}/approvals`, { method: 'POST', pid, body: { action, target } });
+      dlg.innerHTML = `<form method="dialog"><div class="d-body"><h2 id="dlg-title">Founder approval needed</h2>
+        <p>${esc(a.description)}</p><dl class="facts small"><dt>Action</dt><dd><code>${esc(a.action)}</code></dd><dt>Risk</dt><dd>${esc(a.risk)}</dd><dt>Scope</dt><dd>${esc(a.scope)}</dd>
+        <dt>Bound to</dt><dd>${Object.entries(a.payload).map(([k, v]) => `${esc(k.replace(/_/g, ' '))}: <code>${esc(String(v).slice(0, 18))}</code>`).join('; ')}</dd><dt>Expires</dt><dd>${when(a.expires_at)}</dd></dl>
+        <p class="small muted">If any of these inputs change before it runs, this approval is refused as stale. Nothing is published, sent, spent or signed.</p>
+        <label class="check"><input type="checkbox" id="ap-confirm"> I am the founder and I approve exactly this.</label>
+        <div class="field"><label for="ap-note">Note <span class="opt">(optional)</span></label><input id="ap-note" maxlength="600"></div><div id="dlg-err"></div></div>
+        <div class="d-foot"><button class="btn quiet" type="button" id="ap-reject">Reject</button><button class="btn" type="button" id="ap-ok">Approve and run</button></div></form>`;
+      dlg.showModal();
+      await new Promise((resolve) => {
+        dlg.querySelector('#ap-reject').onclick = async () => {
+          await api(`/projects/${pid}/approvals/${a.id}/decide`, { method: 'POST', pid, body: { decision: 'REJECT', note: dlg.querySelector('#ap-note').value || null } });
+          dlg.close(); flash('<div class="notice info">Rejected. The action did not run, and the rejection is in the approval log.</div>'); resolve();
+        };
+        dlg.querySelector('#ap-ok').onclick = async () => {
+          if (!dlg.querySelector('#ap-confirm').checked) { dlg.querySelector('#dlg-err').innerHTML = '<div class="notice warn small">Tick the confirmation first.</div>'; return; }
+          try {
+            await api(`/projects/${pid}/approvals/${a.id}/decide`, { method: 'POST', pid, body: { decision: 'APPROVE', confirm: true, note: dlg.querySelector('#ap-note').value || null } });
+            await execute(a.id); dlg.close(); resolve();
+          } catch (e) { dlg.querySelector('#dlg-err').innerHTML = errorHtml(e); }
+        };
+        dlg.addEventListener('close', resolve, { once: true });
+      });
+    });
+  }
+
+  VIEWS.workflow = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Six phases');
+    const w = await api(`/projects/${pid}/workflow`, { pid });
+    const view = { 1: 'discovery', 2: 'decision', 3: 'build', 4: 'commercial', 5: 'sell', 6: 'operate' };
+    main.innerHTML = `${head('Six phases', 'The six venture phases, each ending in a gate decided by code and a founder approval enforced by the server.')}
+      <div class="notice warn small">${esc(w.mode_notice)}</div>
+      <section class="panel"><ol class="phases">${w.phases.map((p) => `<li class="phase-row" data-status="${esc(p.status)}"><div class="n">${p.phase}</div><div>
+        <h2><a href="/projects/${pid}/${view[p.phase]}" data-link>${esc(p.name)}</a> ${tag(p.status.startsWith('GATE_PASSED') ? 'PASS' : p.status === 'LOCKED' ? 'NOT_STARTED' : GATE_TONE[p.gate.outcome] || 'INFO', p.status.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()))}</h2>
+        <dl class="facts small"><dt>Needs</dt><dd>${esc(p.inputs)}</dd><dt>Agents</dt><dd>${p.agents.map(esc).join(', ')}</dd><dt>Gate</dt><dd>${esc(p.gate.outcome)}: ${esc((p.gate.reasons || []).join(' '))}</dd><dt>Next</dt><dd>${esc(p.next_action)}</dd></dl></div></li>`).join('')}</ol></section>
+      ${w.pending_approvals.length ? `<section class="panel" style="margin-top:18px"><h2>Pending approvals</h2><ul class="plain small">${w.pending_approvals.map((a) => `<li><code>${esc(a.action)}</code>: ${esc(a.description)} (requested ${when(a.requested_at)})</li>`).join('')}</ul></section>` : ''}`;
+  };
+
+  VIEWS.build = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Phase 3: Build Studio');
+    const st = await api(`/projects/${pid}/build`, { pid });
+    const g2 = st.validate_gate, b = st.latest, g3 = st.build_gate;
+    const canStart = !b && ['GO', 'DEMO_ONLY'].includes(g2.outcome);
+    main.innerHTML = `${head('Build Studio', 'The Product Architect writes a spec and user stories from your brief, the Website Builder generates a static site, and the QA agent checks it. Nothing is deployed.')}
+      <div class="cols"><div class="stack">
+        ${gateBox(g2, 'Validate gate (entry to Build)')}
+        ${canStart ? `<div class="row"><button class="btn" id="b-start">${g2.outcome === 'GO' ? 'Approve and build the MVP prototype' : 'Approve a DEMO-ONLY prototype'}</button></div>
+          ${g2.outcome === 'DEMO_ONLY' ? '<p class="small">A demo prototype is <b>not validated, not launch-ready and not commercially approved</b>. It uses DEMO DATA only.</p>' : ''}` : ''}
+        ${b ? `<section class="panel"><header><h2>${esc(b.spec.name)} v${b.version}</h2><span class="row">${tag(b.mode === 'DEMO_ONLY' ? 'REVIEW_REQUIRED' : 'PASS', b.mode)} ${chip(b.qa.status)}</span></header>
+          <p class="small"><b>${esc(b.spec.status_label)}</b> ${esc(b.spec.data_policy)}</p>
+          <div class="preview-wrap"><iframe title="Prototype preview (sandboxed)" sandbox="allow-scripts" src="${esc(b.preview_url)}" id="b-frame" referrerpolicy="no-referrer" loading="lazy"></iframe></div>
+          <p class="small muted">Sandboxed preview: separate origin, no network, no storage, no access to FounderOS. <a href="${esc(b.preview_url)}" target="_blank" rel="noopener noreferrer">Open in a new tab</a></p>
+          <div class="row"><button class="btn secondary small" id="b-zip">Download files (.zip)</button>${g3.approval_action ? '<button class="btn small" id="b-accept">Accept this version for Commercial setup</button>' : ''}</div></section>
+        <section class="panel"><header><h2>Revise with feedback</h2></header><form id="b-rev"><div class="field"><label for="b-fb">Feedback (one change per line)</label>
+          <textarea id="b-fb" rows="4" required minlength="3" placeholder="name: Quiet Corners\nadd filter: Prayer room\nremove filter: Open late\ncolor: navy\nheadline: ...\ntype: directory | forecast | practice | planner\nhide search"></textarea>
+          <p class="help">Understood: name, headline, add filter, remove filter, color, type, hide/show search. Anything else is reported as not applied (nothing is guessed).</p></div>
+          <button class="btn secondary" id="b-rev-btn" type="submit">Generate a new version</button></form></section>
+        <section class="panel"><header><h2>Spec and user stories</h2><span class="small muted">${esc(b.spec.archetype_label)}</span></header>
+          <dl class="facts small"><dt>For</dt><dd>${esc(b.spec.audience)}</dd><dt>Problem</dt><dd>${esc(b.spec.problem)}</dd><dt>Features</dt><dd>${b.spec.features.map((f) => esc(f.title)).join('; ')}</dd><dt>Out of scope</dt><dd>${b.spec.out_of_scope.map(esc).join('; ')}</dd></dl>
+          <ol class="small">${b.spec.user_stories.map((u) => `<li><b>As ${esc(u.as_a)}</b>, I want ${esc(u.i_want)} so that ${esc(u.so_that)}.<ul class="bullets">${u.acceptance.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></li>`).join('')}</ol></section>
+        <section class="panel"><header><h2>QA checks</h2>${chip(b.qa.status)}</header><ul class="plain small">${b.qa.items.map((i) => `<li>${chip(i.ok ? 'PASS' : 'FAIL')} ${esc(i.why)}</li>`).join('')}</ul><p class="small muted">${esc(b.qa.method)}</p></section>
+        <section class="panel"><header><h2>Generated files</h2></header>${Object.entries(b.files).map(([n, c]) => `<details class="adv"><summary><code>${esc(n)}</code> (${b.file_sizes[n]} bytes)</summary><pre class="code">${esc(c)}</pre></details>`).join('')}</section>` : ''}
+      </div><div class="stack">${gateBox(g3, 'Build gate (exit to Commercial setup)')}
+        <section class="panel"><h2>Versions</h2><ol class="plain small">${st.versions.map((v) => `<li>v${v.version} ${chip(v.qa_status)} ${esc(v.mode)}${v.feedback ? `: “${esc(v.feedback.slice(0, 80))}”` : ''}
+          ${(v.changes || []).filter((c) => !c.applied).length ? `<div class="faint">Not applied: ${v.changes.filter((c) => !c.applied).map((c) => esc(c.line)).join('; ')}</div>` : ''}</li>`).join('') || '<li class="faint">None yet</li>'}</ol></section></div></div>`;
+    const start = document.getElementById('b-start');
+    if (start) start.onclick = () => withApproval(pid, g2.approval_action, null, start, async (aid) => { const r = await api(`/projects/${pid}/build`, { method: 'POST', pid, body: { approval_id: aid } }); await render(); ok(`Prototype v${r.version} generated (${r.mode}); QA ${r.qa.status}.`); });
+    const acc = document.getElementById('b-accept');
+    if (acc) acc.onclick = () => withApproval(pid, 'accept_build', null, acc, async (aid) => { await api(`/projects/${pid}/build/accept`, { method: 'POST', pid, body: { approval_id: aid } }); await render(); ok('Version accepted. Commercial setup is open.'); });
+    const zip = document.getElementById('b-zip');
+    if (zip) zip.onclick = () => busy(zip, 'Preparing', async () => { const res = await fetch(`/api/projects/${pid}/build/${b.version}/export.zip`, { headers: { 'X-Project-Token': tokenFor(pid) } });
+      const blob = await res.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `prototype-v${b.version}.zip`; a.click(); URL.revokeObjectURL(a.href); });
+    const rev = document.getElementById('b-rev');
+    if (rev) rev.addEventListener('submit', (e) => { e.preventDefault(); busy(document.getElementById('b-rev-btn'), 'Generating', async () => {
+      const r = await api(`/projects/${pid}/build/revise`, { method: 'POST', pid, body: { feedback: document.getElementById('b-fb').value } }); await render();
+      ok(`Version ${r.version} generated: ${r.changes.filter((c) => c.applied).length} change(s) applied, ${r.changes.filter((c) => !c.applied).length} not applied. QA ${r.qa.status}.`); }); });
+  };
+
+  VIEWS.commercial = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Phase 4: Commercial setup');
+    const st = await api(`/projects/${pid}/commercial`, { pid });
+    const p = st.latest, r = p && p.results, i = (p && p.inputs) || { currency: 'USD', billing: 'monthly', price: 5, variable_cost_per_sale: 0.5, payment_fee_pct: 2.9, payment_fee_fixed: 0.3, fixed_costs_monthly: 20, build_cost_one_off: 0, sales_per_month_low: 2, sales_per_month_base: 10, sales_per_month_high: 30, monthly_churn_pct: 10 };
+    const f = (k, l, step = '0.01') => `<div class="field"><label for="c-${k}">${l}</label><input id="c-${k}" name="${k}" type="number" step="${step}" min="0" value="${esc(i[k])}" required></div>`;
+    main.innerHTML = `${head('Commercial setup', 'Pricing hypotheses, business models and unit economics calculated in code. Inputs are ASSUMPTIONS; outputs are CALCULATED SCENARIOS, not verified results. Not financial or legal advice.')}
+      ${st.build_gate.outcome !== 'GO' ? `<div class="notice warn">Locked: accept a prototype version in Build Studio first. ${esc(st.build_gate.reasons.join(' '))}</div>` : ''}
+      <div class="cols"><div class="stack"><section class="panel"><header><h2>Assumptions</h2>${tag('HYPOTHESIS', 'ASSUMPTION')}</header><form id="c-form">
+        <div class="grid3"><div class="field"><label for="c-currency">Currency</label><input id="c-currency" name="currency" value="${esc(i.currency)}" pattern="[A-Z]{3}" required></div>
+        <div class="field"><label for="c-billing">Billing</label><select id="c-billing" name="billing"><option value="one_time" ${i.billing === 'one_time' ? 'selected' : ''}>One-time</option><option value="monthly" ${i.billing === 'monthly' ? 'selected' : ''}>Monthly</option></select></div>
+        ${f('price', 'Price')}${f('variable_cost_per_sale', 'Variable cost per sale')}${f('payment_fee_pct', 'Payment fee %')}${f('payment_fee_fixed', 'Payment fee fixed')}${f('fixed_costs_monthly', 'Fixed costs per month')}${f('build_cost_one_off', 'One-off build cost')}
+        ${f('sales_per_month_low', 'Sales/month low', '1')}${f('sales_per_month_base', 'Sales/month base', '1')}${f('sales_per_month_high', 'Sales/month high', '1')}${f('monthly_churn_pct', 'Monthly churn %', '0.1')}</div>
+        <div class="field"><label for="c-ev">Evidence note <span class="opt">(where any figure comes from; otherwise it stays an ASSUMPTION)</span></label><input id="c-ev" name="evidence_note" maxlength="600" value="${esc(i.evidence_note || '')}"></div>
+        <button class="btn" id="c-save" type="submit" ${st.build_gate.outcome !== 'GO' ? 'disabled' : ''}>Calculate a new plan version</button></form></section>
+        ${r ? `<section class="panel"><header><h2>Unit economics (plan v${p.version})</h2>${tag('INFO', 'CALCULATED SCENARIO')}</header>
+          <dl class="facts small"><dt>Price</dt><dd>${r.unit_economics.price} ${esc(i.currency)}</dd><dt>Fee per sale</dt><dd>${r.unit_economics.fee_per_sale}</dd><dt>Contribution per sale</dt><dd>${r.unit_economics.contribution_per_sale} (${r.unit_economics.contribution_margin_pct}%)</dd>
+          <dt>Break-even</dt><dd>${esc(r.unit_economics.break_even_note)}</dd><dt>Lifetime contribution</dt><dd>${r.unit_economics.lifetime_contribution_per_customer}</dd></dl>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Scenario</th><th>Sales/month</th><th>Revenue</th><th>Fees</th><th>Profit/month</th><th>Months to recover build</th></tr></thead><tbody>
+          ${Object.entries(r.unit_economics.scenarios).map(([k, x]) => `<tr><td>${esc(k)}</td><td>${x.sales_per_month}</td><td>${x.revenue}</td><td>${x.fees}</td><td>${x.profit_per_month}</td><td>${x.months_to_recover_build_cost ?? 'never'}</td></tr>`).join('')}</tbody></table></div>
+          <p class="small muted">All rows are CALCULATED SCENARIOS from ASSUMPTION inputs.</p></section>
+        <section class="panel"><h2>Pricing hypotheses</h2><ul class="plain small">${r.pricing_hypotheses.map((h) => `<li>${chip('HYPOTHESIS')} ${esc(h.hypothesis)}: contribution ${h.contribution_per_sale}, break-even ${h.break_even_sales_per_month ?? 'never'}/month</li>`).join('')}</ul></section>
+        <section class="panel"><h2>Business models</h2><ul class="plain small">${r.business_models.map((m) => `<li>${m.selected ? tag('PASS', 'Selected') : ''} <b>${esc(m.name)}</b>: ${esc(m.trade_off)}</li>`).join('')}</ul></section>
+        <section class="panel"><h2>Terms and policy checklist</h2><ul class="plain small">${r.terms_checklist.map((t) => `<li>${tag(t.status === 'TO DO' ? 'NOT_STARTED' : 'INFO', t.status)} <b>${esc(t.item)}</b>: ${esc(t.note)}</li>`).join('')}</ul>
+          <p class="small"><b>Payment provider:</b> ${tag('STOP', r.payment_provider.status)} ${esc(r.payment_provider.detail)}</p></section>` : ''}
+      </div><div class="stack">${gateBox(st.gate, 'Commercial gate (exit to Sell)')}${st.gate.approval_action ? '<button class="btn" id="c-act">Adopt this plan for TEST MODE selling</button>' : ''}</div></div>`;
+    const form = document.getElementById('c-form');
+    form.addEventListener('submit', (e) => { e.preventDefault(); if (!form.reportValidity()) return; const fd = Object.fromEntries(new FormData(form));
+      for (const k of Object.keys(fd)) if (!['currency', 'billing', 'evidence_note'].includes(k)) fd[k] = Number(fd[k]);
+      if (!fd.evidence_note) delete fd.evidence_note;
+      busy(document.getElementById('c-save'), 'Calculating', async () => { const res = await api(`/projects/${pid}/commercial`, { method: 'POST', pid, body: fd }); await render(); ok(`Plan v${res.version} calculated. Gate: ${res.gate.outcome}.`); }); });
+    const act = document.getElementById('c-act');
+    if (act) act.onclick = () => withApproval(pid, 'activate_commercial', null, act, async (aid) => { await api(`/projects/${pid}/commercial/activate`, { method: 'POST', pid, body: { approval_id: aid } }); await render(); ok('Plan adopted for TEST MODE selling.'); });
+  };
+
+  VIEWS.sell = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Phase 5: Sell, deliver, get paid');
+    const st = await api(`/projects/${pid}/sell`, { pid });
+    const o = st.offers[0];
+    const rec = st.reconciliation;
+    main.innerHTML = `${head('Sell, deliver, get paid', 'A complete sale-to-cash loop in MOCKED / TEST MODE: offer, draft page, test checkout, simulated payment, delivery, refund and reconciliation. No real money, no card data, nothing published.')}
+      <div class="notice error small"><b>MOCKED / TEST MODE.</b> The payment provider is a built-in simulator. Buyers are test references, not people.</div>
+      ${st.commercial_gate.outcome !== 'GO' ? `<div class="notice warn">Locked: adopt a commercial plan first. ${esc(st.commercial_gate.reasons.join(' '))}</div>` : ''}
+      <div class="cols"><div class="stack">
+        <section class="panel"><header><h2>Offer and sales-page draft</h2>${o ? tag(o.status === 'APPROVED_DRAFT' ? 'PASS' : 'NOT_STARTED', o.status) : ''}</header>
+          ${o ? `<p><b>${esc(o.offer.product)}</b>: ${esc(o.offer.package)}, ${esc(o.offer.price)} ${esc(o.offer.currency)} ${esc(o.offer.billing === 'monthly' ? 'per month' : 'one-time')}. ${MOCK}</p>
+            <details class="adv"><summary>Sales-page draft (not published)</summary><iframe title="Sales page draft" sandbox="" srcdoc="${esc(o.sales_page_html)}" class="srcdoc"></iframe></details>
+            <div class="row">${o.status === 'DRAFT' ? '<button class="btn secondary small" id="s-page">Approve the draft (not published)</button>' : ''}${o.status === 'APPROVED_DRAFT' && !o.checkout_open ? '<button class="btn small" id="s-open">Open the TEST MODE checkout</button>' : ''}</div>` : ''}
+          <div class="row" style="margin-top:8px"><button class="btn quiet small" id="s-offer" ${st.commercial_gate.outcome !== 'GO' ? 'disabled' : ''}>Draft ${o ? 'a new' : 'the'} offer</button></div></section>
+        ${o && o.checkout_open ? `<section class="panel"><header><h2>Test checkout</h2>${MOCK}</header><form id="s-co" class="row"><label for="s-buyer">Test buyer reference</label><input id="s-buyer" value="test-buyer-${st.orders.length + 1}" pattern="[A-Za-z0-9_\\-]+" required>
+          <button class="btn small" id="s-co-btn" type="submit">Create test order</button></form><p class="small muted">No names, emails or card numbers are collected.</p></section>` : ''}
+        <section class="panel"><header><h2>Orders</h2>${MOCK}</header>${st.orders.length ? `<div class="table-wrap"><table class="data"><thead><tr><th>Order</th><th>Buyer</th><th>Amount</th><th>Status</th><th>Access</th><th></th></tr></thead><tbody>
+          ${st.orders.map((x) => `<tr><td><code>${short(x.id)}</code></td><td>${esc(x.buyer_ref)}</td><td>${money(x.amount_cents, x.currency)}</td><td>${tag(x.status === 'PAID' ? 'PASS' : x.status === 'REFUNDED' ? 'STOP' : 'NOT_STARTED', x.status)}</td>
+            <td>${x.access ? `${tag(x.access.status === 'ACTIVE' ? 'PASS' : 'STOP', x.access.status)} <a href="${esc(x.access.url)}" target="_blank" rel="noopener">access link</a> (${x.access.deliveries} opened)` : '—'}</td>
+            <td>${x.status === 'PENDING_PAYMENT' ? `<button class="btn small" data-pay="${x.id}">Simulate payment</button>` : x.status === 'PAID' ? `<button class="btn quiet small" data-replay="${x.id}">Replay payment event</button> <button class="btn danger small" data-refund="${x.id}">Refund</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="faint">No test orders yet.</p>'}</section>
+        <section class="panel"><header><h2>Payment events</h2>${MOCK}</header><ul class="plain small">${st.events.map((e) => `<li><code>${esc(e.event_id)}</code> ${esc(e.type)} → ${tag(e.result.startsWith('PAID') || e.result.startsWith('REFUNDED') ? 'PASS' : 'INFO', e.result)} fee ${money(e.fee_cents)}</li>`).join('') || '<li class="faint">None</li>'}</ul></section>
+      </div><div class="stack">${gateBox(st.gate, 'Sell gate')}
+        <section class="panel"><header><h2>Reconciliation</h2>${tag(rec.ok ? 'PASS' : 'FAIL', rec.ok ? 'Matches' : 'Problems')}</header>
+          <dl class="facts small"><dt>Paid</dt><dd>${money(rec.totals.paid_cents)}</dd><dt>Fees</dt><dd>${money(rec.totals.fee_cents)}</dd><dt>Refunded</dt><dd>${money(rec.totals.refunded_cents)}</dd><dt>Mock payout</dt><dd>${money(rec.totals.mock_payout_cents)}</dd></dl>
+          ${rec.issues.length ? `<ul class="bullets small">${rec.issues.map((i) => `<li>${esc(short(i.order_id))}: ${esc(i.issue)}</li>`).join('')}</ul>` : ''}<p class="small muted">${esc(rec.payout_note)}</p>
+          <button class="btn secondary small" id="s-rec">Run reconciliation</button></section></div></div>`;
+    const reload = async (msg) => { await render(); if (msg) ok(msg); };
+    const btn = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = () => fn(el); };
+    btn('s-offer', (el) => busy(el, 'Drafting', async () => { await api(`/projects/${pid}/sell/offers`, { method: 'POST', pid, body: {} }); await reload('Offer drafted. Review the draft, then approve it.'); }));
+    btn('s-page', (el) => withApproval(pid, 'approve_sales_page', o.id, el, async (aid) => { await api(`/projects/${pid}/sell/offers/${o.id}/approve-page`, { method: 'POST', pid, body: { approval_id: aid } }); await reload('Draft approved. It was not published anywhere.'); }));
+    btn('s-open', (el) => withApproval(pid, 'open_test_checkout', o.id, el, async (aid) => { await api(`/projects/${pid}/sell/offers/${o.id}/open-checkout`, { method: 'POST', pid, body: { approval_id: aid } }); await reload('TEST MODE checkout is open.'); }));
+    btn('s-rec', (el) => busy(el, 'Reconciling', async () => { const r = await api(`/projects/${pid}/sell/reconcile`, { method: 'POST', pid }); await reload(r.ok ? 'Reconciled: orders, payments, fees, refunds and access match.' : `Reconciliation found ${r.issues.length} problem(s).`); }));
+    const co = document.getElementById('s-co');
+    if (co) co.addEventListener('submit', (e) => { e.preventDefault(); busy(document.getElementById('s-co-btn'), 'Creating', async () => {
+      await api(`/projects/${pid}/sell/checkout`, { method: 'POST', pid, body: { offer_id: o.id, buyer_ref: document.getElementById('s-buyer').value, idempotency_key: 'ui-' + crypto.randomUUID() } }); await reload('Test order created: pending payment.'); }); });
+    main.querySelectorAll('[data-pay]').forEach((el) => { el.onclick = () => busy(el, 'Paying (simulated)', async () => { const r = await api(`/projects/${pid}/sell/mock-pay`, { method: 'POST', pid, body: { order_id: el.dataset.pay } }); await reload(`Simulated payment: ${r.result}. Access ${r.access ? r.access.status : 'none'}.`); }); });
+    main.querySelectorAll('[data-replay]').forEach((el) => { el.onclick = () => busy(el, 'Replaying', async () => {
+      const ev = st.events.find((x) => x.order_id === el.dataset.replay && x.type === 'payment_succeeded');
+      const r = await api(`/projects/${pid}/sell/mock-pay`, { method: 'POST', pid, body: { order_id: el.dataset.replay, event_id: ev.event_id } }); await reload(`Replayed event ${ev.event_id}: ${r.result}. No second delivery.`); }); });
+    main.querySelectorAll('[data-refund]').forEach((el) => { el.onclick = () => withApproval(pid, 'refund_order', el.dataset.refund, el, async (aid) => {
+      const r = await api(`/projects/${pid}/sell/orders/${el.dataset.refund}/refund`, { method: 'POST', pid, body: { approval_id: aid } }); await reload(`Refund: ${r.result}. The access link no longer works.`); }); });
+  };
+
+  VIEWS.operate = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Phase 6: Operate and learn');
+    const st = await api(`/projects/${pid}/operate`, { pid });
+    const m = st.derived.metrics, r = st.recommendation;
+    const pct = (v) => (v == null ? '<span class="faint">no data</span>' : `${v}%`);
+    main.innerHTML = `${head('Operate and learn', 'Numbers come only from recorded events (MOCKED / TEST MODE) or from entries you label MANUAL or MOCK_DEMO. The recommendation is rule-based, and any change it proposes needs your approval.')}
+      <div class="cols"><div class="stack">
+        <section class="panel"><header><h2>From recorded events</h2>${MOCK}</header><dl class="facts small">
+          <dt>Checkouts started</dt><dd>${m.checkouts_started}</dd><dt>Paid</dt><dd>${m.orders_paid} (${pct(m.checkout_to_paid_pct)})</dd><dt>Refunded</dt><dd>${m.orders_refunded} (${pct(m.refund_rate_pct)})</dd>
+          <dt>Repeat buyers</dt><dd>${m.repeat_buyers} of ${m.unique_buyers} (${pct(m.repeat_buyer_pct)})</dd><dt>Access links used</dt><dd>${m.access_links_used} (${pct(m.access_usage_pct)})</dd>
+          <dt>Net (mock)</dt><dd>${money(m.net_cents)}</dd><dt>Duplicate events ignored</dt><dd>${m.duplicate_events_ignored}</dd></dl></section>
+        <section class="panel"><header><h2>Recommendation</h2>${tag(GATE_TONE[st.gate.outcome] || 'INFO', r.recommendation)}</header><p><b>${esc(r.recommendation.replace(/_/g, ' '))}</b></p><ul class="bullets small">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+          <p class="small muted">${esc(r.caveat)}</p><button class="btn" id="o-an">Analyse and propose next iteration</button></section>
+        <section class="panel"><header><h2>Proposals</h2></header>${st.proposals.length ? `<ul class="plain small">${st.proposals.map((p) => `<li>${tag(p.status === 'APPLIED' ? 'PASS' : 'NOT_STARTED', p.status)} <b>Phase ${p.target_phase} revision</b>: ${esc(p.rationale)}
+          <div class="faint">${Object.entries(p.change || {}).map(([k, v]) => `${esc(k.replace(/_/g, ' '))}: ${esc(Array.isArray(v) ? v.join(', ') : String(v))}`).join('; ')}</div>${p.status === 'PROPOSED' ? `<button class="btn small" data-apply="${p.id}">Approve and apply as a new version</button>` : `<div>Applied as ${esc(p.applied_ref)}</div>`}</li>`).join('')}</ul>` : '<p class="faint">None yet.</p>'}</section>
+        <section class="panel"><header><h2>Demand tests compared</h2></header><ul class="plain small">${st.experiments.map((x) => `<li>${x.simulated ? chip('SIMULATED_NOT_COUNTED') : chip(x.reading || 'NOT_STARTED')} ${esc(x.hypothesis || '')} ${x.rate_pct != null ? `(${x.rate_pct}% vs ${x.threshold_pct}% pass mark)` : ''}</li>`).join('') || '<li class="faint">No demand tests.</li>'}</ul></section>
+      </div><div class="stack">${gateBox(st.gate, 'Operate gate')}
+        <section class="panel"><h2>Add a metric</h2><form id="o-m"><div class="field"><label for="o-mn">Name</label><input id="o-mn" name="name" required minlength="2" placeholder="weekly active users"></div>
+          <div class="grid2"><div class="field"><label for="o-mv">Value</label><input id="o-mv" name="value" type="number" step="any" required></div><div class="field"><label for="o-mp">Period</label><input id="o-mp" name="period" required value="this week"></div></div>
+          <div class="field"><label for="o-ms">Source</label><select id="o-ms" name="source"><option value="MANUAL">MANUAL (you measured it)</option><option value="MOCK_DEMO">MOCK_DEMO (demo scenario)</option></select></div>
+          <button class="btn secondary small" type="submit">Record</button></form>
+          <ul class="plain small">${st.manual_metrics.map((x) => `<li>${esc(x.name)}: ${esc(x.value)} (${esc(x.period)}) ${tag(x.source === 'MOCK_DEMO' ? 'SIMULATED_NOT_COUNTED' : 'INFO', x.source)}</li>`).join('')}</ul></section>
+        <section class="panel"><h2>Feedback</h2><form id="o-f"><div class="field"><label for="o-ft">What was said</label><textarea id="o-ft" name="text" rows="2" required minlength="3"></textarea></div>
+          <div class="field"><label for="o-fs">Source</label><select id="o-fs" name="source"><option value="FOUNDER_INTERVIEW">Founder interview (with consent)</option><option value="SUPPORT_MESSAGE">Support message</option><option value="MOCK_DEMO">MOCK_DEMO</option></select></div>
+          <div class="field"><label for="o-fp">Provenance</label><input id="o-fp" name="provenance" required minlength="3" placeholder="who, when, how"></div><button class="btn secondary small" type="submit">Add</button></form>
+          <ul class="plain small">${st.feedback.map((x) => `<li>${tag(x.sentiment === 'NEGATIVE' ? 'FAIL' : x.sentiment === 'POSITIVE' ? 'PASS' : 'INFO', x.sentiment)} “${esc(x.text)}” <span class="faint">${esc(x.source)}, ${esc(x.provenance)}</span></li>`).join('')}</ul></section>
+        <section class="panel"><h2>Issues</h2><form id="o-i" class="row"><input name="title" required minlength="3" aria-label="Issue title" placeholder="What is broken?"><select name="severity" aria-label="Severity"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select><button class="btn secondary small" type="submit">Add</button></form>
+          <ul class="plain small">${st.issues.map((x) => `<li>${tag(x.status === 'OPEN' ? (x.severity === 'HIGH' ? 'FAIL' : 'REVIEW_REQUIRED') : 'PASS', x.status)} ${esc(x.severity)}: ${esc(x.title)} ${x.status === 'OPEN' ? `<button class="btn quiet small" data-close="${x.id}">Close</button>` : ''}</li>`).join('')}</ul></section></div></div>`;
+    const reload = async (msg) => { await render(); if (msg) ok(msg); };
+    const post = (form, path, conv) => form.addEventListener('submit', (e) => { e.preventDefault(); if (!form.reportValidity()) return; const fd = Object.fromEntries(new FormData(form)); if (conv) conv(fd);
+      busy(form.querySelector('button[type=submit]'), 'Saving', async () => { await api(`/projects/${pid}${path}`, { method: 'POST', pid, body: fd }); await reload('Saved.'); }); });
+    post(document.getElementById('o-m'), '/operate/metrics', (fd) => { fd.value = Number(fd.value); });
+    post(document.getElementById('o-f'), '/operate/feedback');
+    post(document.getElementById('o-i'), '/operate/issues');
+    main.querySelectorAll('[data-close]').forEach((el) => { el.onclick = () => busy(el, 'Closing', async () => { await api(`/projects/${pid}/operate/issues/${el.dataset.close}/close`, { method: 'POST', pid }); await reload('Issue closed.'); }); });
+    const an = document.getElementById('o-an');
+    an.onclick = () => busy(an, 'Analysing', async () => { const res = await api(`/projects/${pid}/operate/analyze`, { method: 'POST', pid }); await reload(`Recommendation: ${res.recommendation.recommendation}.${res.proposal ? ` Proposal for phase ${res.proposal.target_phase} created; it waits for your approval.` : ''}`); });
+    main.querySelectorAll('[data-apply]').forEach((el) => { el.onclick = () => withApproval(pid, 'apply_proposal', el.dataset.apply, el, async (aid) => {
+      const res = await api(`/projects/${pid}/operate/proposals/${el.dataset.apply}/apply`, { method: 'POST', pid, body: { approval_id: aid } }); await reload(`Applied as ${res.applied}. Earlier versions are kept.`); }); });
+  };
+
   // ---------------- Roadmap & help
   VIEWS.roadmap = async () => {
-    crumb('Six-phase roadmap', 'What is live and what is architecture only');
+    crumb('Six-phase roadmap', 'What each phase does and how it is checked');
     const c = await api('/criteria');
-    const live = [['Discover', 'live', 'Brief, safety, discovery, research and the Discover gate run in this prototype.', c.discover], ['Validate', 'live', 'Demand tests, locked targets, result reading and the decision passport run in this prototype.', c.validate]];
-    const later = [['Build', 'build', 'Smallest product that delivers validated value; finished when its acceptance tests pass.'], ['Commercial setup', 'commercial_setup', 'Price and policy drafts for human review. No payments, ever.'],
-      ['Launch', 'launch', 'Marketing drafts only; nothing is published without a separate, specific approval.'], ['Operate and learn', 'operate_learn', 'Real, opt-in results decide double down, adjust, pivot back or shut down.']];
-    main.innerHTML = `${head('Six business phases', 'Research, demand tests and the decision passport are steps inside the two live phases. The other four are documented with their criteria and are not implemented; nothing here pretends they run.')}
-      <section class="panel">${live.map(([n, , d, crit], i) => `<div class="phase" data-live="1"><span class="n">${i + 1}</span><div><h2>${n} ${chip('PASS', 'Implemented')}<span class="small muted"> Live</span></h2><p class="muted">${d}</p>
+    const live = [['Discover', 'Brief, safety, discovery, research and the Discover gate.', c.discover], ['Validate', 'Demand tests, locked targets, result reading and the decision passport.', c.validate]];
+    const later = [['Build', 'build', 'Spec, user stories, a generated static website, QA, revisions and a sandboxed preview. DEMO DATA; a demo build is never called validated.'],
+      ['Commercial setup', 'commercial_setup', 'Unit economics, break-even, pricing hypotheses and a terms checklist, from ASSUMPTION inputs. Not financial or legal advice.'],
+      ['Sell, deliver, get paid', 'launch', 'Offer, draft sales page, test checkout, simulated payment, delivery, refund and reconciliation. Nothing is published.'],
+      ['Operate and learn', 'operate_learn', 'Metrics from recorded events, feedback, issues, and a continue / iterate / pivot / stop recommendation.']];
+    main.innerHTML = `${head('Six business phases', 'Every phase runs in this prototype and ends in a gate decided by code plus your approval. Phases 3 to 6 run in MOCKED / TEST MODE.')}
+      <section class="panel">${live.map(([n, d, crit], i) => `<div class="phase" data-live="1"><span class="n">${i + 1}</span><div><h2>${n} ${tag('PASS', 'Implemented')}</h2><p class="muted">${d}</p>
         <ul class="bullets small">${crit.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul></div></div>`).join('')}
-        ${later.map(([n, k, d], i) => `<div class="phase"><span class="n">${i + 3}</span><div><h2>${n} <span class="chip plain">Architecture only</span></h2><p class="muted">${d}</p>
-        <ul class="bullets small">${c.architecture_only[k].criteria.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul></div></div>`).join('')}</section>
-      <section class="panel" style="margin-top:18px"><h2>Applied at every live gate</h2><ul class="bullets small">${c.cross_cutting.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul>
+        ${later.map(([n, k, d], i) => `<div class="phase" data-live="1"><span class="n">${i + 3}</span><div><h2>${n} ${tag('PASS', 'Implemented')} <span class="chip stop">MOCKED / TEST MODE</span></h2><p class="muted">${d}</p>
+        <ul class="bullets small">${((c.architecture_only[k] || {}).criteria || []).map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul></div></div>`).join('')}</section>
+      <section class="panel" style="margin-top:18px"><h2>Applied at every gate</h2><ul class="bullets small">${c.cross_cutting.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul>
       <p class="small muted">Criteria file ${esc(c.version)}, source: “${esc(c.source.title)}”, ${esc(c.source.date)}.</p></section>`;
   };
   VIEWS.help = async () => {
     crumb('How it works', 'Plain-language guide');
-    main.innerHTML = `${head('How FounderOS works', 'It helps you decide, with evidence, whether an idea is worth more of your time. It does not build, publish or sell anything.')}
+    main.innerHTML = `${head('How FounderOS works', 'It helps you decide, with evidence, whether an idea is worth more of your time, then lets you rehearse building, pricing, selling and operating it in MOCKED / TEST MODE. It never publishes, sends, spends or takes real money.')}
       <div class="stack"><section class="panel"><h2>Who decides what</h2><dl class="facts"><dt>Your local model</dt><dd>Refines your brief, drafts hypotheses, proposes scores one criterion at a time, and explains verdicts. Everything it writes is a hypothesis.</dd>
         <dt>Code</dt><dd>Runs the twelve safety checks, verifies sources, applies pass marks and picks every gate exit. The model cannot change a verdict.</dd>
-        <dt>You</dt><dd>Approve, revise, pivot or stop at each gate. Approval means more research only.</dd></dl></section>
+        <dt>You</dt><dd>Approve, revise, pivot or stop at each gate. Each approval covers one exact action on the current state; if anything changes first, the server refuses it as stale.</dd></dl></section>
       <section class="panel"><h2>What the words mean</h2><dl class="facts small"><dt>Unknown</dt><dd>No accepted evidence. Never treated as a zero or a middle score.</dd><dt>Excerpt verified</dt><dd>The exact words were found on the fetched page. It does not mean they are true.</dd>
         <dt>Metadata only</dt><dd>A title or abstract from an index. Context, never counted.</dd><dt>Founder-reported</dt><dd>Results you entered. FounderOS cannot check them independently.</dd>
         <dt>Needs evidence</dt><dd>No real customer behaviour yet. Not a judgement that the idea is bad.</dd><dt>Near miss</dt><dd>A locked test came just under its pass mark. Repeat or redesign.</dd></dl></section>

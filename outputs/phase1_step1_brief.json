@@ -1,0 +1,149 @@
+{
+  "brief": {
+    "project_id": "a0430584d3cb47f69b453da4113b119e",
+    "version": 1,
+    "created_at": "2026-11-17T14:55:17.376205+00:00",
+    "payload": {
+      "idea_summary": "A website that helps university students in Cairo find quiet study spaces with Wi-Fi and power outlets near campus.",
+      "problem": "Students waste time finding a quiet place with Wi-Fi and sockets before exams",
+      "target_customers": "Undergraduate students at Cairo universities",
+      "skills": null,
+      "budget": null,
+      "timeline": null,
+      "target_market": "Cairo, Egypt",
+      "values": null,
+      "constraints": null,
+      "current_workaround": "Asking friends on WhatsApp groups",
+      "assumptions": [
+        "STUBBED placeholder: demand is unknown until a demand test is run"
+      ],
+      "questions": [
+        "Who exactly has this problem most often?",
+        "What do they use today instead?"
+      ],
+      "fields": {
+        "problem": {
+          "value": "Students waste time finding a quiet place with Wi-Fi and sockets before exams",
+          "status": "FORM_FIELD",
+          "spans": [
+            {
+              "source": "form:problem",
+              "start": 0,
+              "end": 77,
+              "text": "Students waste time finding a quiet place with Wi-Fi and sockets before exams"
+            }
+          ],
+          "typed": {}
+        },
+        "target_customers": {
+          "value": "Undergraduate students at Cairo universities",
+          "status": "FORM_FIELD",
+          "spans": [
+            {
+              "source": "form:target_customers",
+              "start": 0,
+              "end": 44,
+              "text": "Undergraduate students at Cairo universities"
+            }
+          ],
+          "typed": {
+            "broad": false
+          }
+        },
+        "current_workaround": {
+          "value": "Asking friends on WhatsApp groups",
+          "status": "FORM_FIELD",
+          "spans": [
+            {
+              "source": "form:current_workaround",
+              "start": 0,
+              "end": 33,
+              "text": "Asking friends on WhatsApp groups"
+            }
+          ],
+          "typed": {}
+        },
+        "skills": {
+          "value": null,
+          "status": "NOT_STATED",
+          "spans": [],
+          "typed": {},
+          "question": "Which of the needed skills do you have yourself?"
+        },
+        "budget": {
+          "value": null,
+          "status": "NOT_STATED",
+          "spans": [],
+          "typed": {},
+          "question": "How much money can you spend before the first sale (amount and currency)?"
+        },
+        "timeline": {
+          "value": null,
+          "status": "NOT_STATED",
+          "spans": [],
+          "typed": {},
+          "question": "How much time do you have (weeks or months)?"
+        },
+        "target_market": {
+          "value": "Cairo, Egypt",
+          "status": "FORM_FIELD",
+          "spans": [
+            {
+              "source": "form:target_market",
+              "start": 0,
+              "end": 12,
+              "text": "Cairo, Egypt"
+            }
+          ],
+          "typed": {
+            "city": "Cairo",
+            "country": "Egypt"
+          }
+        },
+        "values": {
+          "value": null,
+          "status": "NOT_STATED",
+          "spans": [],
+          "typed": {},
+          "question": "Which values will you not compromise on? (optional)"
+        },
+        "constraints": {
+          "value": null,
+          "status": "NOT_STATED",
+          "spans": [],
+          "typed": {},
+          "question": "Any other limits? (optional)"
+        },
+        "_signals": {
+          "mentions_minors": false,
+          "pain_stated_unverified": false
+        }
+      },
+      "model_suggestions": {},
+      "provenance": {
+        "problem": "EXPLICIT",
+        "target_customers": "EXPLICIT",
+        "current_workaround": "EXPLICIT",
+        "skills": "UNKNOWN",
+        "budget": "UNKNOWN",
+        "timeline": "UNKNOWN",
+        "target_market": "EXPLICIT",
+        "values": "UNKNOWN",
+        "constraints": "UNKNOWN"
+      },
+      "d02_preview": {
+        "status": "PASS",
+        "missing": [],
+        "model_suggested_unconfirmed": [],
+        "parser_failed": [],
+        "stated_in_text_please_confirm": [],
+        "questions": {}
+      },
+      "model_risk_flags": [],
+      "founder_answers": {},
+      "original_idea_text": "A website that helps university students in Cairo find quiet study spaces with Wi-Fi and power outlets near campus.",
+      "model": "STUBBED offline stand-in (no model ran)",
+      "latency_ms": 0
+    }
+  }
+}

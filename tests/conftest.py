@@ -1,5 +1,8 @@
 """Test fixtures. The FakeModel is injected ONLY here; the shipped app has no fake fallback."""
 import datetime
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))   # the app package lives in backend/
 import pytest
 from fastapi.testclient import TestClient
 from app import main

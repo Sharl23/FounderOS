@@ -1,0 +1,93 @@
+{
+  "status": "PASS",
+  "items": [
+    {
+      "id": "file_set",
+      "ok": true,
+      "why": "Exactly the allowed files: index.html, styles.css, app.js, README.txt."
+    },
+    {
+      "id": "size",
+      "ok": true,
+      "why": "Each file under 120 KB."
+    },
+    {
+      "id": "html_well_formed",
+      "ok": true,
+      "why": "HTML tags open and close in order. "
+    },
+    {
+      "id": "unique_ids",
+      "ok": true,
+      "why": "Element ids are unique."
+    },
+    {
+      "id": "required_elements",
+      "ok": true,
+      "why": "Core interface elements exist: list, filters, area, detail"
+    },
+    {
+      "id": "html_safe",
+      "ok": true,
+      "why": "No inline handlers, external URLs, frames, fake proof or urgency."
+    },
+    {
+      "id": "js_safe",
+      "ok": true,
+      "why": "No eval, network, storage, innerHTML or parent-frame access."
+    },
+    {
+      "id": "only_local_assets",
+      "ok": true,
+      "why": "Loads only its own app.js and styles.css."
+    },
+    {
+      "id": "demo_labelled",
+      "ok": true,
+      "why": "The page and the data say DEMO DATA."
+    },
+    {
+      "id": "status_labelled",
+      "ok": true,
+      "why": "The page states its prototype status."
+    },
+    {
+      "id": "js_braces_balanced",
+      "ok": true,
+      "why": "Basic JS bracket balance (no execution)."
+    },
+    {
+      "id": "features_present",
+      "ok": true,
+      "why": "Every specified feature has its interface element."
+    }
+  ],
+  "features": [
+    {
+      "feature": "F1",
+      "title": "Browse study spaces",
+      "ok": true
+    },
+    {
+      "feature": "F2",
+      "title": "Search by name or area",
+      "ok": true
+    },
+    {
+      "feature": "F3",
+      "title": "Filter by features",
+      "ok": true
+    },
+    {
+      "feature": "F4",
+      "title": "Study Space details",
+      "ok": true
+    },
+    {
+      "feature": "F5",
+      "title": "Shortlist favourites (this session only)",
+      "ok": true
+    }
+  ],
+  "method": "Static inspection only: no generated code is executed on the server."
+}

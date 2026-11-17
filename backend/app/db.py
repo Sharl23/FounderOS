@@ -105,8 +105,70 @@ COLUMNS_V8 = {
 }
 
 
+# v0.9: phases 3-6 (build, commercial, sell/deliver/get paid, operate), approvals, agent actions.
+SCHEMA_V9 = '''
+CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS agent_actions(
+  id TEXT PRIMARY KEY, project_id TEXT, run_tag TEXT, ts TEXT NOT NULL, agent TEXT NOT NULL, action TEXT NOT NULL,
+  sources_json TEXT NOT NULL DEFAULT '[]', model TEXT, cost REAL NOT NULL DEFAULT 0, approved_by TEXT, outcome TEXT, detail_json TEXT);
+CREATE INDEX IF NOT EXISTS ix_agent_actions_project ON agent_actions(project_id, ts);
+CREATE TABLE IF NOT EXISTS approvals(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, action TEXT NOT NULL, risk TEXT NOT NULL, scope TEXT NOT NULL,
+  target TEXT, payload_json TEXT NOT NULL, payload_hash TEXT NOT NULL, status TEXT NOT NULL, requested_at TEXT NOT NULL,
+  decided_at TEXT, decision_note TEXT, expires_at TEXT NOT NULL, consumed_at TEXT);
+CREATE TABLE IF NOT EXISTS approval_events(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, approval_id TEXT NOT NULL, project_id TEXT NOT NULL, event TEXT NOT NULL, detail_json TEXT, at TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS approval_events_no_update BEFORE UPDATE ON approval_events BEGIN SELECT RAISE(ABORT, 'approval events are append-only'); END;
+CREATE TRIGGER IF NOT EXISTS approval_events_no_delete BEFORE DELETE ON approval_events BEGIN SELECT RAISE(ABORT, 'approval events are append-only'); END;
+CREATE TABLE IF NOT EXISTS phase_transitions(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, phase INTEGER NOT NULL, outcome TEXT NOT NULL, gate_json TEXT NOT NULL,
+  approval_id TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS builds(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, version INTEGER NOT NULL, mode TEXT NOT NULL, parent_version INTEGER,
+  spec_json TEXT NOT NULL, files_json TEXT NOT NULL, qa_json TEXT NOT NULL, feedback TEXT, changes_json TEXT,
+  spec_hash TEXT NOT NULL, files_hash TEXT NOT NULL, preview_key TEXT NOT NULL, approval_id TEXT, created_at TEXT NOT NULL,
+  UNIQUE(project_id, version));
+CREATE TABLE IF NOT EXISTS commercial_plans(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, version INTEGER NOT NULL, inputs_json TEXT NOT NULL, results_json TEXT NOT NULL,
+  plan_hash TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(project_id, version));
+CREATE TABLE IF NOT EXISTS offers(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, version INTEGER NOT NULL, commercial_version INTEGER NOT NULL, build_version INTEGER,
+  package_json TEXT NOT NULL, sales_page_html TEXT NOT NULL, offer_hash TEXT NOT NULL, status TEXT NOT NULL, checkout_open INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS orders(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, offer_id TEXT NOT NULL, buyer_ref TEXT NOT NULL, amount_cents INTEGER NOT NULL,
+  currency TEXT NOT NULL, status TEXT NOT NULL, idempotency_key TEXT NOT NULL, test_mode INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(project_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS payment_events(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, event_id TEXT NOT NULL, type TEXT NOT NULL, order_id TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL, fee_cents INTEGER NOT NULL DEFAULT 0, result TEXT NOT NULL, received_at TEXT NOT NULL,
+  test_mode INTEGER NOT NULL DEFAULT 1, UNIQUE(project_id, event_id));
+CREATE TABLE IF NOT EXISTS entitlements(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE, token TEXT NOT NULL UNIQUE, status TEXT NOT NULL,
+  granted_at TEXT NOT NULL, revoked_at TEXT, deliveries INTEGER NOT NULL DEFAULT 0, last_access_at TEXT);
+CREATE TABLE IF NOT EXISTS refunds(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, order_id TEXT NOT NULL UNIQUE, amount_cents INTEGER NOT NULL, approval_id TEXT NOT NULL,
+  event_id TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reconciliations(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, result_json TEXT NOT NULL, ok INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS op_metrics(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, value REAL NOT NULL, period TEXT NOT NULL, source TEXT NOT NULL,
+  note TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS feedback(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL, provenance TEXT NOT NULL,
+  order_id TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS op_issues(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, severity TEXT NOT NULL, status TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS proposals(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL, target_phase INTEGER NOT NULL, rationale TEXT NOT NULL, change_json TEXT NOT NULL,
+  basis_json TEXT NOT NULL, status TEXT NOT NULL, applied_ref TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+'''
+
+
 def migrate(db):
     db.executescript(SCHEMA_V7)
+    db.executescript(SCHEMA_V9)
     for table, cols in list(COLUMNS_V7.items()) + list(COLUMNS_V8.items()):
         have = {r[1] for r in db.execute(f'PRAGMA table_info({table})')}
         for name, typ in cols:
@@ -114,6 +176,7 @@ def migrate(db):
                 db.execute(f'ALTER TABLE {table} ADD COLUMN {name} {typ}')
     db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v7', now()))
     db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v8', now()))
+    db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v9', now()))
 
 
 def init_db():

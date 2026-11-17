@@ -8,3 +8,9 @@ __pycache__/
 .DS_Store
 .venv/
 data/
+*.zip
+node_modules/
+build/
+dist/
+.env.*
+!.env.example

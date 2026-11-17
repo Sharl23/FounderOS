@@ -1,0 +1,115 @@
+{
+  "name": "Study Space Finder Cairo",
+  "headline": "Students waste time finding a quiet place with Wi-Fi and sockets before exams",
+  "archetype": "directory",
+  "archetype_label": "Searchable directory / listings",
+  "archetype_scores": {
+    "directory": 8,
+    "forecast": 1,
+    "practice": 0,
+    "planner": 0
+  },
+  "entity": {
+    "singular": "study space",
+    "plural": "study spaces"
+  },
+  "audience": "Undergraduate students at Cairo universities",
+  "problem": "Students waste time finding a quiet place with Wi-Fi and sockets before exams",
+  "current_workaround": "Asking friends on WhatsApp groups",
+  "attributes": [
+    "Wi-Fi",
+    "Quiet zone",
+    "Power outlets",
+    "Group tables",
+    "Open late"
+  ],
+  "areas": [
+    "Downtown",
+    "Zamalek",
+    "Nasr City",
+    "Maadi",
+    "Heliopolis"
+  ],
+  "accent": "#0E6E62",
+  "features": [
+    {
+      "id": "F1",
+      "title": "Browse study spaces",
+      "check": "list"
+    },
+    {
+      "id": "F2",
+      "title": "Search by name or area",
+      "check": "search"
+    },
+    {
+      "id": "F3",
+      "title": "Filter by features",
+      "check": "filters"
+    },
+    {
+      "id": "F4",
+      "title": "Study Space details",
+      "check": "detail"
+    },
+    {
+      "id": "F5",
+      "title": "Shortlist favourites (this session only)",
+      "check": "shortlist"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US1",
+      "as_a": "one of the undergraduate students at Cairo universities",
+      "i_want": "to see study spaces near me",
+      "so_that": "I can stop asking around",
+      "acceptance": [
+        "A list of demo study spaces is shown on load",
+        "Each card shows name, area and features"
+      ]
+    },
+    {
+      "id": "US2",
+      "as_a": "one of the undergraduate students at Cairo universities",
+      "i_want": "to search by name or area",
+      "so_that": "I find a place quickly",
+      "acceptance": [
+        "Typing in the search box narrows the list on every keystroke",
+        "An empty result shows a clear message"
+      ]
+    },
+    {
+      "id": "US3",
+      "as_a": "one of the undergraduate students at Cairo universities",
+      "i_want": "to filter by the features I need",
+      "so_that": "I only see suitable options",
+      "acceptance": [
+        "Ticking a feature shows only items that have it",
+        "Several features combine (AND)"
+      ]
+    },
+    {
+      "id": "US4",
+      "as_a": "one of the undergraduate students at Cairo universities",
+      "i_want": "to open details",
+      "so_that": "I can decide where to go",
+      "acceptance": [
+        "Clicking a card opens its details",
+        "Details can be closed with a button or Escape"
+      ]
+    }
+  ],
+  "out_of_scope": [
+    "Accounts, logins and passwords",
+    "Payments inside the prototype",
+    "Real business listings, reviews or bookings",
+    "Sending messages or notifications",
+    "Any server-side code"
+  ],
+  "data_policy": "DEMO DATA only: generated placeholder records, clearly labelled. No real businesses, people, reviews or bookings.",
+  "mode": "DEMO_ONLY",
+  "validation_verdict_at_build": "NEEDS_EVIDENCE",
+  "status_label": "DEMO-ONLY PROTOTYPE: not validated, not launch-ready, not commercially approved.",
+  "show_search": true
+}

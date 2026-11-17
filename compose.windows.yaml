@@ -1,19 +1,6 @@
-# OPTIONAL Windows override: use Ollama installed on Windows instead of the Ollama container.
-# The official entry point is still `docker compose up --build` (container Ollama). This file is only for
-# machines where the founder already runs Ollama on Windows.
-#   1. Install Ollama for Windows, then in PowerShell:  ollama pull qwen2.5:1.5b-instruct
-#   2. Check it answers:  ollama run qwen2.5:1.5b-instruct "Reply OK"
-#   3. Start FounderOS:   docker compose -f docker-compose.yml -f compose.windows.yaml up --build
-# In this mode Compose does NOT start or pull the ollama/model-init containers (profile below).
-# Memory settings (OLLAMA_NUM_GPU=0 for CPU-only, OLLAMA_NUM_CTX=1024) come from .env and are passed per request.
+# Kept for backwards compatibility with the v0.7/v0.8 instructions. Since v0.9 the default
+# docker-compose.yml already uses host Ollama (host.docker.internal), so this override changes nothing.
 services:
-  ollama:
-    profiles: ["container-ollama"]
-  model-init:
-    profiles: ["container-ollama"]
   api:
-    environment:
-      OLLAMA_URL: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on: !reset []

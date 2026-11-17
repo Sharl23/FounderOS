@@ -1,0 +1,296 @@
+{
+  "safety": {
+    "project_id": "a0430584d3cb47f69b453da4113b119e",
+    "brief_version": 1,
+    "status": "ALLOW_DISCOVERY",
+    "acknowledged_at": null,
+    "ack_statement": null,
+    "created_at": "2026-11-17T14:55:17.377189+00:00",
+    "assessment": {
+      "status": "ALLOW_DISCOVERY",
+      "policy_version": "safety-policy-2026-11-17.v7-1",
+      "policy_hash": "d5252800d50db3cb7e13cfa7805d3ec530da796dbfdf3b8a259205e8ee911044",
+      "jurisdiction": {
+        "country": "Egypt",
+        "stated_as": "Cairo, Egypt",
+        "status": "IDENTIFIED"
+      },
+      "rules": [
+        {
+          "rule_id": "illegal_in_target_market",
+          "question": "Is the core product, or its main way of earning money, prohibited by law in the target market?",
+          "fail_if": "An official source shows the activity is banned in the target market, or requires a licence the founder cannot obtain; a blog post or forum is not a source.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "UNKNOWN_SOURCE",
+          "spans": [],
+          "reasons": [
+            "No official source was checked. Legal status is UNKNOWN — this is not legal clearance and not a ban."
+          ],
+          "source_needed": "Official source (statute, regulator page or government guidance) for the exact jurisdiction. Blogs/forums do not count.",
+          "research_instruction": "Identify the founder's target jurisdiction from the brief, then cite one official source (statute, regulator page or government guidance) stating whether the core product or its revenue method is banned or needs a licence; if none exists, record the search queries and jurisdiction.",
+          "attempted_searches": [
+            {
+              "query": "A website that helps university students in Cairo find quiet study spaces with W licence requirement Egypt official regulator",
+              "executed": false,
+              "note": "No compliant automated legal-search provider is configured; query proposed for the founder or a professional."
+            },
+            {
+              "query": "A website that helps university students in Cairo find quiet study spaces with W prohibited Egypt law",
+              "executed": false,
+              "note": "No compliant automated legal-search provider is configured; query proposed for the founder or a professional."
+            },
+            {
+              "query": "Egypt data protection law personal data official",
+              "executed": false,
+              "note": "No compliant automated legal-search provider is configured; query proposed for the founder or a professional."
+            }
+          ],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "Criteria Types for the Agent Workflow (Sharl, Nov 16 2026), \"Phase 1: Discover, The ethics screen, in three tiers\": \"Illegal in the target market, built on deceiving or harming people\". Page not visible in supplied text.",
+          "detected_by": [],
+          "jurisdiction": {
+            "country": "Egypt",
+            "stated_as": "Cairo, Egypt",
+            "status": "IDENTIFIED"
+          }
+        },
+        {
+          "rule_id": "regulated_or_sensitive_area",
+          "question": "Does the product operate in a legal area that is sensitive or regulated?",
+          "fail_if": "The product handles children's data, personal or special-category data, or a regulated activity, so pause the run, state what is uncertain, recommend professional advice, and continue only after the founder approves.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "REVIEW_REQUIRED",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": "Regulator page or legislation for the target market describing applicable rules.",
+          "research_instruction": "Match the idea to sensitive categories (children, personal or special-category data, or any regulated activity), then cite one regulator page or piece of legislation describing the rules that apply in the target market.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "Criteria Types for the Agent Workflow (Sharl): \"Legal but sensitive or regulated areas, such as health, money, children or personal data\" — a flag to the founder, not automatic rejection.",
+          "detected_by": []
+        },
+        {
+          "rule_id": "physical_goods_exclusion",
+          "question": "Is the main thing the customer receives a physical good?",
+          "fail_if": "The core offering is a physical item, or revenue depends on making, selling or shipping physical items.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify what the customer receives, then cite one independent source confirming whether that deliverable is digital or physical.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3 \"The Hard Walls\": \"Physical goods. The system covers digital products only.\" (hackathon scope exclusion)",
+          "detected_by": []
+        },
+        {
+          "rule_id": "financial_crypto_exclusion",
+          "question": "Does the product trade, lend, give investing advice, issue tokens, or move or manage money for users?",
+          "fail_if": "The core function involves trading, lending, investing advice, tokens, or any handling or management of users' money.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to list every way the product touches money, then cite one regulator page or reputable publication that classifies each function as financial, crypto or neither.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"This covers trading, lending, investing advice, tokens and anything that moves or manages money.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "health_legal_advice_exclusion",
+          "question": "Does the product diagnose, treat, interpret symptoms, or tell people what the law requires of them?",
+          "fail_if": "The product gives health or legal guidance that a user acts on, whatever label the founder gives it.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify what the product tells users to do, then cite one independent source classifying that output as health advice, legal advice or neither.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"An app that diagnoses, treats, interprets symptoms or tells people what the law requires of them is excluded.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "advice_in_disguise",
+          "question": "Does the product give advice a user acts on for their health, money or legal position, even when it is labeled educational or a tracker?",
+          "fail_if": "The output of the product is advice a user acts on for their health, money or legal position, so pause the run and escalate to the founder in plain language instead of approving.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "REVIEW_REQUIRED",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Find how the brief describes the product and how comparable live products describe themselves, then cite one independent source on whether such products count as health, money or legal advice.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"does the product give advice a person might act on for their health, money or legal position?\" — border cases decided by whether people would act on it, unsure cases go to the founder.",
+          "detected_by": []
+        },
+        {
+          "rule_id": "income_promise_dependency",
+          "question": "Does the idea depend on promising income to the founder or to customers?",
+          "fail_if": "The idea sells or markets itself on a promise of income or a guaranteed financial outcome.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify how the product attracts customers and earns revenue, then cite one independent source on rules or guidance for income claims in the target market.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"Promising income to the founder or to customers.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "fake_proof_dependency",
+          "question": "Does the idea depend on faked reviews, sign-ups, testimonials or urgency?",
+          "fail_if": "The business logic needs fabricated reviews, sign-ups, testimonials or urgency in order to work.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify how the product obtains reviews, sign-ups, testimonials and urgency, then cite one consumer-protection source that prohibits fabricated versions of them.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"Faking reviews, sign-ups, testimonials or urgency.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "impersonation_dependency",
+          "question": "Does the idea depend on impersonating a person or an organization?",
+          "fail_if": "The product speaks as, or poses as, a real person, company or brand without being that person, company or brand.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify whose name, voice or brand the product speaks in, then cite one independent source on impersonation rules in the target market.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"Impersonating any person or organization.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "money_or_credentials_dependency",
+          "question": "Does the idea require the system to move money or store credentials?",
+          "fail_if": "The product only works if the system moves money, holds funds, or stores passwords, keys or card details.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify whether the product needs payments, balances or login credentials in order to function, then cite one independent source on the handling rules for whatever you find.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"Moving money or storing credentials.\"",
+          "detected_by": []
+        },
+        {
+          "rule_id": "harm_to_people",
+          "question": "Is the product designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or intellectual property theft?",
+          "fail_if": "The product's purpose matches any of the listed harms, whatever the size of the market.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "BLOCK",
+          "outcome": "CLEAR",
+          "spans": [],
+          "reasons": [
+            "No indicator found in the brief for this rule. (Absence of a match is not proof.)"
+          ],
+          "source_needed": null,
+          "research_instruction": "Read the brief to identify who uses the product and who it acts on, then cite one regulator, court record or reputable report on whether that function is harmful or unlawful in the target market.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 3: \"products designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or clear intellectual property theft are rejected regardless of market size.\" The chapter labels this expanded harm wall a PROPOSED ASSUMPTION.",
+          "detected_by": []
+        },
+        {
+          "rule_id": "founder_values_conflict",
+          "question": "Does the idea clash with a value the founder wrote in the brief?",
+          "fail_if": "The idea or the way it must be run betrays a stated value, so pause the run and surface the mismatch to the founder.",
+          "kind": "knockout",
+          "policy_outcome_on_fail": "REVIEW_REQUIRED",
+          "outcome": "NOT_APPLICABLE",
+          "spans": [],
+          "reasons": [
+            "No founder values were written in the brief."
+          ],
+          "source_needed": null,
+          "research_instruction": "Quote the founder's values field word for word, then quote the part of the idea that touches each stated value; no web source is needed.",
+          "attempted_searches": [],
+          "official_source": null,
+          "founder_review_scope": null,
+          "provenance": "\"The Gate at the Edge of the Map\", Chapter 2 \"The Cast\": \"Values are an ethical input, not decoration. An idea that betrays the founder’s own stated values is a mismatch the system must surface.\"",
+          "detected_by": []
+        }
+      ],
+      "system_guards": [],
+      "findings": [],
+      "counts": {
+        "HARD_STOP": 0,
+        "REVIEW_REQUIRED": 0,
+        "UNKNOWN_SOURCE": 1,
+        "CLEAR": 10,
+        "NOT_APPLICABLE": 1
+      },
+      "model_classifier": {
+        "accepted_flags": [],
+        "rejected_flags": [],
+        "note": "Model flags escalate to founder review only and need a verbatim brief quote."
+      },
+      "feasibility_notes": [
+        "Budget UNKNOWN: experiment costs cannot be checked against your limits.",
+        "Timeline UNKNOWN: time-boxes are estimates only.",
+        "Founder skills UNKNOWN: build feasibility cannot be assessed."
+      ],
+      "limitations": [
+        "Deterministic rule detectors (English) plus an optional model classifier that can only escalate to founder review. Not a legal review; certifies nothing.",
+        "It can miss harmful ideas and can flag harmless ones. A flag is a question for the founder, not an accusation.",
+        "A missing official source never means the activity is legal, and never means it is banned.",
+        "A HARD_STOP cannot be overridden by founder approval or model output. Revise the brief instead."
+      ]
+    }
+  }
+}

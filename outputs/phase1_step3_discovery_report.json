@@ -1,0 +1,75 @@
+{
+  "model": "STUBBED offline stand-in (no model ran)",
+  "report": {
+    "problem_statement": "ASSUMPTION (stubbed hypothesis): A website that helps university students in Cairo find quiet study spaces with Wi-Fi and power outlets near campus.",
+    "target_customers": [
+      "Undergraduate students at Cairo universities"
+    ],
+    "beachhead_user": null,
+    "beachhead_payer": null,
+    "value_proposition": "ASSUMPTION (stubbed hypothesis): untested value proposition taken from the founder idea",
+    "alternatives_unverified": [
+      "Asking friends or classmates (unverified)",
+      "General map apps (unverified)"
+    ],
+    "opportunities": [],
+    "feasibility_notes": [],
+    "viability_first_look": null,
+    "hypotheses": [
+      "ASSUMPTION (stubbed hypothesis): the target customer has this problem often enough to act on it",
+      "ASSUMPTION (stubbed hypothesis): the current workaround is slow or unreliable"
+    ],
+    "unknowns": [
+      "Willingness to pay",
+      "How often the problem occurs"
+    ],
+    "directions": [
+      {
+        "name": "Narrow first segment",
+        "segment": "One campus",
+        "value": "Smaller test, faster learning",
+        "id": "A"
+      }
+    ],
+    "experiments": [
+      "Run a consented, opt-in waitlist test with a pre-registered pass mark"
+    ],
+    "_removed_directions": [
+      {
+        "name": "Different job to be done",
+        "segment": "Same users",
+        "value": "Re-check the problem first"
+      }
+    ],
+    "_quality": {
+      "attempts": 2,
+      "first_pass_issues": [
+        {
+          "kind": "INCONSISTENT_DIRECTION",
+          "field": "directions[1]",
+          "text": "Different job to be done",
+          "severity": "HIGH",
+          "issue": "Direction \"Different job to be done\" (Same users) shares no customer, problem or product term with your brief."
+        }
+      ],
+      "degraded": true,
+      "remaining_issues": [
+        {
+          "kind": "INCONSISTENT_DIRECTION",
+          "field": "directions[1]",
+          "text": "Different job to be done",
+          "severity": "HIGH",
+          "issue": "Direction \"Different job to be done\" (Same users) shares no customer, problem or product term with your brief."
+        }
+      ]
+    },
+    "_label": "HYPOTHESES: everything below was written by the local model from your brief. None of it is evidence.",
+    "_status": "AI_HYPOTHESES_ONLY: nothing here is evidence; no customer was contacted.",
+    "_skeptic_flags": []
+  },
+  "gate_exit_by_code": "REPEAT",
+  "gate_reasons": [
+    "5 of 5 scored criteria are UNKNOWN (more than 2 allowed): gather evidence in Research, then re-evaluate."
+  ],
+  "note": "Full criteria evaluation is stored in the database and shown in the UI."
+}

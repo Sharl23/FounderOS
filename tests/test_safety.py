@@ -129,4 +129,4 @@ def test_no_card_or_password_in_any_text_field(client, project):
         'sample_size': 1, 'collected_from': TODAY, 'consent_confirmed': True})
     assert r.status_code == 422
     state = client.get(f'/api/projects/{pid}', headers=h).json()
-    assert '4111' not in str(state)
+    assert '4111 1111' not in str(state)   # the bare digits can occur by chance inside random ids

@@ -1,0 +1,53 @@
+{
+  "model": "STUBBED offline stand-in (no model ran)",
+  "report": {
+    "summary": "STUBBED: no model ran. The verdict comes from code: no independent evidence of purchasing demand.",
+    "market_research_vs_customer_demand": "Unknown / not provided",
+    "risks": [
+      "Demand is not confirmed."
+    ],
+    "contradictions_or_gaps": [
+      "No recorded customer behaviour."
+    ],
+    "pricing_hypotheses": [
+      "ASSUMPTION: untested price point."
+    ],
+    "business_model_hypotheses": [],
+    "competitor_research_limitations": [
+      "No competitors were identified in the recorded evidence data was sourced in this demo run."
+    ],
+    "_prose_checks": [
+      {
+        "kind": "FRAGMENT_REMOVED",
+        "original": "No accepted evidence; demand untested",
+        "issue": "Removed an incomplete fragment from the model output.",
+        "field": "market_research_vs_customer_demand"
+      },
+      {
+        "kind": "FRAGMENT_REMOVED",
+        "original": "ASSUMPTION: subscription (untested).",
+        "issue": "Removed an incomplete fragment from the model output.",
+        "field": "business_model_hypotheses[0]"
+      },
+      {
+        "kind": "REWORDED_ABSENCE_CLAIM",
+        "original": "No competitor data was sourced in this demo run.",
+        "issue": "A categorical absence claim was reworded: the ledger can only show that no evidence was recorded.",
+        "field": "competitor_research_limitations[0]"
+      }
+    ],
+    "_status": "VALIDATION_ASSISTANCE: AI explanation of a backend-computed verdict. Not customer testing.",
+    "_skeptic_flags": [
+      {
+        "field": "competitor_research_limitations[0]",
+        "text": "No competitors were identified in the recorded evidenc",
+        "issue": "OVER-CLAIM \"No competitors\": not supported by the evidence ledger; treat as ASSUMPTION."
+      }
+    ]
+  },
+  "verdict_by_code": "NEEDS_EVIDENCE",
+  "gate": {
+    "verdict": "NEEDS_EVIDENCE",
+    "experiment_outcomes": []
+  }
+}

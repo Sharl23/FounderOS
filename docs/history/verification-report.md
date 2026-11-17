@@ -12,4 +12,4 @@
 - `docker compose up --build`, the first Ollama model pull, real Qwen2.5 inference quality and latency (`scripts/benchmark.py`), persistence across container restarts, the optional n8n import.
 - Real fetching of public URLs (the sandbox's egress is restricted; the fetcher's SSRF checks were unit-tested, the happy path was not hit against a live site).
 
-Nothing above is claimed beyond what ran. Status: **PARTIALLY READY** (see `docs/judge-readiness.md`).
+Nothing above is claimed beyond what ran. Status: **PARTIALLY READY**.

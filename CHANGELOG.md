@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.9.0 — 17 Nov 2026 (all six phases, MOCKED / TEST MODE for 3-6)
+
+- **Phase 3 Build:**
+  - `agents/product_architect.py` writes the spec, user stories and acceptance criteria from the founder's own words.
+  - `agents/website_builder.py` writes a real static site: HTML, CSS, JS and a README.
+  - `agents/qa.py` runs static checks; `agents/revision.py` runs the feedback loop and reports what it did not apply.
+  - Versions, a sandboxed preview (CSP sandbox, random key, four allowed file names) and a ZIP export.
+  - Validate STOP or BLOCK refuses any build. Otherwise the build is DEMO-ONLY unless every critical locked test was a hit.
+- **Phase 4 Commercial setup:** `agents/commercial.py` computes Decimal unit economics, break-even, scenarios, pricing hypotheses, business models, packages and a terms checklist. The payment provider is MOCKED.
+- **Phase 5 Sell / deliver / get paid (MOCKED / TEST MODE):**
+  - offer and draft sales page, with an honesty check;
+  - idempotent checkout that rejects card fields;
+  - HMAC-signed simulator and an idempotent webhook (duplicates ignored, forged events rejected);
+  - one entitlement per order, a refund that needs approval and revokes access, and reconciliation.
+- **Phase 6 Operate and learn:** metrics derived from recorded events, MANUAL or MOCK_DEMO metrics, feedback with provenance and issues. A rule-based recommendation leads to a proposal back to Phase 3 or 1, applied as a new version.
+- **Approvals:** `approval.py` covers server-side approvals:
+  - bound to a state hash;
+  - single use, with expiry;
+  - stale, rejected and pending approvals refused;
+  - append-only event history.
+
+  Actions that are never performed are refused even with an approval.
+- **Gates and orchestration:** `gates.py` holds gates 1-6. `orchestrator.py` holds the workflow state machine and API. `agent_log.py` writes one row per agent action, exported as `decision_log.json`.
+- **Interface:** sidebar grouped by the six phases, a Six phases overview, and Build Studio, Commercial setup, Sell and get paid, and Operate and learn views. An approval dialog offers approve or reject.
+- **Repository layout:**
+  - `tests/` moved to the root;
+  - `ARCHITECTURE.md`, `prompts/` (generated from code), `outputs/` and `decision_log.json` from `scripts/demo_run.py`;
+  - README rewritten to the required headings;
+  - reviewer-facing docs removed.
+- **Docker:** `docker compose up` now starts only the app against Ollama on the host. The Ollama containers are under the `ollama` profile.
+
 ## 0.8.0 — 17 Nov 2026 (final repair after the founder's manual trial)
 
 Repairs every defect seen in the real end-to-end trial on 17 Nov 2026 and registers the team's 67-check Phase-1 rubric. Data from v0.7 is kept (additive migration `v8`; nothing is deleted).

@@ -95,8 +95,8 @@ def test_oom_during_refine_keeps_input_and_reports_code(client, monkeypatch):
 
 # ---------------------------------------------------------------- migration from a v0.4 database
 def test_v04_database_migrates_without_losing_projects_or_decisions(tmp_path, monkeypatch):
-    repo = Path(__file__).resolve().parents[2]
-    old = subprocess.run(['git', 'show', 'HEAD~1:backend/app/db.py'], cwd=repo, capture_output=True, text=True)
+    repo = Path(__file__).resolve().parents[1]
+    old = subprocess.run(['git', 'show', 'fa02550:backend/app/db.py'], cwd=repo, capture_output=True, text=True)
     src = old.stdout if old.returncode == 0 and 'SCHEMA' in old.stdout else None
     if src is None:
         pytest.skip('v0.4 baseline not available in git history')

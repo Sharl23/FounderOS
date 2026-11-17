@@ -1,0 +1,16 @@
+{
+  "mode": "MOCKED / TEST MODE",
+  "offer": {
+    "product": "Quiet Corners: prototype access",
+    "package": "Standard",
+    "price": 5.0,
+    "currency": "USD",
+    "billing": "monthly",
+    "delivers": "Access link to the generated prototype files (DEMO-ONLY digital artifact)",
+    "includes": [
+      "Access to the digital product"
+    ],
+    "mode": "MOCKED / TEST MODE"
+  },
+  "honesty_check": "PASS"
+}

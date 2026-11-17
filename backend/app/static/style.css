@@ -318,3 +318,21 @@ dialog h2 { font-family: var(--serif); font-weight: 500; font-size: 22px; }
 
 .panel.simulated { border: 2px dashed var(--stop); }
 dl.facts.defs { grid-template-columns: 92px 1fr; }
+
+/* v0.9: phases 3-6 */
+.nav-phase { margin: 12px 10px 2px; font-size: 12px; font-weight: 600; color: var(--faint); }
+.phases { list-style: none; margin: 0; padding: 0; }
+.phase-row { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 16px 0; border-top: 1px solid var(--rule); }
+.phase-row:first-child { border-top: 0; }
+.phase-row .n { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--rule-strong); display: grid; place-items: center; font-weight: 600; color: var(--slate); }
+.phase-row[data-status^="GATE_PASSED"] .n { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.phase-row[data-status="STOPPED"] .n { border-color: var(--stop); color: var(--stop); }
+.phase-row h2 { margin: 2px 0 6px; font-size: 17px; }
+.gate-slip { background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: var(--r-panel); padding: 14px 16px; }
+.gate-slip .verdict { margin: 4px 0 8px; font-weight: 600; }
+.preview-wrap { border: 1px solid var(--rule-strong); border-radius: var(--r-ctl); overflow: hidden; background: #fff; }
+.preview-wrap iframe { display: block; width: 100%; height: 460px; border: 0; }
+iframe.srcdoc { width: 100%; height: 360px; border: 1px solid var(--rule); border-radius: var(--r-ctl); background: #fff; }
+pre.code { max-height: 360px; overflow: auto; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-ctl); padding: 10px; font: 12.5px/1.45 var(--mono); white-space: pre; }
+table.data th, table.data td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+label.check { display: flex; gap: 8px; align-items: center; margin: 10px 0; }

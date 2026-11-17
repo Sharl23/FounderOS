@@ -1,0 +1,74 @@
+{
+  "mode": "MOCKED / TEST MODE",
+  "orders": [
+    {
+      "order_id": "76aaf81d484149c4b63617d8db34eb54",
+      "buyer_ref": "test-buyer-1",
+      "status": "REFUNDED",
+      "amount_cents": 500,
+      "paid_cents": 500,
+      "fee_cents": 45,
+      "refunded_cents": 500,
+      "net_cents": -45,
+      "access": "REVOKED",
+      "deliveries": 1,
+      "issues": []
+    },
+    {
+      "order_id": "d93d827295e7481f9d7ebfe621968efe",
+      "buyer_ref": "test-buyer-2",
+      "status": "PAID",
+      "amount_cents": 500,
+      "paid_cents": 500,
+      "fee_cents": 45,
+      "refunded_cents": 0,
+      "net_cents": 455,
+      "access": "ACTIVE",
+      "deliveries": 1,
+      "issues": []
+    },
+    {
+      "order_id": "864870c83a4b472fabce71497a994ddb",
+      "buyer_ref": "test-buyer-3",
+      "status": "PAID",
+      "amount_cents": 500,
+      "paid_cents": 500,
+      "fee_cents": 45,
+      "refunded_cents": 0,
+      "net_cents": 455,
+      "access": "ACTIVE",
+      "deliveries": 0,
+      "issues": []
+    },
+    {
+      "order_id": "96db02572e3543e3b0590093e9fe6413",
+      "buyer_ref": "test-buyer-4",
+      "status": "PENDING_PAYMENT",
+      "amount_cents": 500,
+      "paid_cents": 0,
+      "fee_cents": 0,
+      "refunded_cents": 0,
+      "net_cents": 0,
+      "access": "NONE",
+      "deliveries": 0,
+      "issues": []
+    }
+  ],
+  "totals": {
+    "paid_cents": 1500,
+    "fee_cents": 135,
+    "refunded_cents": 500,
+    "net_cents": 865,
+    "mock_payout_cents": 865
+  },
+  "issues": [],
+  "ok": true,
+  "payout_note": "Mock payout = payments - fees - refunds. No payout is made; there is no bank account.",
+  "gate": {
+    "phase": 5,
+    "outcome": "GO",
+    "reasons": [
+      "3 MOCKED order(s) paid, delivered and reconciled in TEST MODE."
+    ]
+  }
+}

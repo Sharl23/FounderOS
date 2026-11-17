@@ -1,0 +1,11 @@
+{
+  "target_phase": 3,
+  "rationale": "Operate & Learn recommends ITERATE: 1 open high-severity issue(s): fix before anything else. Only 3 paid order(s) recorded; at least 10 are needed before conversion or refund rates mean anything.",
+  "change": {
+    "feedback_commands": [
+      "show search",
+      "add filter: Prayer Room"
+    ],
+    "source": "feedback + recorded events"
+  }
+}

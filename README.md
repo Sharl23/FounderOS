@@ -1,109 +1,111 @@
-# FounderOS — evidence-first venture decisions
+# FounderOS: an evidence-first venture builder
 
-Open-source, local-first team of AI agents for the MADS × CSEA AI Hackathon (Nov 2026). FounderOS helps a founder decide, with evidence, whether an idea deserves more of their time. **It evaluates and guides venture work; it does not build, publish, sell or launch the founder's product.**
+FounderOS is an open-source, local-first team of AI agents. It takes a founder's idea through six phases:
 
-The local open-weight model drafts and explains. **Code decides**: twelve written safety rules, 21 criteria from *Criteria Types for the Agent Workflow*, the team's **67-check Phase-1 rubric** (aggregated under D01 and D03–D07), source verification, locked pass marks and every gate exit.
+1. Discover
+2. Validate
+3. Build
+4. Commercial setup
+5. Sell, deliver and get paid
+6. Operate and learn
 
-**Version 0.8.0** (17 Nov 2026): final repair after the founder's manual trial. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/v08-repair-report.md`](docs/v08-repair-report.md). The founder approves, revises, pivots or stops at each gate, and every approval means *research only*.
+Each phase ends in a gate that code decides. Moving on needs a founder approval that the server enforces. A small open-weight model, running locally through Ollama, drafts the text.
 
-| Business phase | Status |
-|---|---|
-| 1 Discover (brief → safety → discovery agent → research → Discover gate) | **Live** |
-| 2 Validate (demand tests → locked targets → result reading → decision passport) | **Live** |
-| 3 Build · 4 Commercial setup · 5 Launch · 6 Operate & learn | **Architecture only** — documented with their 17 criteria, endpoints return 501, nothing simulated |
+**Phases 3-6 run in MOCKED / TEST MODE.**
 
-Judges: start with [`docs/README-for-judges.md`](docs/README-for-judges.md).
+- The website it builds is a DEMO-ONLY prototype that uses demo data.
+- Payments go through a built-in signed simulator.
+- Nothing is published, sent, spent, signed or deployed.
 
-## Upgrading from v0.7 (keeps your data)
+Version 0.9.0 (17 Nov 2026). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md). Outputs of a real run: [`outputs/`](outputs/README.md) and [`decision_log.json`](decision_log.json).
 
-Your projects, evidence and decisions live in the `founder_data` Docker volume (shown by Docker as `founder-os_founder_data`). v0.8 adds columns only (migration `v8`) and deletes nothing. Do **not** run `docker compose down -v` (that deletes the volume). Docker names the volume after the folder, so **run v0.8 from a folder named `founder-os`** (replace the old folder, or rename it) or the old data will not be found. In PowerShell:
-
-```powershell
-cd founder-os                      # the new v0.8 folder
-docker compose down                # stops v0.7; the data volume stays
-docker compose -f docker-compose.yml -f compose.windows.yaml up --build    # host Ollama on Windows (your setup)
-```
-
-Then open http://localhost:8000, click the model status, run the real test, and check that `/api/health` says `0.8.0`. Keep `OLLAMA_NUM_GPU=0` in `.env` if CPU-only worked for you.
-
-## Run it — one command (official path)
-
-Prerequisites: Docker Desktop (Windows: WSL2 backend) or Docker Engine with Compose v2, ~3 GB disk, internet for the first download only.
-
-```powershell
-cd founder-os
-docker compose up --build
-```
-
-Wait until `model-init` prints `model qwen2.5:1.5b-instruct is pulled`, then open **http://localhost:8000**. Click the model status in the top bar and run the one-token test before a timed demo: “installed” is not the same as “working”.
-
-## Windows with Ollama already installed on Windows (optional override)
-
-Use this if you run the Ollama app on Windows instead of the Ollama container. The official command above is unchanged.
-
-```powershell
-ollama pull qwen2.5:1.5b-instruct
-ollama run qwen2.5:1.5b-instruct "Reply OK"        # must answer before you continue
-cd founder-os
-docker compose -f docker-compose.yml -f compose.windows.yaml up --build
-```
-
-In this mode Compose starts only the `api` container and reaches Ollama at `http://host.docker.internal:11434`; it does not pull the Ollama image.
-
-### If the model will not load (out of memory)
-
-FounderOS maps Ollama errors to plain codes and never switches models or shows simulated text.
-
-| You see | Meaning | Do this |
-|---|---|---|
-| `MODEL_OOM_GPU` / `cudaMalloc failed: out of memory` | GPU memory too small or busy | Close GPU-heavy apps. In `.env` set `OLLAMA_NUM_GPU=0` (CPU only), restart. On host Ollama you can also set the Windows environment variable `OLLAMA_NUM_GPU=0` or `CUDA_VISIBLE_DEVICES=-1` and restart the Ollama app. |
-| `MODEL_OOM_CPU` / `failed to allocate CPU_REPACK buffer` | Not enough free RAM | Close browsers with many tabs, IDEs and games; set `OLLAMA_NUM_CTX=1024` in `.env`; in Docker Desktop → Settings → Resources (or `%UserProfile%\.wslconfig` `memory=6GB`) give the VM more memory, then `wsl --shutdown` and restart Docker. Check free memory in Task Manager → Performance. |
-| `OLLAMA_UNREACHABLE` | Ollama not running / wrong URL | Container mode: wait for `ollama` and `model-init`. Host mode: start the Ollama app; `http://localhost:11434` must answer in your browser. |
-| `MODEL_NOT_FOUND` | Model not pulled | `ollama pull qwen2.5:1.5b-instruct` |
-| `MODEL_TIMEOUT` | First load is slow | Press Retry; raise `OLLAMA_TIMEOUT_S`. |
-
-Do not disable the Windows pagefile or kill unrelated processes. A smaller model (`OLLAMA_MODEL=qwen2.5:0.5b-instruct`) is your explicit choice only and was **not** benchmarked by the authors. Your input is saved before every model call, so a failure never loses it.
-
-## The journey (seven screens, two live phases)
-
-1. **Projects** — start a venture or continue one. Project keys stay in your browser.
-2. **Brief** — your words with the phrases used for each field highlighted. Each field is marked *typed by you*, *in your words (please confirm)*, *model suggestion* (never counts until confirmed), *not stated* (with one clear question) or *parser failed*. An idea-clarity (D02) box says exactly what is missing. Corrections create new versions and retire old approvals.
-3. **Safety** — twelve checks (hard stop, needs your review, source not checked, no issue found). Hard stops cannot be overridden; reviews allow research only. Attach official sources for the legal checks.
-4. **Discover** — the discovery agent's hypotheses as cards, the criteria scorecard (unknown is never zero) and the Discover gate decided by code.
-5. **Research** — the **Criteria matrix**: all 67 team checks grouped under the five dimensions. Each check shows its question, weak/mixed/strong definitions, the source types it accepts, sources required versus accepted, rejected evidence with reasons, searches tried and what to do next.
-   - **Searches:** a plan built from your brief's structured fields; Crossref, OpenAlex and World Bank searches.
-   - **Inspection:** inspection of any public page you choose, with precise fetch errors (timeout, certificate, oversized page). If a page can't be fetched, you can paste the passage yourself; it's labelled as yours and never counted as verified.
-   - **Relevance review:** five questions (claim, geography, buyer, method, date) decide whether a source counts.
-   - **Ledger:** exact passages go into an immutable ledger, alongside your own customer research (founder-reported).
-6. **Demand tests** — a suggestion aimed at the riskiest assumption; design check; **lock** before collecting; code reads real results as hit / near miss / clear miss / too little data.
-   - Simulated or hypothetical actions cannot be locked as real. A labelled SIMULATED demo never counts.
-   - Ideas involving children are tested with consenting adults only.
-   - Results record recruitment, exclusions, consent, dates and limitations.
-7. **Decision** — verdict (Needs evidence, Continue testing, Pivot, Stop, Blocked) with the code's own explanation first; five dimensions with clickable evidence; what would change it; the model's commentary, checked against the verdict, with every correction listed. Printable.
-   - Plus the **decision log**: one card per decision with the gate it was made against, your reason (or "none given, optional here") and every version and hash it is bound to.
-   - Plus a **six-phase roadmap**.
-
-## Tests
+## Quickstart
 
 ```bash
-cd backend
-pip install -r requirements-dev.txt
-python -m pytest -q                         # 247 tests; model and providers mocked (TEST_ONLY)
-cd ..
-pip install playwright && playwright install chromium
-python scripts/ui_e2e.py                    # real browser through every screen, 60 checks (TEST_ONLY model)
-python scripts/live_check.py                # LIVE: your model + free providers, writes docs/live-check-results.md
+docker compose up
 ```
 
-## What is honest about this prototype
+1. Open **http://localhost:8000**.
+2. The app looks for Ollama on your machine (the host) at `http://host.docker.internal:11434`. To give it a model, install [Ollama](https://ollama.com) and run `ollama pull qwen2.5:1.5b-instruct`.
+3. To check the model works, click the model status in the top bar and run the real one-token test.
 
-- No paid API, key or account is required. Research providers are free public services that may throttle or be offline; failures are shown as failures.
-- General web, competitor, pricing, patent and regulator search is **not automated** (no compliant free search API). FounderOS proposes queries and links for you to run and verifies the pages you bring back. Academic indexes return metadata about papers, which never counts as customer or competitor evidence.
-- The team rubric's book references are recorded exactly as supplied ("page: not visible") and were not independently checked. They explain why a check exists; they are never evidence about your venture.
-- A verified excerpt proves the words are on the page, not that they are true; secondary sources never prove demand.
-- Customer results are entered by you and stay *founder-reported, not independently verified*.
-- The project key is a prototype capability token, not production authentication. Do not expose the app to the internet.
+Without a model, the interface still opens. Phases 1-2 then say plainly that the model is unavailable, and Phases 3-6 keep working, because they need no model.
 
-Docs: [v0.8 repair report](docs/v08-repair-report.md) · [67-check rubric traceability](docs/rubric-traceability.md) · [architecture](docs/architecture.md) · [criteria methodology](docs/criteria-methodology.md) · [criteria & safety traceability](docs/criteria-traceability.md) · [implementation matrix](docs/v7-implementation-matrix.md) · [API](docs/api.md) · [security](docs/security.md) · [costs & licenses](docs/api-cost-and-licenses.md)
+- **Ollama in a container instead.** Set `OLLAMA_URL=http://ollama:11434` in `.env`, then run `docker compose --profile ollama up`.
+- **Machine settings.** Copy `.env.example` to `.env`. On a GPU with 6 GB or less that runs out of memory, set `OLLAMA_NUM_GPU=0`. If RAM runs out, set `OLLAMA_NUM_CTX=1024`. Troubleshooting is in [`docs/user-guide.md`](docs/user-guide.md).
+- **Reproduce `outputs/` and `decision_log.json`.** Run `pip install -r backend/requirements-dev.txt && python scripts/demo_run.py`.
+- **Tests.** Run `python -m pytest -q` from the repository root.
 
-License: MIT (this repository). Third-party components and their licences: `docs/api-cost-and-licenses.md`. n8n (optional, off by default) is fair-code, not OSI open source.
+## What works and what is mocked
+
+| Area | Status | Notes |
+|---|---|---|
+| Phase 1 Discover: brief, 12-rule safety screen, discovery agent, Discover gate | Working | Model drafts; code screens and decides |
+| Phase 2 Validate: research verification, pre-registered demand tests, verdict, decision log | Working | Customer results are founder-reported |
+| Phase 3 Build: spec, user stories, acceptance criteria, HTML/CSS/JS generator, QA, revision loop, versions, sandboxed preview, ZIP export | Working | Template-based generator; DEMO DATA; a DEMO-ONLY build is never called validated |
+| Phase 4 Commercial setup: unit economics, break-even, scenarios, pricing hypotheses, business models, terms checklist | Working | Every input is an ASSUMPTION; not financial or legal advice |
+| Phase 5 payment provider | MOCKED | Built-in HMAC-signed simulator, TEST MODE only; no live mode exists |
+| Phase 5 checkout, idempotent webhook, delivery link, refund and revocation, reconciliation | Working (against the mock) | No card data accepted or stored |
+| Phase 5 publishing the sales page, emailing buyers | STUBBED | Not built on purpose: drafts only |
+| Phase 6 metrics from recorded events, feedback with provenance, issues, recommendation, proposals back to Phase 1 or 3 | Working | Sales events are MOCKED, so results describe the simulation |
+| Phase 6 real analytics or support inbox | STUBBED | Manual or MOCK_DEMO entries only |
+| Founder approvals: bound to state, single use, expiring, stale or rejected ones refused, append-only history | Working | Enforced on the server |
+| Model used by `scripts/demo_run.py` when Ollama is not running | STUBBED | Labelled offline stand-in; marked in every log entry it touches |
+
+## Architecture
+
+There is one FastAPI service with a vanilla-JS interface, SQLite storage and Ollama on the host.
+
+- **The orchestrator** (`backend/app/orchestrator.py`) runs a six-phase state machine.
+- **The agents** each have one role, with typed inputs and outputs, in `backend/app/agents/`:
+  - product architect;
+  - website builder;
+  - QA;
+  - revision;
+  - commercial;
+  - sales and delivery;
+  - operations.
+
+  The Phase 1-2 agents (refiner, discovery, validation and criterion judges) use the prompts in `prompts/`.
+- **The gates** (`gates.py`) and **approvals** (`approval.py`) are code.
+- **Sale to cash** runs through `payments.py`, `webhooks.py`, `delivery.py`, `refunds.py` and `reconcile.py`.
+
+Details, the Mermaid diagram and the data flow are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Models and free resources
+
+- **Model:** `qwen2.5:1.5b-instruct` (Apache-2.0 open weights, about 1 GB) via [Ollama](https://ollama.com). It runs on a CPU, and a 6 GB GPU is optional.
+- **Paid APIs, keys and accounts:** none are required.
+- **Research sources:** free public services (Crossref, OpenAlex, World Bank), plus pages the founder brings. They may throttle requests, and failures are shown as failures.
+- **Smaller model:** `OLLAMA_MODEL=qwen2.5:0.5b-instruct` is available, but only if you choose it. The authors did not benchmark it.
+- **What has been tested:** the automated tests and `outputs/` were produced with the labelled offline stand-in, not with the model. Check the model on your own machine with `python scripts/live_check.py`.
+
+Licences are listed in [`docs/api-cost-and-licenses.md`](docs/api-cost-and-licenses.md).
+
+## Cost per run
+
+About $0.00 per run: the model is local and no API is paid. The only costs are your computer's electricity and the one-time model download of about 1 GB. Token counts per run were not measured.
+
+## Demo video
+
+No demo video has been recorded yet. The link will be added here when one exists (3 minutes at most).
+
+## What our system will NOT do
+
+- Take real payments, store card data, or create merchant, bank or provider accounts.
+- Publish pages, post to social media, send emails or messages, contact buyers, sign agreements, deploy, or spend money. The server refuses these actions even with an approval.
+- Invent customer evidence, reviews, testimonials, signups or benchmarks. Demo and test data is labelled MOCK_DEMO, TEST_ONLY or DEMO DATA.
+- Promise profits or give financial, investment, legal or health advice. Commercial figures are ASSUMPTIONS and CALCULATED SCENARIOS.
+- Help build prohibited ventures: physical goods; financial, investment or crypto products; health or legal advice. The code safety screen stops these before any model call.
+- Call a DEMO-ONLY prototype validated, launch-ready or production-ready.
+
+## How the project stays alive after the hackathon
+
+- **Maintainers.** The founding team maintains the project. Contributions follow [`CONTRIBUTING.md`](CONTRIBUTING.md) under the MIT licence.
+- **Roadmap** (also in [`ARCHITECTURE.md`](ARCHITECTURE.md#roadmap)):
+  1. A real payment provider in its own test mode, behind the same approvals.
+  2. Model-assisted copy, with QA kept in code.
+  3. Real opt-in analytics.
+  4. Export and import of a venture.
+- **Running costs.** Running it costs nothing beyond a laptop, so the project does not depend on funding to keep working. Any future funding would go to user research with founders, not to API bills.
+- **Community.** Issues and pull requests are welcome. Policy files (`backend/policy/*.yaml`) and agent prompts (`prompts/`) are plain text, so non-programmers can propose changes.

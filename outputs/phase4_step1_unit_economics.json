@@ -1,0 +1,171 @@
+{
+  "labels": {
+    "inputs": "ASSUMPTION unless the evidence note says otherwise",
+    "outputs": "CALCULATED SCENARIO, not a verified financial outcome",
+    "advice": "Not financial, tax or legal advice."
+  },
+  "inputs": {
+    "currency": "USD",
+    "billing": "monthly",
+    "price": 5.0,
+    "variable_cost_per_sale": 0.5,
+    "payment_fee_pct": 2.9,
+    "payment_fee_fixed": 0.3,
+    "fixed_costs_monthly": 20.0,
+    "build_cost_one_off": 200.0,
+    "sales_per_month_low": 2,
+    "sales_per_month_base": 10,
+    "sales_per_month_high": 30,
+    "monthly_churn_pct": 10.0,
+    "packages": [],
+    "evidence_note": null
+  },
+  "unit_economics": {
+    "price": 5.0,
+    "fee_per_sale": 0.45,
+    "contribution_per_sale": 4.06,
+    "contribution_margin_pct": 81.1,
+    "break_even_sales_per_month": 5,
+    "break_even_note": "5 sale(s) per month cover the fixed costs.",
+    "lifetime_contribution_per_customer": 40.55,
+    "scenarios": {
+      "low": {
+        "sales_per_month": 2,
+        "revenue": 10.0,
+        "fees": 0.89,
+        "variable_costs": 1.0,
+        "contribution": 8.11,
+        "fixed_costs": 20.0,
+        "profit_per_month": -11.89,
+        "months_to_recover_build_cost": null,
+        "label": "CALCULATED SCENARIO from ASSUMPTION inputs"
+      },
+      "base": {
+        "sales_per_month": 10,
+        "revenue": 50.0,
+        "fees": 4.45,
+        "variable_costs": 5.0,
+        "contribution": 40.55,
+        "fixed_costs": 20.0,
+        "profit_per_month": 20.55,
+        "months_to_recover_build_cost": 10,
+        "label": "CALCULATED SCENARIO from ASSUMPTION inputs"
+      },
+      "high": {
+        "sales_per_month": 30,
+        "revenue": 150.0,
+        "fees": 13.35,
+        "variable_costs": 15.0,
+        "contribution": 121.65,
+        "fixed_costs": 20.0,
+        "profit_per_month": 101.65,
+        "months_to_recover_build_cost": 2,
+        "label": "CALCULATED SCENARIO from ASSUMPTION inputs"
+      }
+    }
+  },
+  "pricing_hypotheses": [
+    {
+      "hypothesis": "Customers will pay 2.5 USD (lower price point)",
+      "price": 2.5,
+      "contribution_per_sale": 1.63,
+      "break_even_sales_per_month": 13,
+      "status": "HYPOTHESIS: untested. Test with a pre-registered demand test before relying on it."
+    },
+    {
+      "hypothesis": "Customers will pay 5.0 USD (entered price point)",
+      "price": 5.0,
+      "contribution_per_sale": 4.06,
+      "break_even_sales_per_month": 5,
+      "status": "HYPOTHESIS: untested. Test with a pre-registered demand test before relying on it."
+    },
+    {
+      "hypothesis": "Customers will pay 10.0 USD (higher price point)",
+      "price": 10.0,
+      "contribution_per_sale": 8.91,
+      "break_even_sales_per_month": 3,
+      "status": "HYPOTHESIS: untested. Test with a pre-registered demand test before relying on it."
+    }
+  ],
+  "packages": [
+    {
+      "name": "Standard",
+      "price": 5.0,
+      "includes": [
+        "Access to the digital product"
+      ],
+      "unit_economics": {
+        "price": 5.0,
+        "fee_per_sale": 0.45,
+        "contribution_per_sale": 4.06,
+        "contribution_margin_pct": 81.1,
+        "break_even_sales_per_month": 5,
+        "break_even_note": "5 sale(s) per month cover the fixed costs.",
+        "lifetime_contribution_per_customer": 40.55
+      }
+    }
+  ],
+  "business_models": [
+    {
+      "id": "one_time",
+      "name": "One-time purchase",
+      "trade_off": "Simple to explain; revenue stops unless new buyers keep coming.",
+      "selected": false
+    },
+    {
+      "id": "monthly",
+      "name": "Subscription",
+      "trade_off": "Recurring revenue if people keep using it; churn decides everything.",
+      "selected": true
+    },
+    {
+      "id": "freemium",
+      "name": "Free tier + paid upgrade",
+      "trade_off": "Lowers the barrier; most free users never pay, so test conversion first.",
+      "selected": false
+    },
+    {
+      "id": "per_use",
+      "name": "Pay per use",
+      "trade_off": "Fits occasional use; revenue is lumpy.",
+      "selected": false
+    },
+    {
+      "id": "b2b_license",
+      "name": "Business licence (per site)",
+      "trade_off": "Fewer, larger customers; a longer sales cycle.",
+      "selected": false
+    }
+  ],
+  "terms_checklist": [
+    {
+      "item": "Terms of service (draft)",
+      "status": "TO DO",
+      "note": "What the buyer gets, access period, acceptable use."
+    },
+    {
+      "item": "Refund policy (draft)",
+      "status": "TO DO",
+      "note": "Must meet consumer rules in Egypt; check with a qualified professional."
+    },
+    {
+      "item": "Privacy notice",
+      "status": "TO DO",
+      "note": "What personal data is collected (FounderOS collects none in the prototype)."
+    },
+    {
+      "item": "Business registration and tax",
+      "status": "TO DO",
+      "note": "Requirements in Egypt are not checked by FounderOS."
+    },
+    {
+      "item": "Payment provider account",
+      "status": "NOT CREATED",
+      "note": "FounderOS never creates accounts. Checkout is MOCKED / TEST MODE."
+    }
+  ],
+  "payment_provider": {
+    "status": "MOCKED",
+    "detail": "No payment provider is configured. Live payment processing is disabled in code; only the built-in TEST MODE simulator exists."
+  }
+}

@@ -1,7 +1,7 @@
 # Criteria and safety-rule traceability (v0.7)
 
 Policy files: `backend/policy/criteria.yaml` (version `criteria-2026-11-17.v7.1`) and `backend/policy/safety_rules.yaml` (version `safety-policy-2026-11-17.v7-1`). Both are hashed (SHA-256) and the hashes are stored on every evaluation and founder decision (`decisions.criteria_policy_hash`, `decisions.safety_policy_hash`).
-Page numbers refer to *Criteria Types for the Agent Workflow* (@Sharl, 16 Nov 2026, 11 pages), read in full. Test status is from `cd backend && python -m pytest -q` → **247 passed** (v0.8; unit/integration; model mocked as `FakeModel`, TEST_ONLY).
+Page numbers refer to *Criteria Types for the Agent Workflow* (@Sharl, 16 Nov 2026, 11 pages), read in full. Test status at v0.8 was `cd backend && python -m pytest -q` → **247 passed**; since v0.9 tests live in `tests/` and run from the root (`python -m pytest -q`, 269 passed) ( unit/integration; model mocked as `FakeModel`, TEST_ONLY).
 
 UI locations: Brief `/projects/:id/brief`, Safety `/safety`, Discover `/discovery`, Research `/research`, Demand tests `/experiments`, Decision `/decision`, Log `/audit`, Roadmap `/roadmap`.
 

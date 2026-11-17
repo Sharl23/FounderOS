@@ -29,7 +29,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .db import init_db, conn, now, qone, qall, audit, unpack_run, unpack_brief, unpack_experiment
+from .db import init_db, conn, now, qone, qall, audit as _db_audit, unpack_run, unpack_brief, unpack_experiment
+from . import agent_log
 from .schemas import (ProjectCreate, RefinedBrief, DiscoveryReport, ValidationReport, ClarifyRequest, SafetyAck,
                       DecisionRequest, EvidenceAdd, ExperimentDraft, ExperimentLock, ExperimentResult,
                       PublicActionRequest, JudgeOutput, CheckJudgeOutput, BRIEF_FIELDS)
@@ -42,7 +43,7 @@ from .llm import (OllamaClient, ModelUnavailable, ModelOutputError, ADVICE, REFI
 
 LLM = OllamaClient()
 STARTED_AT = now()
-VERSION = '0.8.0'
+VERSION = '0.9.0'
 
 
 @asynccontextmanager
@@ -54,6 +55,48 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title='FounderOS', version=VERSION, lifespan=lifespan,
               description='Evidence-first founder decision system. Draft-only: no publishing, sending, spending, signing or payments.')
+
+
+# Audit events that are agent actions also go to the agent log (exported as decision_log.json).
+AGENT_EVENTS = {
+    'BRIEF_REFINED': ('brief_refiner', 'refine_brief'), 'SAFETY_SCREENED': ('safety', 'screen_twelve_rules'), 'SAFETY_PRESCREEN_BLOCK': ('safety', 'prescreen_block'),
+    'PHASE_RUN_READY': (None, None), 'CRITERIA_EVALUATED': ('gate', 'phase1_criteria_evaluation'), 'CRITERION_JUDGED': ('criterion_judge', 'judge_criterion'),
+    'RUBRIC_CHECK_JUDGED': ('check_judge', 'judge_rubric_check'), 'RESEARCH_QUERY_RUN': ('researcher', 'search_provider'),
+    'SOURCE_INSPECTED': ('verifier', 'inspect_source'), 'EVIDENCE_ADDED': ('evidence_review', 'add_to_ledger'),
+    'EXPERIMENT_DRAFTED': ('experiment_designer', 'draft_demand_test'), 'EXPERIMENT_PREREGISTERED': ('founder', 'lock_demand_test'),
+    'EXPERIMENT_RESULT_RECORDED': ('validation', 'read_locked_result'), 'FOUNDER_DECISION': ('founder', None), 'RISK_ACKNOWLEDGED': ('founder', 'acknowledge_review_required'),
+    'EXTERNAL_ACTION_BLOCKED': ('approval', 'refuse_external_action'),
+}
+
+
+def audit(db, pid, event, details=None):
+    _db_audit(db, pid, event, details)
+    if event not in AGENT_EVENTS:
+        return
+    d = details or {}
+    agent, action = AGENT_EVENTS[event]
+    model, outcome, approved = None, None, None
+    sources = [u for u in (d.get('final_url'), d.get('url'), d.get('source_url')) if u]
+    if event == 'PHASE_RUN_READY':
+        agent, action, model = ('discovery' if d.get('phase') == 'discover' else 'validation'), f'run_{d.get("phase")}', d.get('model')
+        outcome = str(d.get('gate')).lower()
+    elif event == 'FOUNDER_DECISION':
+        action, approved, outcome = f'{d.get("decision", "").lower()}_{d.get("phase")}_gate', ('founder' if d.get('decision') == 'APPROVE' else None), f'gate said {d.get("gate")}'
+    elif event in ('EXPERIMENT_PREREGISTERED', 'RISK_ACKNOWLEDGED'):
+        approved = 'founder'
+    elif event == 'BRIEF_REFINED':
+        model = d.get('model')
+    elif event in ('CRITERION_JUDGED', 'RUBRIC_CHECK_JUDGED'):
+        model, outcome = LLM.model, str(d.get('rating') or d.get('score') or d.get('status')).lower()
+    elif event == 'CRITERIA_EVALUATED':
+        outcome = str(d.get('exit')).lower()
+    elif event == 'SAFETY_SCREENED':
+        outcome = str(d.get('status')).lower()
+    elif event == 'RESEARCH_QUERY_RUN':
+        outcome = f'{d.get("provider")}: {d.get("status")}, {d.get("results")} result(s)'
+    elif event == 'EXPERIMENT_RESULT_RECORDED':
+        outcome = str(d.get('outcome')).lower()
+    agent_log.record(db, pid, agent, action, sources=sources, model=model, approved_by=approved, outcome=outcome, detail={'event': event})
 
 
 def jsonstr(x):
@@ -274,7 +317,7 @@ def public_project(pid):
             'criteria': {'version': criteria.VERSION, 'policy_hash': criteria.POLICY_HASH, 'config': cfg, 'config_version': cfg_version,
                          'config_hash': stable_hash(cfg), 'discover': ev_d, 'validate': ev_v},
             'research_candidate_count': rcount,
-            'phases': [{'id': p, 'status': 'LIVE' if p in ACTIVE_PHASES else 'ARCHITECTURE_ONLY'} for p in PHASES],
+            'phases': [{'id': p, 'status': 'LIVE'} for p in PHASES],
             'current': {'discover': disc and disc['state'], 'validate': val and val['state'], 'stopped': bool(project['stopped']),
                         'safety': safety_row and safety_row['status']}}
 
@@ -794,7 +837,7 @@ async def project_criteria(pid: str, project=Depends(authorize)):
 @app.post('/api/projects/{pid}/phases/{phase}/run')
 async def run_phase(pid: str, phase: str, project=Depends(authorize)):
     if phase in PHASES and phase not in ACTIVE_PHASES:
-        raise HTTPException(501, f'Phase "{phase}" is ARCHITECTURE ONLY in this prototype; it is not executed and nothing is simulated.')
+        raise HTTPException(409, f'Phase "{phase}" is run through its own workflow endpoints (/api/projects/{{id}}/workflow); see ARCHITECTURE.md.')
     if phase not in ACTIVE_PHASES:
         raise HTTPException(404, 'Unknown phase')
     not_stopped(project)
@@ -1670,3 +1713,8 @@ async def home():
 async def spa(rest: str = ''):
     """Deep links (/projects/:id/brief, ...) serve the same app shell; data access still needs the project token."""
     return FileResponse(STATIC / 'index.html')
+
+
+# ----------------------------------------------------------------------------- phases 3-6, approvals, agent log
+from .orchestrator import router as _workflow_router  # noqa: E402  (imported last: it uses helpers defined above)
+app.include_router(_workflow_router)

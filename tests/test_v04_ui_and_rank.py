@@ -5,7 +5,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from app import main
 
-STATIC = Path(__file__).parents[1] / 'app' / 'static'
+STATIC = Path(__file__).parents[1] / 'backend' / 'app' / 'static'
 
 
 def test_single_sidebar_unique_ids_and_routes(client):

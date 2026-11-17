@@ -1,0 +1,58 @@
+{
+  "derived": {
+    "source": "DERIVED_FROM_EVENTS",
+    "mode": "MOCKED / TEST MODE events",
+    "metrics": {
+      "checkouts_started": 4,
+      "orders_paid": 3,
+      "orders_refunded": 1,
+      "checkout_to_paid_pct": 75.0,
+      "refund_rate_pct": 33.3,
+      "unique_buyers": 3,
+      "repeat_buyers": 0,
+      "repeat_buyer_pct": 0.0,
+      "gross_cents": 1500,
+      "fees_cents": 135,
+      "refunds_cents": 500,
+      "net_cents": 865,
+      "access_links_used": 2,
+      "access_usage_pct": 66.7,
+      "duplicate_events_ignored": 1
+    }
+  },
+  "manual_metrics": [
+    {
+      "id": "cb7822930dd14940a1077db65138c6ae",
+      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "name": "weekly active users",
+      "value": 7.0,
+      "period": "demo week 1",
+      "source": "MOCK_DEMO",
+      "note": null,
+      "created_at": "2026-11-17T14:55:17.680700+00:00"
+    }
+  ],
+  "feedback": [
+    {
+      "id": "335460c133e5448f9dc7e6a5042e0cd0",
+      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "text": "Search is hard to find on my phone and I want a filter for prayer room",
+      "source": "MOCK_DEMO",
+      "provenance": "TEST_ONLY scripted demo input, no real people",
+      "order_id": null,
+      "created_at": "2026-11-17T14:55:17.686360+00:00",
+      "sentiment": "NEGATIVE"
+    }
+  ],
+  "issues": [
+    {
+      "id": "9ada781a6ce24ab8910f981d3661b275",
+      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "title": "Search box is hard to find on phones",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "created_at": "2026-11-17T14:55:17.693079+00:00",
+      "updated_at": "2026-11-17T14:55:17.693089+00:00"
+    }
+  ]
+}

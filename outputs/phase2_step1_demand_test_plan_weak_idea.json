@@ -1,0 +1,62 @@
+{
+  "scenario": "A (weak evidence)",
+  "experiment": {
+    "experiment_id": "89511c2612384b74b4a05257a88a5605",
+    "version": 1,
+    "status": "DRAFT",
+    "criteria_hash": "675e254ae9a710a3f23ac4bd8aae0bed2e9651a57a6a00728d8d6c499ed2dbd9",
+    "criteria": {
+      "hypothesis": "Students will pay 20 EGP for an exam-time water reminder app",
+      "claim_id": "C-DEM",
+      "dimension": "demand",
+      "target_segment": "Cairo university students",
+      "metric": "Share of people shown the offer who pre-order",
+      "success_threshold_pct": 30.0,
+      "adverse_threshold_pct": 10.0,
+      "min_sample": 10,
+      "critical": true,
+      "pivot_alternative": null,
+      "threshold_origin": "TEAM_ASSUMPTION",
+      "benchmark_evidence_id": null,
+      "time_window_days": 7,
+      "near_miss_band": 0.2,
+      "direction_id": null
+    },
+    "design_check": {
+      "status": "PASS",
+      "items": {
+        "behavioral_metric": {
+          "ok": true,
+          "why": "Metric must count an action people take (opt-in, sign-up, pre-order, use), not opinions."
+        },
+        "can_fail": {
+          "ok": true,
+          "why": "Needs a success threshold, a lower adverse trigger and a sample floor, so the test can fail."
+        },
+        "low_cost_within_budget": {
+          "ok": true,
+          "why": "Cost estimate must be stated as a number and fit the budget (UNKNOWN)."
+        },
+        "honest_consent": {
+          "ok": true,
+          "why": "Participants must knowingly consent; no deception."
+        },
+        "founder_runs_it": {
+          "ok": true,
+          "why": "The founder runs it personally; FounderOS never contacts anyone."
+        },
+        "no_prohibited_tactic": {
+          "ok": true,
+          "why": "No fake sign-ups, impersonation, payments or other never-rules.",
+          "findings": []
+        },
+        "real_action_not_simulated": {
+          "ok": true,
+          "why": "The test describes a simulated or hypothetical action. Rewrite it as a real, voluntary action, or mark it SIMULATED / NOT COUNTED."
+        }
+      },
+      "simulated": false
+    },
+    "notice": "DRAFT. Lock it (pre-register) BEFORE collecting data. A planned experiment is never evidence."
+  }
+}

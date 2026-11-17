@@ -31,4 +31,4 @@ Audit method: `grep -ri "api_key\|apikey\|bearer\|openai\|anthropic\|brave\|tavi
 
 ## Cost per run (honest note for the tie-break rule)
 
-Local inference has **no per-request charge**. The cost is the laptop's CPU time and electricity, plus the one-time ~1 GB download. Observed latencies are **not** pre-filled here; run `python scripts/live_check.py` after `docker compose up --build` and paste the numbers into `docs/judge-readiness.md`.
+Local inference has **no per-request charge**. The cost is the laptop's CPU time and electricity, plus the one-time ~1 GB download. Observed latencies are **not** pre-filled here; run `python scripts/live_check.py` after `docker compose up --build` and record the numbers you observe.

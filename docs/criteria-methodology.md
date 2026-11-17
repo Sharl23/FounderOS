@@ -16,7 +16,7 @@ The PDF's three consequences (p.2) are tested: knockouts run first; "a score wit
 
 ## Seven rules for feeding criteria to agents (p.10)
 
-1. **Own file** — `backend/policy/criteria.yaml`, readable by founder (Roadmap screen, Criteria settings), judges and code.
+1. **Own file** — `backend/policy/criteria.yaml`, readable by the founder (Roadmap screen, Criteria settings), the criterion judge agents and code.
 2. **Version in every decision** — `decisions.criteria_version`, `criteria_policy_hash`, `config_hash`, `evaluation_hash`, `safety_policy_hash`.
 3. **One criterion per call** — `run_judges` loops criteria; each call carries only that criterion's accepted evidence.
 4. **Gatherer ≠ judge** — Research Studio gathers (providers, founder URLs); the judge may cite only aliased ledger ids `E1…En`.

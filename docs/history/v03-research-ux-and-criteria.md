@@ -41,7 +41,7 @@ The PDF names **five criterion kinds**: Knockout, Scored, Evidence standard, Thr
 - Automatic market-wide search, market-size and actual competitor extraction.
 - Fully autonomous phases 3–6 (architecture only).
 
-Do **not** tell judges those unimplemented features work. Current backend verdict is conservative and safe, but the current research enrichment and score coverage remain limited.
+Current backend verdict is conservative and safe, but the current research enrichment and score coverage remain limited.
 
 ## Local Windows execution
 

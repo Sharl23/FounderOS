@@ -7,7 +7,7 @@ from .conftest import make_project, refine, run, decide, approved_discovery, TOD
 def test_full_founder_journey_persists_and_gates(client, project):
     pid, h = project
     state = client.get(f'/api/projects/{pid}', headers=h).json()
-    assert state['brief'] is None and state['phases'][2]['status'] == 'ARCHITECTURE_ONLY'
+    assert state['brief'] is None and state['phases'][2]['status'] == 'LIVE'
     r = refine(client, pid, h)
     brief = r['brief']
     assert brief['original_idea_text'].startswith('An AI planner')
@@ -114,7 +114,7 @@ def test_external_actions_hard_denied_and_later_phases_not_simulated(client, pro
     assert any(x['event'] == 'EXTERNAL_ACTION_BLOCKED' for x in client.get(f'/api/projects/{pid}', headers=h).json()['audit'])
     refine(client, pid, h)
     for phase in ('build', 'commercial_setup', 'launch', 'operate_learn'):
-        assert client.post(f'/api/projects/{pid}/phases/{phase}/run', headers=h).status_code == 501
+        assert client.post(f'/api/projects/{pid}/phases/{phase}/run', headers=h).status_code in (404, 409)   # phases 3-6 run through /workflow endpoints
     assert client.post(f'/api/projects/{pid}/phases/nonsense/run', headers=h).status_code == 404
 
 
