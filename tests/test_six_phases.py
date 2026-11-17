@@ -1,4 +1,4 @@
-"""Phases 3-6, approvals, sale-to-cash and isolation. Model calls use the TEST_ONLY FakeModel; payments are MOCKED / TEST MODE."""
+﻿"""Phases 3-6, approvals, sale-to-cash and isolation. Model calls use the TEST_ONLY FakeModel; payments are MOCKED / TEST MODE."""
 import datetime
 import io
 import json
@@ -139,7 +139,7 @@ def test_generated_site_is_real_relevant_and_safe(client):
     assert set(files) == {'index.html', 'styles.css', 'app.js', 'README.txt'}
     assert 'id="search"' in files['index.html'] and 'class="feature"' in files['index.html'] and 'DEMO-ONLY PROTOTYPE' in files['index.html']
     assert 'Demo Study Space' in files['app.js'] and 'innerHTML' not in files['app.js'] and 'fetch(' not in files['app.js']
-    node = subprocess.run(['node', '--check', '-'], input=files['app.js'], capture_output=True, text=True) if subprocess.run(['which', 'node'], capture_output=True).returncode == 0 else None
+    node = subprocess.run(['node', '--check', '-'], input=files['app.js'], capture_output=True, text=True) if __import__('shutil').which('node') is not None else None
     if node is not None:
         assert node.returncode == 0, node.stderr
     # isolated preview: CSP sandbox, only whitelisted names, wrong key 404
@@ -338,7 +338,7 @@ def test_default_compose_is_one_command_and_valid():
     assert 'model-init' not in deps and 'ollama' not in deps                  # api starts even when no model container runs
     assert 'host.docker.internal' in str(api['environment']['OLLAMA_URL']) and 'host-gateway' in str(api.get('extra_hosts'))
     r = subprocess.run(['docker', 'compose', '-f', str(ROOT / 'docker-compose.yml'), 'config', '-q'], capture_output=True, text=True) \
-        if subprocess.run(['which', 'docker'], capture_output=True).returncode == 0 else None
+        if __import__('shutil').which('docker') is not None else None
     if r is not None:
         assert r.returncode == 0, r.stderr
 
@@ -388,3 +388,4 @@ def test_submission_checker_detectors():
     spec.loader.exec_module(m)
     m.self_test()
     assert m.RESULTS[-1][0] == 'PASS', m.RESULTS[-1]
+
