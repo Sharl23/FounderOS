@@ -208,29 +208,90 @@ show();
 
 
 def _planner(spec):
+    """A functional, local-only study planner with a seven-day workload schedule."""
     e = html.escape
-    body = f"""<form id="add" class="controls"><label for="title">{e(spec['entity']['singular'].title())}</label><input type="text" id="title" maxlength="120" required>
-<label for="due">Due in (days)</label><input type="number" id="due" value="3" min="-30" max="365"><button type="submit">Add</button></form><p id="form-msg" class="muted" aria-live="polite"></p>
-<p class="muted">Done: <span id="done-count">0</span></p><table id="list"><thead><tr><th>{e(spec['entity']['singular'].title())}</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>"""
+    body = f"""<section class="warn" aria-label="Prototype limitations">DEMO-ONLY: sample tasks are fictional. Your edits stay in this browser tab; this is not a validated product.</section>
+<form id="add" class="controls"><label for="title">{e(spec['entity']['singular'].title())}</label><input type="text" id="title" maxlength="120" required>
+<label for="due">Due in (days)</label><input type="number" id="due" value="3" min="-30" max="365" required>
+<label for="hours">Estimated hours</label><input type="number" id="hours" value="2" min="0.5" max="100" step="0.5" required>
+<button type="submit">Add task</button></form>
+<p id="form-msg" class="muted" aria-live="polite"></p>
+<section aria-label="Weekly study plan"><h2>Personalized 7-day study plan</h2>
+<div class="controls"><label for="daily">Study hours available per day</label><input type="number" id="daily" value="2" min="0.5" max="16" step="0.5">
+<button type="button" id="generate">Generate plan</button></div>
+<p class="muted">Tasks are prioritized by deadline. The scheduler fills each day's available hours, and flags work that cannot fit before a deadline. This is a deterministic demo scheduler, not an AI-generated timetable.</p>
+<div id="schedule" aria-live="polite"></div></section>
+<h2>Tasks</h2><p class="muted">Completed: <span id="done-count">0</span></p>
+<table id="list"><thead><tr><th>Task</th><th>Due</th><th>Hours left</th><th>Status</th><th>Action</th></tr></thead><tbody></tbody></table>"""
     js = """'use strict';
 const SPEC = %(spec)s;
 const DATA = %(data)s;
 const $ = (id) => document.getElementById(id);
+DATA.forEach(r => { r.hours = 2; }); // DEMO DATA: fictional estimates
+function safeNumber(value, fallback) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
 function render() {
   const tb = $('list').querySelector('tbody'); tb.textContent = '';
-  const rows = DATA.filter((r) => !r.done).sort((a, b) => a.due_in_days - b.due_in_days);
-  for (const r of rows) { const tr = document.createElement('tr');
+  const rows = DATA.filter(r => !r.done).sort((a,b) => a.due_in_days - b.due_in_days);
+  for (const r of rows) {
+    const tr = document.createElement('tr');
     const st = r.due_in_days < 0 ? 'Overdue' : r.due_in_days <= 2 ? 'Due soon' : 'Planned';
-    for (const v of [r.title, r.due_in_days + ' day(s)', st]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    for (const v of [r.title, r.due_in_days + ' day(s)', r.hours + ' h', st]) {
+      const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
+    }
     if (st !== 'Planned') tr.className = st === 'Overdue' ? 'bad' : 'warn';
-    const td = document.createElement('td'); const b = document.createElement('button'); b.className = 'ghost'; b.textContent = 'Done';
-    b.addEventListener('click', () => { r.done = true; render(); }); td.appendChild(b); tr.appendChild(td); tb.appendChild(tr); }
-  $('done-count').textContent = String(DATA.filter((r) => r.done).length);
+    const td = document.createElement('td'); const b = document.createElement('button');
+    b.className = 'ghost'; b.textContent = 'Done';
+    b.addEventListener('click', () => { r.done = true; render(); generatePlan(); });
+    td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
+  }
+  $('done-count').textContent = String(DATA.filter(r => r.done).length);
 }
-$('add').addEventListener('submit', (e) => { e.preventDefault(); const t = $('title').value.trim();
-  if (!t) { $('form-msg').textContent = 'Give it a title.'; return; }
-  DATA.push({ title: t, due_in_days: Number($('due').value) || 0, done: false }); $('title').value = ''; $('form-msg').textContent = 'Added (kept in this page only).'; render(); });
-render();
+function scheduleTasks(tasks, dailyHours) {
+  const capacity = Array(7).fill(dailyHours);
+  const days = Array.from({length:7}, () => []);
+  const warnings = [];
+  const ordered = tasks.filter(r => !r.done).map(r => ({
+    title: String(r.title), due: safeNumber(r.due_in_days, 0), remaining: Math.max(0, safeNumber(r.hours, 2))
+  })).sort((a,b) => a.due - b.due);
+  for (const task of ordered) {
+    if (task.due < 0) { warnings.push(task.title + ': overdue; needs immediate review'); continue; }
+    const last = Math.min(6, Math.floor(task.due));
+    for (let d=0; d<=last && task.remaining > 0.001; d++) {
+      const h = Math.min(capacity[d], task.remaining);
+      if (h > 0.001) { days[d].push({title:task.title, hours:h}); capacity[d]-=h; task.remaining-=h; }
+    }
+    if (task.remaining > 0.001) warnings.push(task.title + ': ' + task.remaining.toFixed(1) + ' h cannot fit before its deadline');
+  }
+  return {days, warnings};
+}
+function generatePlan() {
+  const daily = safeNumber($('daily').value, 0);
+  const root = $('schedule'); root.textContent = '';
+  if (daily < 0.5 || daily > 16) { root.textContent = 'Choose between 0.5 and 16 study hours per day.'; return; }
+  const result = scheduleTasks(DATA, daily);
+  const table = document.createElement('table'); const head = document.createElement('thead');
+  const hr = document.createElement('tr');
+  for (const name of ['Day', 'Planned work', 'Total hours']) { const th=document.createElement('th'); th.textContent=name; hr.appendChild(th); }
+  head.appendChild(hr); table.appendChild(head);
+  const tbody=document.createElement('tbody');
+  result.days.forEach((entries, i) => {
+    const tr=document.createElement('tr');
+    const values=['Day '+(i+1), entries.length ? entries.map(x=>x.title+' ('+x.hours.toFixed(1)+' h)').join('; ') : 'Free / catch up', entries.reduce((s,x)=>s+x.hours,0).toFixed(1)+' h'];
+    values.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);root.appendChild(table);
+  result.warnings.forEach(w=>{const p=document.createElement('p');p.className='warn';p.textContent='Attention: '+w;root.appendChild(p);});
+}
+$('add').addEventListener('submit', e => { e.preventDefault();
+  const t=$('title').value.trim(); const due=Number($('due').value); const hours=Number($('hours').value);
+  if (!t || !Number.isInteger(due) || due < -30 || due > 365 || !Number.isFinite(hours) || hours < 0.5 || hours > 100) {
+    $('form-msg').textContent='Enter a task, a valid deadline and estimated hours.'; return;
+  }
+  DATA.push({title:t,due_in_days:due,hours,done:false});$('title').value='';
+  $('form-msg').textContent='Task added in this browser tab (not saved to a server).';render();generatePlan();
+});
+$('generate').addEventListener('click',generatePlan);
+render();generatePlan();
 """
     return body, js
 
