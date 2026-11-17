@@ -1,5 +1,6 @@
 # FounderOS: an evidence-first venture builder
 
+**Team:** EL Malek Salman 
 FounderOS is an open-source, local-first team of AI agents. It takes a founder's idea through six phases:
 
 1. Discover
