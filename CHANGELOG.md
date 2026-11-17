@@ -29,6 +29,11 @@
   - `ARCHITECTURE.md`, `prompts/` (generated from code), `outputs/` and `decision_log.json` from `scripts/demo_run.py`;
   - README rewritten to the required headings;
   - reviewer-facing docs removed.
+- **Submission checker:** `scripts/check_submission.py` re-runs the pipeline and compares the result with the committed outputs.
+- **Fixes from the audit:**
+  - A safety-blocked step now logs `model: null` instead of a placeholder string.
+  - A payment event sent to a venture without a commercial plan now gets 401, 403 or 409 instead of a server error. The signature is checked before anything else.
+  - `.gitignore` now excludes model weights and local databases.
 - **Docker:** `docker compose up` now starts only the app against Ollama on the host. The Ollama containers are under the `ollama` profile.
 
 ## 0.8.0 — 17 Nov 2026 (final repair after the founder's manual trial)

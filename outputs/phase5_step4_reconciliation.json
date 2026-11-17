@@ -2,7 +2,7 @@
   "mode": "MOCKED / TEST MODE",
   "orders": [
     {
-      "order_id": "76aaf81d484149c4b63617d8db34eb54",
+      "order_id": "a7e0fdd50cd946a19d80322241aa4c93",
       "buyer_ref": "test-buyer-1",
       "status": "REFUNDED",
       "amount_cents": 500,
@@ -15,7 +15,7 @@
       "issues": []
     },
     {
-      "order_id": "d93d827295e7481f9d7ebfe621968efe",
+      "order_id": "05066a84472549369ed22cac19e21694",
       "buyer_ref": "test-buyer-2",
       "status": "PAID",
       "amount_cents": 500,
@@ -28,7 +28,7 @@
       "issues": []
     },
     {
-      "order_id": "864870c83a4b472fabce71497a994ddb",
+      "order_id": "5e9f39ddfc5e4ce7a1d8141691a43c0a",
       "buyer_ref": "test-buyer-3",
       "status": "PAID",
       "amount_cents": 500,
@@ -41,7 +41,7 @@
       "issues": []
     },
     {
-      "order_id": "96db02572e3543e3b0590093e9fe6413",
+      "order_id": "12f9b27a91f14a2aae5835a4a621eb86",
       "buyer_ref": "test-buyer-4",
       "status": "PENDING_PAYMENT",
       "amount_cents": 500,

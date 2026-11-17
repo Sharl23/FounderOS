@@ -1,6 +1,6 @@
 [
   {
-    "timestamp": "2026-11-17T14:55:17.255541+00:00",
+    "timestamp": "2026-11-17T15:23:08.687163+00:00",
     "agent": "safety",
     "action": "screen_twelve_rules",
     "sources": [],
@@ -8,20 +8,20 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "allow_discovery",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.255628+00:00",
+    "timestamp": "2026-11-17T15:23:08.687223+00:00",
     "agent": "brief_refiner",
     "action": "refine_brief",
     "sources": [],
     "model": "STUBBED offline stand-in (no model ran)",
     "cost": 0.0,
     "approved_by": null,
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.270759+00:00",
+    "timestamp": "2026-11-17T15:23:08.703366+00:00",
     "agent": "discovery",
     "action": "run_discover",
     "sources": [],
@@ -29,10 +29,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "none",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.273195+00:00",
+    "timestamp": "2026-11-17T15:23:08.705927+00:00",
     "agent": "gate",
     "action": "phase1_criteria_evaluation",
     "sources": [],
@@ -40,10 +40,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "repeat",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.288732+00:00",
+    "timestamp": "2026-11-17T15:23:08.720899+00:00",
     "agent": "founder",
     "action": "approve_discover_gate",
     "sources": [],
@@ -51,30 +51,30 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "gate said REPEAT",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.296109+00:00",
+    "timestamp": "2026-11-17T15:23:08.727976+00:00",
     "agent": "experiment_designer",
     "action": "draft_demand_test",
     "sources": [],
     "model": null,
     "cost": 0.0,
     "approved_by": null,
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.303846+00:00",
+    "timestamp": "2026-11-17T15:23:08.736543+00:00",
     "agent": "founder",
     "action": "lock_demand_test",
     "sources": [],
     "model": null,
     "cost": 0.0,
     "approved_by": "founder",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.309942+00:00",
+    "timestamp": "2026-11-17T15:23:08.742784+00:00",
     "agent": "validation",
     "action": "read_locked_result",
     "sources": [],
@@ -82,10 +82,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "fail",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.320790+00:00",
+    "timestamp": "2026-11-17T15:23:08.754539+00:00",
     "agent": "validation",
     "action": "run_validate",
     "sources": [],
@@ -93,10 +93,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "stop_do_not_launch",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.334523+00:00",
+    "timestamp": "2026-11-17T15:23:08.782636+00:00",
     "agent": "gatekeeper",
     "action": "validate_gate_stop",
     "sources": [],
@@ -104,20 +104,20 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "stop",
-    "venture_id": "59a7cf73e2a543f29c0227aaf9b015a8"
+    "venture_id": "1f997ee0a65443f28aefb9e754786e31"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.339910+00:00",
+    "timestamp": "2026-11-17T15:23:08.788646+00:00",
     "agent": "safety",
     "action": "prescreen_block",
     "sources": [],
     "model": null,
     "cost": 0.0,
     "approved_by": null,
-    "venture_id": "4948f5b8b5e145d89471a532187d402a"
+    "venture_id": "09f09e3bf08b419284ec07f6c51d1180"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.348706+00:00",
+    "timestamp": "2026-11-17T15:23:08.799192+00:00",
     "agent": "safety",
     "action": "screen_twelve_rules",
     "sources": [],
@@ -125,20 +125,20 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "block",
-    "venture_id": "4948f5b8b5e145d89471a532187d402a"
+    "venture_id": "09f09e3bf08b419284ec07f6c51d1180"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.348766+00:00",
+    "timestamp": "2026-11-17T15:23:08.799249+00:00",
     "agent": "brief_refiner",
     "action": "refine_brief",
     "sources": [],
-    "model": "NOT_CALLED_SAFETY_BLOCK",
+    "model": null,
     "cost": 0.0,
     "approved_by": null,
-    "venture_id": "4948f5b8b5e145d89471a532187d402a"
+    "venture_id": "09f09e3bf08b419284ec07f6c51d1180"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.362167+00:00",
+    "timestamp": "2026-11-17T15:23:08.814046+00:00",
     "agent": "safety_screen",
     "action": "prohibited_category_stop",
     "sources": [],
@@ -146,10 +146,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "stop",
-    "venture_id": "4948f5b8b5e145d89471a532187d402a"
+    "venture_id": "09f09e3bf08b419284ec07f6c51d1180"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.377291+00:00",
+    "timestamp": "2026-11-17T15:23:08.833195+00:00",
     "agent": "safety",
     "action": "screen_twelve_rules",
     "sources": [],
@@ -157,20 +157,20 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "allow_discovery",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.377350+00:00",
+    "timestamp": "2026-11-17T15:23:08.833250+00:00",
     "agent": "brief_refiner",
     "action": "refine_brief",
     "sources": [],
     "model": "STUBBED offline stand-in (no model ran)",
     "cost": 0.0,
     "approved_by": null,
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.395055+00:00",
+    "timestamp": "2026-11-17T15:23:08.860881+00:00",
     "agent": "discovery",
     "action": "run_discover",
     "sources": [],
@@ -178,10 +178,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "none",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.397312+00:00",
+    "timestamp": "2026-11-17T15:23:08.862940+00:00",
     "agent": "gate",
     "action": "phase1_criteria_evaluation",
     "sources": [],
@@ -189,10 +189,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "repeat",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.408513+00:00",
+    "timestamp": "2026-11-17T15:23:08.877723+00:00",
     "agent": "founder",
     "action": "approve_discover_gate",
     "sources": [],
@@ -200,10 +200,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "gate said REPEAT",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.421805+00:00",
+    "timestamp": "2026-11-17T15:23:08.896812+00:00",
     "agent": "validation",
     "action": "run_validate",
     "sources": [],
@@ -211,10 +211,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "needs_evidence",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.429125+00:00",
+    "timestamp": "2026-11-17T15:23:08.906264+00:00",
     "agent": "founder",
     "action": "approve_validate_gate",
     "sources": [],
@@ -222,10 +222,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "gate said NEEDS_EVIDENCE",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.441063+00:00",
+    "timestamp": "2026-11-17T15:23:08.922934+00:00",
     "agent": "approval",
     "action": "request_enter_build_demo_only",
     "sources": [],
@@ -233,10 +233,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.446269+00:00",
+    "timestamp": "2026-11-17T15:23:08.930065+00:00",
     "agent": "founder",
     "action": "approve_enter_build_demo_only",
     "sources": [],
@@ -244,10 +244,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.452532+00:00",
+    "timestamp": "2026-11-17T15:23:08.938064+00:00",
     "agent": "gate",
     "action": "phase2_gate",
     "sources": [],
@@ -255,10 +255,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "demo_only",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.452783+00:00",
+    "timestamp": "2026-11-17T15:23:08.938274+00:00",
     "agent": "orchestrator",
     "action": "enter_phase3_build",
     "sources": [],
@@ -266,10 +266,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "demo_only",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.456662+00:00",
+    "timestamp": "2026-11-17T15:23:08.942219+00:00",
     "agent": "product_architect",
     "action": "write_spec_and_user_stories",
     "sources": [],
@@ -277,10 +277,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "directory, 4 stories",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.456692+00:00",
+    "timestamp": "2026-11-17T15:23:08.942253+00:00",
     "agent": "website_builder",
     "action": "generate_website_files",
     "sources": [],
@@ -288,10 +288,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "v1: index.html, styles.css, app.js, README.txt",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.456707+00:00",
+    "timestamp": "2026-11-17T15:23:08.942268+00:00",
     "agent": "qa",
     "action": "check_generated_site",
     "sources": [],
@@ -299,10 +299,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pass",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.470344+00:00",
+    "timestamp": "2026-11-17T15:23:08.957324+00:00",
     "agent": "revision",
     "action": "parse_founder_feedback",
     "sources": [],
@@ -310,10 +310,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "3 applied, 1 not applied",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.471761+00:00",
+    "timestamp": "2026-11-17T15:23:08.958677+00:00",
     "agent": "product_architect",
     "action": "write_spec_and_user_stories",
     "sources": [],
@@ -321,10 +321,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "directory, 4 stories",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.471787+00:00",
+    "timestamp": "2026-11-17T15:23:08.958702+00:00",
     "agent": "website_builder",
     "action": "generate_website_files",
     "sources": [],
@@ -332,10 +332,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "v2: index.html, styles.css, app.js, README.txt",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.471802+00:00",
+    "timestamp": "2026-11-17T15:23:08.958717+00:00",
     "agent": "qa",
     "action": "check_generated_site",
     "sources": [],
@@ -343,10 +343,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pass",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.478225+00:00",
+    "timestamp": "2026-11-17T15:23:08.968687+00:00",
     "agent": "approval",
     "action": "request_accept_build",
     "sources": [],
@@ -354,10 +354,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.483843+00:00",
+    "timestamp": "2026-11-17T15:23:08.974710+00:00",
     "agent": "founder",
     "action": "approve_accept_build",
     "sources": [],
@@ -365,10 +365,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.489856+00:00",
+    "timestamp": "2026-11-17T15:23:08.980880+00:00",
     "agent": "orchestrator",
     "action": "execute_accept_build",
     "sources": [],
@@ -376,10 +376,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "done",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.490031+00:00",
+    "timestamp": "2026-11-17T15:23:08.981062+00:00",
     "agent": "gate",
     "action": "phase3_gate",
     "sources": [],
@@ -387,10 +387,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "go",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.501475+00:00",
+    "timestamp": "2026-11-17T15:23:08.994101+00:00",
     "agent": "commercial",
     "action": "calculate_unit_economics",
     "sources": [],
@@ -398,10 +398,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "contribution 4.06 per sale, break-even 5/month",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.501820+00:00",
+    "timestamp": "2026-11-17T15:23:08.994385+00:00",
     "agent": "gate",
     "action": "phase4_gate",
     "sources": [],
@@ -409,10 +409,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "repeat",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.508235+00:00",
+    "timestamp": "2026-11-17T15:23:09.001403+00:00",
     "agent": "approval",
     "action": "request_activate_commercial",
     "sources": [],
@@ -420,10 +420,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.513185+00:00",
+    "timestamp": "2026-11-17T15:23:09.006880+00:00",
     "agent": "founder",
     "action": "approve_activate_commercial",
     "sources": [],
@@ -431,10 +431,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.519234+00:00",
+    "timestamp": "2026-11-17T15:23:09.013009+00:00",
     "agent": "orchestrator",
     "action": "execute_activate_commercial",
     "sources": [],
@@ -442,10 +442,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "done",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.519536+00:00",
+    "timestamp": "2026-11-17T15:23:09.013237+00:00",
     "agent": "gate",
     "action": "phase4_gate",
     "sources": [],
@@ -453,10 +453,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "go",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.531411+00:00",
+    "timestamp": "2026-11-17T15:23:09.028516+00:00",
     "agent": "sales_delivery",
     "action": "draft_offer_and_sales_page",
     "sources": [],
@@ -464,10 +464,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "offer v1 DRAFT (5.0 USD)",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.537799+00:00",
+    "timestamp": "2026-11-17T15:23:09.035386+00:00",
     "agent": "approval",
     "action": "request_approve_sales_page",
     "sources": [],
@@ -475,10 +475,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.542929+00:00",
+    "timestamp": "2026-11-17T15:23:09.040583+00:00",
     "agent": "founder",
     "action": "approve_approve_sales_page",
     "sources": [],
@@ -486,10 +486,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.550100+00:00",
+    "timestamp": "2026-11-17T15:23:09.046582+00:00",
     "agent": "orchestrator",
     "action": "execute_approve_sales_page",
     "sources": [],
@@ -497,10 +497,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "done",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.555482+00:00",
+    "timestamp": "2026-11-17T15:23:09.053653+00:00",
     "agent": "approval",
     "action": "request_open_test_checkout",
     "sources": [],
@@ -508,10 +508,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.560940+00:00",
+    "timestamp": "2026-11-17T15:23:09.060335+00:00",
     "agent": "founder",
     "action": "approve_open_test_checkout",
     "sources": [],
@@ -519,10 +519,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.566539+00:00",
+    "timestamp": "2026-11-17T15:23:09.067230+00:00",
     "agent": "orchestrator",
     "action": "execute_open_test_checkout",
     "sources": [],
@@ -530,10 +530,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "done",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.572903+00:00",
+    "timestamp": "2026-11-17T15:23:09.073536+00:00",
     "agent": "sales_delivery",
     "action": "create_test_checkout_order",
     "sources": [],
@@ -541,10 +541,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "created",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.578541+00:00",
+    "timestamp": "2026-11-17T15:23:09.079550+00:00",
     "agent": "sales_delivery",
     "action": "create_test_checkout_order",
     "sources": [],
@@ -552,10 +552,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "created",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.585798+00:00",
+    "timestamp": "2026-11-17T15:23:09.085469+00:00",
     "agent": "sales_delivery",
     "action": "create_test_checkout_order",
     "sources": [],
@@ -563,10 +563,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "created",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.592070+00:00",
+    "timestamp": "2026-11-17T15:23:09.092358+00:00",
     "agent": "sales_delivery",
     "action": "create_test_checkout_order",
     "sources": [],
@@ -574,10 +574,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "created",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.597489+00:00",
+    "timestamp": "2026-11-17T15:23:09.099101+00:00",
     "agent": "sales_delivery",
     "action": "create_test_checkout_order",
     "sources": [],
@@ -585,10 +585,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "idempotent_replay",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.603867+00:00",
+    "timestamp": "2026-11-17T15:23:09.106533+00:00",
     "agent": "payments",
     "action": "process_payment_event",
     "sources": [],
@@ -596,10 +596,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "paid_and_delivered",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.609766+00:00",
+    "timestamp": "2026-11-17T15:23:09.112532+00:00",
     "agent": "payments",
     "action": "process_payment_event",
     "sources": [],
@@ -607,10 +607,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "paid_and_delivered",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.614938+00:00",
+    "timestamp": "2026-11-17T15:23:09.119520+00:00",
     "agent": "payments",
     "action": "process_payment_event",
     "sources": [],
@@ -618,10 +618,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "paid_and_delivered",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.624905+00:00",
+    "timestamp": "2026-11-17T15:23:09.125225+00:00",
     "agent": "payments",
     "action": "process_payment_event",
     "sources": [],
@@ -629,10 +629,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "duplicate_ignored",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.631390+00:00",
+    "timestamp": "2026-11-17T15:23:09.134574+00:00",
     "agent": "delivery",
     "action": "serve_access_link",
     "sources": [],
@@ -640,10 +640,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "delivered",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.641225+00:00",
+    "timestamp": "2026-11-17T15:23:09.147550+00:00",
     "agent": "approval",
     "action": "request_refund_order",
     "sources": [],
@@ -651,10 +651,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.646720+00:00",
+    "timestamp": "2026-11-17T15:23:09.155418+00:00",
     "agent": "founder",
     "action": "approve_refund_order",
     "sources": [],
@@ -662,10 +662,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.652404+00:00",
+    "timestamp": "2026-11-17T15:23:09.165491+00:00",
     "agent": "payments",
     "action": "refund_and_revoke",
     "sources": [],
@@ -673,10 +673,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "refunded_and_revoked",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.658149+00:00",
+    "timestamp": "2026-11-17T15:23:09.175245+00:00",
     "agent": "delivery",
     "action": "serve_access_link",
     "sources": [],
@@ -684,10 +684,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "delivered",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.663187+00:00",
+    "timestamp": "2026-11-17T15:23:09.181307+00:00",
     "agent": "reconcile",
     "action": "reconcile_orders_payments_fees_payouts",
     "sources": [],
@@ -695,10 +695,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "ok",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.663831+00:00",
+    "timestamp": "2026-11-17T15:23:09.182115+00:00",
     "agent": "gate",
     "action": "phase5_gate",
     "sources": [],
@@ -706,10 +706,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "go",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.681045+00:00",
+    "timestamp": "2026-11-17T15:23:09.205467+00:00",
     "agent": "operations",
     "action": "record_metric",
     "sources": [],
@@ -717,10 +717,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "mock_demo",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.687056+00:00",
+    "timestamp": "2026-11-17T15:23:09.211706+00:00",
     "agent": "operations",
     "action": "ingest_feedback",
     "sources": [],
@@ -728,10 +728,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "negative",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.704251+00:00",
+    "timestamp": "2026-11-17T15:23:09.228218+00:00",
     "agent": "operations",
     "action": "analyze_recorded_events",
     "sources": [],
@@ -739,10 +739,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "iterate",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.704314+00:00",
+    "timestamp": "2026-11-17T15:23:09.228284+00:00",
     "agent": "gate",
     "action": "phase6_gate",
     "sources": [],
@@ -750,10 +750,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "repeat",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.704625+00:00",
+    "timestamp": "2026-11-17T15:23:09.228568+00:00",
     "agent": "operations",
     "action": "propose_phase3_revision",
     "sources": [],
@@ -761,10 +761,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "proposed",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.718841+00:00",
+    "timestamp": "2026-11-17T15:23:09.243692+00:00",
     "agent": "approval",
     "action": "request_apply_proposal",
     "sources": [],
@@ -772,10 +772,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pending",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.724042+00:00",
+    "timestamp": "2026-11-17T15:23:09.250434+00:00",
     "agent": "founder",
     "action": "approve_apply_proposal",
     "sources": [],
@@ -783,10 +783,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "approved",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.729787+00:00",
+    "timestamp": "2026-11-17T15:23:09.257846+00:00",
     "agent": "orchestrator",
     "action": "execute_apply_proposal",
     "sources": [],
@@ -794,10 +794,10 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "done",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.734475+00:00",
+    "timestamp": "2026-11-17T15:23:09.260104+00:00",
     "agent": "product_architect",
     "action": "write_spec_and_user_stories",
     "sources": [],
@@ -805,10 +805,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "directory, 4 stories",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.734507+00:00",
+    "timestamp": "2026-11-17T15:23:09.260134+00:00",
     "agent": "website_builder",
     "action": "generate_website_files",
     "sources": [],
@@ -816,10 +816,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "v3: index.html, styles.css, app.js, README.txt",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.734527+00:00",
+    "timestamp": "2026-11-17T15:23:09.260149+00:00",
     "agent": "qa",
     "action": "check_generated_site",
     "sources": [],
@@ -827,10 +827,10 @@
     "cost": 0.0,
     "approved_by": null,
     "outcome": "pass",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   },
   {
-    "timestamp": "2026-11-17T14:55:17.734607+00:00",
+    "timestamp": "2026-11-17T15:23:09.260186+00:00",
     "agent": "orchestrator",
     "action": "apply_phase3_proposal",
     "sources": [],
@@ -838,6 +838,6 @@
     "cost": 0.0,
     "approved_by": "founder",
     "outcome": "build v3",
-    "venture_id": "a0430584d3cb47f69b453da4113b119e"
+    "venture_id": "971e7baea5674d1ea6595dc3f3adc52a"
   }
 ]

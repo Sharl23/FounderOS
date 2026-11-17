@@ -72,7 +72,8 @@ def make_event(db, pid, etype, order, event_id=None) -> dict:
 
 
 # ------------------------------------------------------------------------- webhook (idempotent)
-def handle_event(db, pid: str, event: dict, signature: str, fees: dict) -> dict:
+def handle_event(db, pid: str, event: dict, signature: str, fees) -> dict:
+    """fees: a dict, or a callable returning one; it is only evaluated after the signature and venture checks pass."""
     if not hmac.compare_digest(sign(db, event), signature or ''):
         raise HTTPException(401, 'Bad test-webhook signature')
     if event.get('livemode') is not False:
@@ -92,7 +93,8 @@ def handle_event(db, pid: str, event: dict, signature: str, fees: dict) -> dict:
         elif order['status'] != 'PENDING_PAYMENT':
             result = f'IGNORED_ORDER_{order["status"]}'
         else:
-            fee = fee_cents(order['amount_cents'], fees['pct'], fees['fixed'])
+            f = fees() if callable(fees) else fees
+            fee = fee_cents(order['amount_cents'], f['pct'], f['fixed'])
             db.execute("UPDATE orders SET status='PAID', updated_at=? WHERE id=?", (now(), order['id']))
             grant(db, pid, order['id'])
             result = 'PAID_AND_DELIVERED'

@@ -1,11 +1,11 @@
 {
   "safety": {
-    "project_id": "a0430584d3cb47f69b453da4113b119e",
+    "project_id": "971e7baea5674d1ea6595dc3f3adc52a",
     "brief_version": 1,
     "status": "ALLOW_DISCOVERY",
     "acknowledged_at": null,
     "ack_statement": null,
-    "created_at": "2026-11-17T14:55:17.377189+00:00",
+    "created_at": "2026-11-17T15:23:08.833096+00:00",
     "assessment": {
       "status": "ALLOW_DISCOVERY",
       "policy_version": "safety-policy-2026-11-17.v7-1",

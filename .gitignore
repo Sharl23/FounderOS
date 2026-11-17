@@ -14,3 +14,15 @@ build/
 dist/
 .env.*
 !.env.example
+# model weights and local model stores (never committed)
+*.gguf
+*.safetensors
+*.onnx
+*.pt
+*.pth
+*.ckpt
+ollama_models/
+.ollama/
+# local databases
+*.db
+*.sqlite

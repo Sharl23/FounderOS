@@ -22,37 +22,37 @@
   },
   "manual_metrics": [
     {
-      "id": "cb7822930dd14940a1077db65138c6ae",
-      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "id": "9cfd1c5349d048179a39e95b534c18b0",
+      "project_id": "971e7baea5674d1ea6595dc3f3adc52a",
       "name": "weekly active users",
       "value": 7.0,
       "period": "demo week 1",
       "source": "MOCK_DEMO",
       "note": null,
-      "created_at": "2026-11-17T14:55:17.680700+00:00"
+      "created_at": "2026-11-17T15:23:09.205050+00:00"
     }
   ],
   "feedback": [
     {
-      "id": "335460c133e5448f9dc7e6a5042e0cd0",
-      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "id": "f4abdaad775546f6baa95455adea6d88",
+      "project_id": "971e7baea5674d1ea6595dc3f3adc52a",
       "text": "Search is hard to find on my phone and I want a filter for prayer room",
       "source": "MOCK_DEMO",
       "provenance": "TEST_ONLY scripted demo input, no real people",
       "order_id": null,
-      "created_at": "2026-11-17T14:55:17.686360+00:00",
+      "created_at": "2026-11-17T15:23:09.211356+00:00",
       "sentiment": "NEGATIVE"
     }
   ],
   "issues": [
     {
-      "id": "9ada781a6ce24ab8910f981d3661b275",
-      "project_id": "a0430584d3cb47f69b453da4113b119e",
+      "id": "c45c431354bc4a819e7791dd49f796c3",
+      "project_id": "971e7baea5674d1ea6595dc3f3adc52a",
       "title": "Search box is hard to find on phones",
       "severity": "HIGH",
       "status": "OPEN",
-      "created_at": "2026-11-17T14:55:17.693079+00:00",
-      "updated_at": "2026-11-17T14:55:17.693089+00:00"
+      "created_at": "2026-11-17T15:23:09.217030+00:00",
+      "updated_at": "2026-11-17T15:23:09.217043+00:00"
     }
   ]
 }

@@ -358,3 +358,33 @@ def test_prompt_files_match_the_code():
     for name, const in (('brief_refiner', 'REFINE_SYSTEM'), ('discovery', 'DISCOVER_SYSTEM'), ('validation', 'VALIDATE_SYSTEM'),
                         ('criterion_judge', 'JUDGE_SYSTEM'), ('check_judge', 'CHECK_JUDGE_SYSTEM')):
         assert getattr(llm, const) in (ROOT / 'prompts' / f'{name}.md').read_text(), name
+
+
+def test_blocked_idea_logs_no_model(client):
+    """A safety-blocked brief never calls the model, so its decision-log entry has model null (not a placeholder string)."""
+    r = client.post('/api/projects', json={'idea': 'TEST_ONLY: an app giving students crypto investment signals with guaranteed returns', 'target_market': 'Cairo, Egypt'}).json()
+    pid, h = r['project_id'], {'X-Project-Token': r['access_token']}
+    assert r['prescreen']['status'] == 'BLOCK'
+    client.post(f'/api/projects/{pid}/refine', headers=h).raise_for_status()
+    log = client.get(f'/api/projects/{pid}/agent-log', headers=h).json()['entries']
+    refined = [e for e in log if e['action'] == 'refine_brief' or e['agent'] == 'brief_refiner']
+    assert refined and all(e['model'] is None for e in refined)
+    assert client.post(f'/api/projects/{pid}/phases/discover/run', headers=h).status_code == 403
+
+
+def test_live_or_foreign_payment_events_are_refused(client):
+    pid, h, oid = selling(client)
+    order = client.post(f'/api/projects/{pid}/sell/checkout', headers=h, json={'offer_id': oid, 'buyer_ref': 'test-buyer-7', 'idempotency_key': 'idem-7777'}).json()['order']['id']
+    p = client.post(f'/api/projects/{pid}/sell/mock-pay', headers=h, json={'order_id': order}).json()
+    other, h2 = make_project(client, idea='Another venture: a quiz app for adults learning Arabic vocabulary')
+    assert client.post(f'/api/projects/{other}/sell/webhook', json={'event': p['event'], 'signature': p['signature']}).status_code == 403
+    assert client.post(f'/api/projects/{pid}/sell/webhook', json={'event': dict(p['event'], livemode=True), 'signature': p['signature']}).status_code == 401
+
+
+def test_submission_checker_detectors():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('check_submission', ROOT / 'scripts' / 'check_submission.py')
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    m.self_test()
+    assert m.RESULTS[-1][0] == 'PASS', m.RESULTS[-1]

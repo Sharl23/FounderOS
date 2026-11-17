@@ -34,7 +34,7 @@ Without a model, the interface still opens. Phases 1-2 then say plainly that the
 - **Ollama in a container instead.** Set `OLLAMA_URL=http://ollama:11434` in `.env`, then run `docker compose --profile ollama up`.
 - **Machine settings.** Copy `.env.example` to `.env`. On a GPU with 6 GB or less that runs out of memory, set `OLLAMA_NUM_GPU=0`. If RAM runs out, set `OLLAMA_NUM_CTX=1024`. Troubleshooting is in [`docs/user-guide.md`](docs/user-guide.md).
 - **Reproduce `outputs/` and `decision_log.json`.** Run `pip install -r backend/requirements-dev.txt && python scripts/demo_run.py`.
-- **Tests.** Run `python -m pytest -q` from the repository root.
+- **Tests.** Run `python -m pytest -q` from the repository root. `python scripts/check_submission.py` checks the repository layout and re-runs the pipeline.
 
 ## What works and what is mocked
 

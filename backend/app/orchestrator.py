@@ -437,6 +437,8 @@ class CheckoutReq(BaseModel):
 
 def _fees(db, pid):
     p = gates.latest_plan(db, pid)
+    if not p:
+        raise HTTPException(409, {'code': 'GATE_NOT_OPEN', 'message': 'This venture has no commercial plan, so it has no checkout or fees.'})
     return {'pct': p['inputs']['payment_fee_pct'], 'fixed': p['inputs']['payment_fee_fixed']}
 
 
@@ -465,7 +467,7 @@ async def mock_pay(pid: str, req: MockPay, project=Depends(authorize)):
         if not o:
             raise HTTPException(404, 'Order not found for this venture')
         ev = payments.make_event(db, pid, 'payment_succeeded', o, req.event_id)
-        res = payments.handle_event(db, pid, ev['event'], ev['signature'], _fees(db, pid))
+        res = payments.handle_event(db, pid, ev['event'], ev['signature'], lambda: _fees(db, pid))
         _log(db, pid, 'payments', 'process_payment_event', outcome=res['result'].lower(), detail={'event_id': ev['event']['event_id']})
         ent = qone(db, 'SELECT token, status FROM entitlements WHERE order_id=?', (o['id'],))
     return {'event': ev['event'], 'signature': ev['signature'], **res, 'access': ent and {'status': ent['status'], 'url': f'/deliver/{ent["token"]}'}, 'mode': TEST_BANNER}
@@ -480,7 +482,7 @@ class WebhookIn(BaseModel):
 async def webhook(pid: str, req: WebhookIn):
     """Webhook endpoint (signature-authenticated, like a provider callback). Replaying an event is a no-op."""
     with conn() as db:
-        res = payments.handle_event(db, pid, req.event, req.signature, _fees(db, pid))
+        res = payments.handle_event(db, pid, req.event, req.signature, lambda: _fees(db, pid))
         _log(db, pid, 'payments', 'process_payment_event', outcome=res['result'].lower(), detail={'event_id': req.event.get('event_id')})
     return res
 

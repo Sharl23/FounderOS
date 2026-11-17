@@ -13,6 +13,9 @@ RUN_TAG = None   # set by the demo runner so one run's log can be exported on it
 
 
 def record(db, pid, agent: str, action: str, *, sources=None, model=None, approved_by=None, outcome=None, detail=None, cost=0.0):
+    if isinstance(model, str) and model.startswith('NOT_CALLED'):   # the step skipped the model (e.g. safety block): no AI ran
+        detail = {**(detail or {}), 'model_not_called': model}
+        model = None
     sources = [s for s in (sources or []) if isinstance(s, str) and s.startswith(('http://', 'https://'))]
     db.execute('INSERT INTO agent_actions(id,project_id,run_tag,ts,agent,action,sources_json,model,cost,approved_by,outcome,detail_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
                (uuid.uuid4().hex, pid, RUN_TAG, now(), agent, action, json.dumps(sorted(set(sources))), model, float(cost),
