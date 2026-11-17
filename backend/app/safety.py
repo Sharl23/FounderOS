@@ -73,7 +73,8 @@ det('advice_in_disguise', 'REVIEW_REQUIRED',
 
 det('income_promise_dependency', 'HARD_STOP',
     r"\bguarante\w*\b[^.;!?\n]{0,40}\b(income|profits?|returns?|earnings|revenue|success|roi|rich|salary|wealth|money|to make|grades?|results?|jobs?|admission)\b"
-    r"|\bpromis(e|es|ing)\s+(\w+\s+){0,3}(income|profits|returns|earnings|success|wealth|to make money|\d+\s*%)\b"
+    r"|\bpromis(e|es|ing)\s+(\w+\s+){0,6}(income|profits|returns|earnings|success|wealth|to make money|\d+\s*%)\b"
+    r"|\bpromis(e|es|ing)\s+(\w+\s+){0,3}(they|members|users|customers|students|you)\s+will\s+(earn|make|get rich|double)\b"
     r"|\b(get[- ]rich[- ]quick|double your money|risk[- ]free (income|returns?|profits?)|passive income guaranteed|earn \$?\d[\d,]*\s*(egp|usd|\$)?\s*(per|a|every) (day|week|month) guaranteed|pyramid scheme|mlm|multi[- ]level marketing)\b",
     'The idea sells or markets itself on a promise of income or a guaranteed outcome.')
 
@@ -96,12 +97,13 @@ det('money_or_credentials_dependency', 'HARD_STOP',
     r"\b(you|founder ?os|the ai|ai agents?|the agents?|the assistant|the bot|the (app|platform|system|product))\b[^.;!?\n]{0,50}\b(hold|holds|keep|keeps|transfer|transfers|wire|wires|refund|refunds|charge|charges|collect|collects|move|moves|withdraw|withdraws|pay|pays|process|processes|send|sends|stores?|safeguards?)\b[^.;!?\n]{0,30}\b(users'? money|customers'? money|their money|funds|deposits?|refunds?|cash|wallets?|balances?|bank transfers?)\b"
     r"|\b(store|stores|storing|save|saves|saving|keep|keeps|keeping|remember|log|logs|logging|collect|collects|collecting|harvest\w*|record|records|ask for)\b[^.;!?\n]{0,50}\b(card (details|numbers?|data)|credit ?card (numbers?|details|data)|debit ?card (numbers?|details)|cvv|cvc|bank(ing)? (logins?|passwords?|credentials)|one[- ]time (codes?|passwords?)|otp codes?|api (keys?|secrets?)|private keys?|seed phrases?)\b"
     r"|\b(store|save|keep|remember|log|record|collect|harvest\w*)\s+(\w+\s+){0,2}(my|our|their|customers'?|users'?|clients'?|plain[- ]?text|account)\s+(\w+\s+)?(passwords?|login credentials|credentials|logins?)\b"
-    r"|\bplain[- ]?text passwords?\b|\b(hold|holds|holding) (the )?(funds|money|deposits)\b",
+    r"|\bplain[- ]?text passwords?\b|\b(hold|holds|holding) (the )?(funds|money|deposits)\b"
+    r"|\b(we|i|our (app|platform|startup|company))\s+(will\s+|would\s+)?(hold|keep|store|manage|move|transfer|safeguard)\w*\s+(\w+'?\s+){0,2}(funds|money|deposits|savings|balances|wallets?)\b",
     'The product only works if the system moves or holds money, or stores passwords, keys or card details.')
 
 det('harm_to_people', 'HARD_STOP',
     r"\b(stalk\w*|harass\w*|dox+\w*|revenge porn|track\w* (\w+\s+){0,2}(partner|spouse|wife|husband|girlfriend|boyfriend|ex|employees?|someone|a person|people|individuals?)('s)? (location|phone|messages|whereabouts)|secretly (track|monitor|record|follow)\w*|spy(ing)? on|spyware|stalkerware|keylogger\w*|surveil\w* (of )?(individuals?|specific people|a person|employees|neighbou?rs)|facial recognition (to|for) (identify|track|find) (strangers|people|individuals)"
-    r"|(exam|test) cheating|cheat\w* (on|in|during) (\w+\s+){0,2}(exams?|tests?|quizzes)|write (their|students'?|others'?) (essays?|exams?|theses|thesis|assignments|homework) for (them|money)|essay mill|contract cheating|(take|sit) (\w+\s+){0,2}exams? for (them|others|students|money)|fake (degrees?|diplomas?|certificates?|transcripts?|ids?|id cards?|documents?|prescriptions?)"
+    r"|(exam|test) cheating|cheat\w* (on|in|during) (\w+\s+){0,2}(exams?|tests?|quizzes)|writ\w* (\w+\s+){0,2}(their|students'?|others'?|people'?s?) (essays?|exams?|theses|thesis|assignments|homework|coursework) for (them|money|a fee|pay)|essay mill|contract cheating|(take|sit) (\w+\s+){0,2}exams? for (them|others|students|money)|fake (degrees?|diplomas?|certificates?|transcripts?|ids?|id cards?|documents?|prescriptions?)"
     r"|phish\w*|scam\w*|ponzi|money launder\w*|launder(ing)? (money|funds)|counterfeit\w*|(mislead|deceiv|trick|manipulat)\w* (\w+\s+){0,2}(elderly|seniors|vulnerable|children|kids|patients|people|users|customers|students)|dark pattern\w*|bait[- ]and[- ]switch"
     r"|pirat\w* (movies|films|software|books|content|courses)|pirated|crack(ed|ing)? (software|games|licen[cs]es)|torrent\w* (of )?(copyrighted|movies|games|courses)|re-?upload\w* (\w+\s+){0,2}(copyrighted|paid) (courses|content|books)|steal\w* (designs?|content|ip|intellectual property|data|passwords?|accounts?|identit\w*|credentials)|stolen (data|cards?|accounts?|credentials|content)|malware|ransomware|credential stuffing|hack(ing)? into)\b",
     'The product\'s purpose matches a listed harm: harassment, stalking, surveillance of individuals, academic/credential fraud, deceptive manipulation of vulnerable people, or IP theft. (The source labels this wall a proposed assumption.)')
