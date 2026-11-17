@@ -43,7 +43,7 @@ from .llm import (OllamaClient, ModelUnavailable, ModelOutputError, ADVICE, REFI
 
 LLM = OllamaClient()
 STARTED_AT = now()
-VERSION = '0.9.0'
+VERSION = '0.10.0'
 
 
 @asynccontextmanager
@@ -1200,10 +1200,13 @@ def _cand(row):
 async def research_plan_v7(pid: str, project=Depends(authorize)):
     with conn() as db:
         brief = latest_brief(db, pid)
+        evidence = [e for e in evidence_of(db, pid) if not e.get('duplicate_of') and not e.get('injection_flag')] if brief else []
     if not brief:
         raise HTTPException(409, 'Refine the brief first: the research plan is built from it.')
     jur = safety.jurisdiction_of(safety_fields(project, brief['payload']))
-    return {'brief_version': brief['version'], 'jurisdiction': jur, **research.plan(brief['payload'], jur)}
+    # Research is ranked by business risk: the critical claim with the weakest counted evidence comes first.
+    register = risk_register(brief['payload'], None, None, evidence)
+    return {'brief_version': brief['version'], 'jurisdiction': jur, **research.plan(brief['payload'], jur, register)}
 
 
 class ResearchItem(BaseModel):

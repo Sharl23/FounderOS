@@ -145,7 +145,8 @@ def scenario_b(c):
 
 def scenario_c(c):
     v = Venture(c, STUDY, current_workaround='Asking friends on WhatsApp groups', problem='Students waste time finding a quiet place with Wi-Fi and sockets before exams',
-                target_customers='Undergraduate students at Cairo universities')
+                target_customers='Undergraduate students at Cairo universities',
+                skills='Python and basic web development', budget='1000 EGP', timeline='6 weeks')
     ok(v.post('/refine'))
     s = ok(v.get(''))
     write('phase1_step1_brief.json', {'brief': s['brief']})
@@ -160,6 +161,20 @@ def scenario_c(c):
     val = v.run('validate')
     write('phase2_step2_validation_report.json', {'model': val.get('model'), 'report': val.get('report'), 'verdict_by_code': val['gate'].get('verdict'),
                                                    'gate': {k: v for k, v in val['gate'].items() if k in ('verdict', 'reasons', 'what_would_change_it', 'experiment_outcomes')}})
+    nd = val['gate'].get('next_decision')
+    if nd:
+        write('phase2_step3_next_decision.md', '\n'.join([
+            '# Your next decision (Decision Passport, computed in code)', '', f'**Decision:** {nd["decision"]}', '',
+            '## Why', *[f'- {x}' for x in nd['why']], '', f'**Evidence:** {", ".join(nd["evidence_ids"]) or nd["evidence_note"]}', '',
+            '## Still unknown', *[f'- {x}' for x in nd['unknowns']], '', f'**Do next:** {nd["next_action"]}', '',
+            *([f'**Cost and time (ASSUMPTION):** {nd["cost_and_time"]["cost"]} {nd["cost_and_time"]["time"]}', ''] if nd.get('cost_and_time') else []),
+            *([f'**Success looks like:** {nd["success_criterion"]}', ''] if nd.get('success_criterion') else []),
+            '## Fits this founder because', *[f'- {x}' for x in nd['founder_fit']], '', f'**Trade-off:** {nd["trade_off"]}', '',
+            '## Options considered and rejected', *[f'- {a["option"]}: {a["not_chosen_because"]}' for a in nd['alternatives']], '',
+            '## What would change it', *[f'- {x}' for x in nd['what_would_change_it']], '',
+            f'**Needs founder approval:** {nd["needs_founder_approval"]}', '',
+            f'**Confidence:** {nd["confidence"]["level"]} ({nd["confidence"]["basis"]}). {nd["confidence"]["meaning"]}', '',
+            'Limits: ' + ' '.join(nd['limitations'])]))
     v.decide('validate', val, 'APPROVE', feedback='Build a demo prototype only; demand is not validated.')
     write('phase2_gate_validate.md', gate_md('Validate gate (scenario C)', v.gate(2),
           f'Validation verdict: **{val["gate"]["verdict"]}**. No customer behaviour was recorded, so the only build allowed is a DEMO-ONLY prototype that is never called validated.'))
@@ -192,7 +207,10 @@ def scenario_c(c):
         f'- Break-even: {ue["break_even_note"]}', '', '| Scenario | Sales/month | Profit/month | Months to recover build |', '|---|---|---|---|',
         *[f'| {k} | {x["sales_per_month"]} | {x["profit_per_month"]} | {x["months_to_recover_build_cost"] or "never"} |' for k, x in ue['scenarios'].items()], '',
         f'Payment provider: **{cp["plan"]["payment_provider"]["status"]}**: {cp["plan"]["payment_provider"]["detail"]}', '',
-        '## Terms checklist', *[f'- [{t["status"]}] {t["item"]}: {t["note"]}' for t in cp['plan']['terms_checklist']]]))
+        '## Terms checklist', *[f'- [{t["status"]}] {t["item"]}: {t["note"]}' for t in cp['plan']['terms_checklist']], '',
+        f'## Commercial recommendation: {cp["plan"]["decision"]["recommendation"]}', '',
+        *[f'- **{f["code"]}** ({f["severity"]}): {f["reasoning"]} {f["what_to_do"]}' for f in cp['plan']['decision']['findings']], '',
+        f'Missing inputs: {"; ".join(cp["plan"]["decision"]["missing_inputs"]) or "none"}', '', cp['plan']['decision']['labels']]))
     ok(v.post('/commercial/activate', {'approval_id': v.approve('activate_commercial')}))
     write('phase4_gate_commercial.md', gate_md('Commercial setup gate', v.gate(4)))
 
@@ -254,7 +272,9 @@ def scenario_c(c):
     write('phase6_step1_metrics.json', {'derived': op['derived'], 'manual_metrics': op['manual_metrics'], 'feedback': op['feedback'], 'issues': op['issues']})
     an = ok(v.post('/operate/analyze'))
     r = an['recommendation']
-    write('phase6_step2_recommendation.md', '\n'.join([f'# Recommendation: {r["recommendation"]}', '', *[f'- {x}' for x in r['reasons']], '', f'Caveat: {r["caveat"]}',
+    write('phase6_step2_recommendation.md', '\n'.join([f'# Recommendation: {r["recommendation"]}', '', f'Evidence status: **{r["evidence_status"]}**',
+                                                       f'Bottleneck: {r["bottleneck"]}', f'Next iteration: {r["next_iteration"]} (loops back to Phase {r["loops_back_to_phase"]})',
+                                                       f'Data used: {json.dumps(r["data_sources"])}', '', *[f'- {x}' for x in r['reasons']], '', f'Caveat: {r["caveat"]}',
                                                        '', f'Thresholds: {json.dumps(r["thresholds"])}']))
     write('phase6_step3_proposal.json', an['proposal'])
     write('phase6_gate_operate.md', gate_md('Operate and learn gate', v.gate(6)))

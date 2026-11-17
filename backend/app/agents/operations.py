@@ -66,7 +66,30 @@ def recommend(d: dict, manual: list[dict], feedback: list[dict], issues: list[di
         rec = 'STOP' if rec != 'CONTINUE' else 'PIVOT'
         reasons.append(f'{len(failed)} critical demand test(s) were clear misses.')
     mock_only = all(x['source'] == 'MOCK_DEMO' for x in manual) if manual else True
+    # The observed bottleneck decides where the next iteration goes (and which earlier phase it loops back to).
+    if failed:
+        bottleneck, nxt, phase = 'Demand: a critical pre-registered test failed', 'Revisit the customer segment or problem and pre-register a new test; do not iterate the product first.', 1
+    elif open_high:
+        bottleneck, nxt, phase = 'Delivery: an open high-severity issue', f'Fix "{open_high[0]["title"][:80]}" in a new prototype version, then re-check.', 3
+    elif m['orders_paid'] < MIN_ORDERS:
+        bottleneck, nxt, phase = 'Not enough data', f'Keep the TEST MODE offer running until at least {MIN_ORDERS} paid orders exist; change nothing yet.', 5
+    elif m['refund_rate_pct'] is not None and m['refund_rate_pct'] >= 30:
+        bottleneck, nxt, phase = 'Expectations: buyers ask for refunds', 'Compare what the offer promises with what is delivered; revise onboarding or the offer text.', 3
+    elif m['checkout_to_paid_pct'] is not None and m['checkout_to_paid_pct'] < 20:
+        bottleneck, nxt, phase = 'Offer or price: checkouts are abandoned', 'Revisit the price and offer clarity in Commercial setup, then re-test.', 4
+    elif m['access_usage_pct'] is not None and m['access_usage_pct'] < 30:
+        bottleneck, nxt, phase = 'Value: buyers do not use what they bought', 'Interview buyers who did not use access; the problem or segment may be wrong.', 1 if rec == 'PIVOT' else 3
+    elif feedback and len(neg) / len(feedback) >= 0.5:
+        bottleneck, nxt, phase = 'Product experience: mostly negative feedback', 'Turn the most repeated complaint into one revision and measure again.', 3
+    else:
+        bottleneck, nxt, phase = 'None against the fixed thresholds', 'Continue testing with real (not MOCKED) buyers before any launch decision.', 6
+    sources = {'mocked_payment_events': m['checkouts_started'], 'founder_reported_metrics': sum(1 for x in manual if x['source'] == 'MANUAL'),
+               'demo_metrics': sum(1 for x in manual if x['source'] == 'MOCK_DEMO'),
+               'founder_reported_feedback': sum(1 for f in feedback if f.get('source') != 'MOCK_DEMO'),
+               'demo_feedback': sum(1 for f in feedback if f.get('source') == 'MOCK_DEMO'), 'real_observed_sales': 0}
     return {'recommendation': rec, 'reasons': reasons,
+            'evidence_status': 'INSUFFICIENT EVIDENCE' if m['orders_paid'] < MIN_ORDERS else 'ENOUGH RECORDED EVENTS FOR A READING (MOCKED)',
+            'bottleneck': bottleneck, 'next_iteration': nxt, 'loops_back_to_phase': phase, 'data_sources': sources,
             'caveat': 'All sales events are MOCKED / TEST MODE' + (' and all manual metrics are MOCK_DEMO' if mock_only else '') +
                       ', so this recommendation is about the simulation, not real performance.',
             'thresholds': {'min_paid_orders': MIN_ORDERS, 'refund_rate_iterate_pct': 30, 'checkout_to_paid_min_pct': 20, 'access_usage_min_pct': 30}}

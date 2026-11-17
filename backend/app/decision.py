@@ -394,13 +394,14 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
         'STOP_DO_NOT_LAUNCH': 'On current evidence, do not launch. A defensible decision not to launch is a valid outcome. You may record a different course with your reasons.',
         'BLOCK_DO_NOT_LAUNCH': 'Revise the brief to remove the prohibited element, or stop.',
     }[verdict]
+    next_decision = next_decision_card(verdict, headline, recommendation, nxt, register, exp_outcomes, change_mind, counted, brief)
     return {
         'verdict': verdict, 'verdict_kind': kind, 'headline': headline, 'recommendation': recommendation,
         'never': 'Never VALIDATED / PROCEED_TO_LAUNCH. No success probability is computed.',
         'matrix': matrix,
         'reasons_for': [t for _, t in sorted(reasons_for, key=lambda x: -x[0])][:3],
         'reasons_against': [t for _, t in sorted(reasons_against, key=lambda x: -x[0])][:3],
-        'strongest_source': ({'id': strongest['id'], 'kind': strongest['kind'], 'claim': strongest['claim'],
+        'strongest_source': ({'id': strongest['id'], 'kind': strongest['kind'], 'claim': strongest.get('claim') or 'UNKNOWN claim text',
                               'source_url': strongest.get('source_url'), 'limitations': LIMITS[strongest['kind']]}
                              if strongest else {'id': None, 'kind': None, 'limitations': 'SOURCE UNAVAILABLE: no counted evidence. All market statements are ASSUMPTIONS.'}),
         'unresolved_critical_assumptions': unresolved,
@@ -410,6 +411,7 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
         'risk_register': register,
         'what_would_change_our_mind': change_mind,
         'next_experiment': nxt,
+        'next_decision': next_decision,
         'caveats': caveats,
         'permissions': {'continue_research': verdict != 'BLOCK_DO_NOT_LAUNCH', 'build': False, 'launch': False,
                         'external_actions': False},
@@ -418,6 +420,65 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
                    'evidence_snapshot_hash': evidence_snapshot_hash(evidence),
                    'experiment_versions': sorted(f'{x["id"]}:v{x["version"]}:{x["status"]}' for x in experiments),
                    'decision_policy': POLICY_VERSION, 'methodology': METHODOLOGY},
+    }
+
+
+def next_decision_card(verdict, headline, recommendation, nxt, register, exp_outcomes, change_mind, counted, brief) -> dict:
+    """One founder-facing answer to: what do I do next, why, on what evidence, and what would change it.
+
+    Built only from values already computed above (verdict, risk register, next experiment). It adds no new
+    judgement: confidence describes evidence coverage of the critical claims, never a probability of success.
+    """
+    critical = [r for r in register if r['claim_id'].startswith('C-')]
+    behaviour = [r['claim_id'] for r in critical if r['assumption_status'] == 'SUPPORTED_BY_BEHAVIOR']
+    weak = [r for r in critical if r['assumption_status'] != 'SUPPORTED_BY_BEHAVIOR']
+    ids = sorted({i for r in critical for i in r.get('evidence_ids', []) + r.get('contradictory_evidence_ids', [])})
+    coverage = f'{len(behaviour)} of {len(critical)} critical claims have observed-behaviour support'
+    # NONE: no critical claim has behaviour support. LOW: under half. MODERATE: half or more. Never HIGH: customer evidence is
+    # founder-reported, and a model's wording can never raise this. Not applicable when a hard rule decided the outcome.
+    level = 'NONE' if not behaviour else 'LOW' if len(behaviour) * 2 < len(critical) else 'MODERATE'
+    if verdict == 'BLOCK_DO_NOT_LAUNCH':
+        level, coverage = 'NOT_APPLICABLE', 'A safety hard stop decided this; evidence cannot change it'
+    proposal = nxt.get('kind') == 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL'
+    crit_fail = next((o for o in exp_outcomes if o['critical'] and o['outcome'] == 'FAIL'), None)
+    if verdict == 'BLOCK_DO_NOT_LAUNCH':
+        decision, action = 'Do not pursue this venture as described.', nxt.get('instruction')
+        alternatives = [{'option': 'Remove the prohibited element and re-screen a revised brief', 'not_chosen_because': 'Only you can decide to change the idea; nothing runs until it passes the safety screen.'}]
+    elif verdict in ('STOP_DO_NOT_LAUNCH', 'PIVOT'):
+        decision = 'Stop and review the failed critical test before anything else.' if verdict == 'STOP_DO_NOT_LAUNCH' else \
+            'Review the failed critical test, then decide whether to test the recorded alternative.'
+        action = nxt.get('instruction')
+        alternatives = [
+            {'option': 'REPEAT the same test', 'not_chosen_because': 'Only justified if the test itself was flawed (wrong people, broken form). Record why before re-running.'},
+            {'option': 'PIVOT to the recorded alternative', 'not_chosen_because': 'The alternative is untested; it needs its own locked test.' if crit_fail and crit_fail.get('pivot_alternative') else 'No alternative was recorded before the result.'},
+            {'option': 'Continue building', 'not_chosen_because': 'A critical assumption failed its own pre-registered criterion.'}]
+    elif proposal:
+        decision = f'Test {nxt["claim_id"]} ({nxt["dimension"]}) next: {nxt["method_chosen"]["label"]}.'
+        action = nxt['founder_actions'][1]
+        alternatives = nxt.get('alternatives_considered', []) + [
+            {'option': 'Build the full product now', 'not_chosen_because': f'{nxt["claim_id"]} has no observed-behaviour support; building would not answer it.'}]
+    else:
+        decision, action = recommendation, nxt.get('instruction') or recommendation
+        alternatives = []
+    crit = (nxt.get('suggested_criteria') or {}) if proposal else {}
+    return {
+        'decision': decision,
+        'why': [headline] + [f'{r["claim_id"]} ({r["category"]}) is {r["assumption_status"]}.' for r in weak[:3]],
+        'evidence_ids': ids,
+        'evidence_note': 'No counted evidence yet: every claim is an ASSUMPTION.' if not ids else 'IDs refer to the evidence ledger.',
+        'unknowns': [f'{r["claim_id"]}: {r["exact_claim"][:140]}' for r in weak],
+        'alternatives': alternatives,
+        'trade_off': nxt.get('trade_off') if proposal else 'The safest defensible option given a failed or blocked critical check.',
+        'founder_fit': nxt.get('founder_fit', []) if proposal else [],
+        'next_action': action,
+        'cost_and_time': {'cost': nxt.get('cost_estimate'), 'time': nxt.get('timebox_estimate')} if proposal else None,
+        'success_criterion': (f'At least {crit.get("success_threshold_pct")}% of at least {crit.get("min_sample")} relevant participants take the action '
+                              f'within {crit.get("time_window_days")} days (STARTING ASSUMPTION: you choose and lock the real numbers before collecting results).') if crit else None,
+        'what_would_change_it': change_mind,
+        'needs_founder_approval': 'Locking the test criteria and every contact with participants are yours; FounderOS sends nothing.' if proposal else 'Recording your decision on this verdict.',
+        'confidence': {'level': level, 'basis': coverage, 'meaning': 'Evidence coverage, not a probability of success. Model wording never raises it.'},
+        'limitations': ['Customer evidence is founder-reported unless independently verified.', 'Costs, durations and thresholds are ASSUMPTIONS.',
+                        'Simulated (MOCKED) sales are never counted as demand.'],
     }
 
 

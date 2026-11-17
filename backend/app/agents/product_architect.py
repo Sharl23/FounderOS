@@ -15,7 +15,18 @@ ARCHETYPES = {
                  'kw': r'\b(quiz\w*|practi[cs]e\w*|flashcards?|learn\w*|revision|exam prep|vocabulary|maths?|math)\b'},
     'planner': {'label': 'Planner / task tracker',
                 'kw': r'\b(deadlines?|planner|plan\w*|schedul\w*|reminders?|assignments?|tasks?|to-?dos?|calendar)\b'},
+    'tracker': {'label': 'Client and project tracker',
+                'kw': r'\b(clients?|projects?|freelanc\w*|deliverables?|invoic\w*|milestones?|retainers?|agency|agencies|consultants?)\b'},
+    'booking': {'label': 'Appointment booking',
+                'kw': r'\b(book\w*|appointments?|slots?|reservations?|reserv\w*|availability|barbers?|salons?|walk-?ins?|sessions?)\b'},
 }
+BOOKING_SERVICES = [
+    (r'\b(barber|hair|salon|beard)', ['Haircut (30 min)', 'Beard trim (15 min)', 'Haircut and beard (45 min)']),
+    (r'\b(tutor|lesson|teacher|class)', ['Trial lesson (30 min)', 'Standard lesson (60 min)', 'Exam review (90 min)']),
+    (r'\b(photo|photograph)', ['Portrait session (30 min)', 'Headshots (45 min)', 'Product shoot (60 min)']),
+    (r'\b(repair|technician|laptop|phone)', ['Diagnosis (15 min)', 'Standard repair (60 min)', 'Pick-up slot (15 min)']),
+]
+GENERIC_SERVICES = ['Short session (30 min)', 'Standard session (60 min)', 'Long session (90 min)']
 
 ATTRIBUTE_BANKS = [
     (r'\bstud(y|ying|ents?)\b', ['Wi-Fi', 'Quiet zone', 'Power outlets', 'Group tables', 'Open late']),
@@ -44,6 +55,10 @@ def archetype(text: str) -> tuple[str, dict]:
 
 
 def entity_noun(text: str, kind: str) -> tuple[str, str]:
+    if kind == 'tracker':
+        return 'project', 'projects'
+    if kind == 'booking':
+        return 'appointment', 'appointments'
     t = text.lower()
     pairs = [('study space', r'study (space|spot|room|place)s?'), ('ingredient', r'ingredients?'), ('tutor', r'tutors?'), ('cafe', r'cafes?'),
              ('restaurant', r'restaurants?'), ('workshop', r'workshops?'), ('freelancer', r'freelancers?'), ('assignment', r'assignments?'),
@@ -69,7 +84,8 @@ def keyphrase(text: str, n: int = 4) -> str:
 
 
 def name_for(brief: dict, singular: str, kind: str) -> str:
-    base = {'directory': f'{singular.title()} Finder', 'forecast': f'{singular.title()} Planner', 'practice': 'Practice Coach', 'planner': 'Deadline Planner'}[kind]
+    base = {'directory': f'{singular.title()} Finder', 'forecast': f'{singular.title()} Planner', 'practice': 'Practice Coach', 'planner': 'Deadline Planner',
+            'tracker': 'Client Project Tracker', 'booking': 'Appointment Booker'}[kind]
     tm = (((brief.get('fields') or {}).get('target_market') or {}).get('typed') or {})
     return f'{base} {tm.get("city")}' if tm.get('city') and kind == 'directory' else base
 
@@ -94,6 +110,10 @@ def spec(brief: dict, discovery: dict | None, verdict: str | None, mode: str, ov
         kind = overrides['archetype']
     singular, plural = entity_noun(text, kind)
     attrs = next((a for rx, a in ATTRIBUTE_BANKS if re.search(rx, text, re.I)), GENERIC_ATTRS)
+    if kind == 'booking':
+        attrs = next((a for rx, a in BOOKING_SERVICES if re.search(rx, text, re.I)), GENERIC_SERVICES)
+    elif kind == 'tracker':
+        attrs = ['Not started', 'In progress', 'Waiting on client', 'Delivered']
     audience = brief.get('target_customers') or 'ASSUMPTION: target customer not confirmed in the brief'
     problem = brief.get('problem') or 'ASSUMPTION: problem not confirmed in the brief'
     tm = (((brief.get('fields') or {}).get('target_market') or {}).get('typed') or {})
@@ -125,6 +145,29 @@ def spec(brief: dict, discovery: dict | None, verdict: str | None, mode: str, ov
                     {'id': 'F3', 'title': 'Score and retry', 'check': 'score'}]
         story('US1', who, 'to answer short practice questions', 'I can practise at home', ['One question at a time with choices', 'Choosing an answer shows right or wrong'])
         story('US2', who, 'to see my score', 'I know what to repeat', ['A score is shown at the end', 'A retry button restarts the set'])
+    elif kind == 'tracker':
+        features = [{'id': 'F1', 'title': 'Add clients', 'check': 'clients'}, {'id': 'F2', 'title': 'Add projects for a client with a delivery date', 'check': 'projects'},
+                    {'id': 'F3', 'title': 'Add tasks to a project and mark them done', 'check': 'tasks'},
+                    {'id': 'F4', 'title': 'Progress view: % done per project, late and at-risk deliveries, open work per client', 'check': 'progress'}]
+        story('US1', who, 'to record each client once and attach projects to them', 'I stop tracking work across chats and notes',
+              ['A client needs a name; duplicates are rejected', 'A project needs a client, a title and a delivery date'])
+        story('US2', who, 'to break a project into tasks and tick them off', 'I know what is left before delivery',
+              ['Adding a task to a project increases its task count', 'Marking a task done updates the project % immediately'])
+        story('US3', who, 'to see which deliveries are late or at risk', 'I can warn a client before a deadline slips',
+              ['Projects past their delivery date and not finished are marked Late', 'Projects due within 3 days with open tasks are marked At risk',
+               'A per-client summary shows open tasks and the next delivery'])
+    elif kind == 'booking':
+        features = [{'id': 'F1', 'title': 'Available slots for the next 5 days', 'check': 'slots'},
+                    {'id': 'F2', 'title': 'Booking form with validation', 'check': 'booking_form'},
+                    {'id': 'F3', 'title': 'Confirmation summary (nothing is sent)', 'check': 'confirm'},
+                    {'id': 'F4', 'title': 'Bookings list with cancel, which frees the slot', 'check': 'cancel'}]
+        story('US1', who, 'to see which time slots are still free', 'I can book without calling back and forth',
+              ['Only free slots can be chosen', 'Slots that are already booked are shown as taken'])
+        story('US2', who, 'to book a service in a free slot', 'my appointment is recorded',
+              ['A booking needs a client reference, a service and a free slot', 'Booking the same slot twice is refused with a message',
+               'A confirmation summary is shown; it states that no message was sent'])
+        story('US3', 'the service provider', 'to cancel a booking', 'the slot becomes available again',
+              ['Cancelling removes the booking and the slot shows as free again'])
     else:
         features = [{'id': 'F1', 'title': f'Add {plural} with due dates', 'check': 'form'}, {'id': 'F2', 'title': 'Sorted by due date', 'check': 'table'},
                     {'id': 'F3', 'title': 'Overdue and due-soon highlighting', 'check': 'warning'}, {'id': 'F4', 'title': 'Mark done', 'check': 'done'}]

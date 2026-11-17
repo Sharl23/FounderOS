@@ -1,11 +1,11 @@
 {
   "safety": {
-    "project_id": "971e7baea5674d1ea6595dc3f3adc52a",
+    "project_id": "03e144fe59f641f5804e206bde99bff8",
     "brief_version": 1,
     "status": "ALLOW_DISCOVERY",
     "acknowledged_at": null,
     "ack_statement": null,
-    "created_at": "2026-11-17T15:23:08.833096+00:00",
+    "created_at": "2026-11-17T19:24:11.619295+00:00",
     "assessment": {
       "status": "ALLOW_DISCOVERY",
       "policy_version": "safety-policy-2026-11-17.v7-1",
@@ -280,11 +280,7 @@
         "rejected_flags": [],
         "note": "Model flags escalate to founder review only and need a verbatim brief quote."
       },
-      "feasibility_notes": [
-        "Budget UNKNOWN: experiment costs cannot be checked against your limits.",
-        "Timeline UNKNOWN: time-boxes are estimates only.",
-        "Founder skills UNKNOWN: build feasibility cannot be assessed."
-      ],
+      "feasibility_notes": [],
       "limitations": [
         "Deterministic rule detectors (English) plus an optional model classifier that can only escalate to founder review. Not a legal review; certifies nothing.",
         "It can miss harmful ideas and can flag harmless ones. A flag is a question for the founder, not an accusation.",

@@ -48,6 +48,20 @@ def demo_records(spec: dict, seed: int) -> list[dict]:
             choices = sorted({ans, ans + rnd.choice([1, 2, 10]), ans - rnd.choice([1, 2]), ans + a})
             qs.append({'q': f'DEMO question {i}: {a} × {b} = ?', 'choices': choices, 'answer': ans})
         return qs
+    if k == 'tracker':
+        clients = [f'Demo Client {c}' for c in 'ABC']
+        projects = []
+        for i, (c, due) in enumerate([(0, -2), (0, 6), (1, 2), (2, 12)], 1):
+            tasks = [{'title': f'Demo task {i}.{j}', 'done': rnd.random() < 0.4} for j in range(1, rnd.randint(3, 5))]
+            projects.append({'id': i, 'client': clients[c], 'title': f'Demo project {i}', 'due_in_days': due, 'status': spec['attributes'][min(i - 1, 3)], 'tasks': tasks})
+        return {'clients': clients, 'projects': projects}
+    if k == 'booking':
+        days = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5']
+        times = ['10:00', '11:00', '12:00', '14:00', '15:00', '16:00']
+        slots = [{'id': f'{d}-{t}', 'day': d, 'time': t} for d in days for t in times]
+        taken = rnd.sample(slots, k=5)
+        bookings = [{'slot': x['id'], 'ref': f'DEMO-{i:02d}', 'service': rnd.choice(spec['attributes'])} for i, x in enumerate(taken, 1)]
+        return {'slots': slots, 'bookings': bookings}
     return [{'title': f'Demo {spec["entity"]["singular"]} {i}', 'due_in_days': d, 'done': False} for i, d in enumerate([-1, 1, 2, 5, 9], 1)]
 
 
@@ -296,7 +310,157 @@ render();generatePlan();
     return body, js
 
 
-BUILDERS = {'directory': _directory, 'forecast': _forecast, 'practice': _practice, 'planner': _planner}
+def _tracker(spec):
+    """Freelancer-style client and project tracker: clients -> projects -> tasks, with a progress view."""
+    body = """<section class="warn" aria-label="Prototype limitations">DEMO-ONLY: clients and projects are fictional. Edits stay in this browser tab; nothing is saved, sent or invoiced.</section>
+<div class="grid">
+<form id="add-client" class="card"><h3>Add client</h3><label for="client-name">Client name</label><input type="text" id="client-name" maxlength="80" required>
+<button type="submit">Add client</button></form>
+<form id="add-project" class="card"><h3>Add project</h3><label for="project-client">Client</label><select id="project-client" required></select>
+<label for="project-title">Project title</label><input type="text" id="project-title" maxlength="100" required>
+<label for="project-due">Delivery in (days)</label><input type="number" id="project-due" value="7" min="-60" max="365" required>
+<button type="submit">Add project</button></form>
+<form id="add-task" class="card"><h3>Add task</h3><label for="task-project">Project</label><select id="task-project" required></select>
+<label for="task-title">Task</label><input type="text" id="task-title" maxlength="100" required>
+<button type="submit">Add task</button></form>
+</div>
+<p id="form-msg" class="muted" aria-live="polite"></p>
+<h2>Projects</h2>
+<table id="projects"><thead><tr><th>Project</th><th>Client</th><th>Delivery</th><th>Progress</th><th>Flag</th><th>Open tasks</th></tr></thead><tbody></tbody></table>
+<h2>Progress by client</h2><div id="progress" aria-live="polite"></div>"""
+    js = """'use strict';
+const SPEC = %(spec)s;
+const DATA = %(data)s;
+const $ = (id) => document.getElementById(id);
+function pct(p) { return p.tasks.length ? Math.round(100 * p.tasks.filter(t => t.done).length / p.tasks.length) : 0; }
+function flag(p) {
+  const open = p.tasks.filter(t => !t.done).length;
+  if (p.tasks.length && open === 0) return 'Delivered';
+  if (p.due_in_days < 0) return 'Late';
+  if (p.due_in_days <= 3) return 'At risk';
+  return 'On track';
+}
+function cell(tr, text, cls) { const td = document.createElement('td'); td.textContent = String(text); if (cls) td.className = cls; tr.appendChild(td); return td; }
+function fillSelect(sel, values) {
+  const keep = sel.value; sel.textContent = '';
+  for (const [v, label] of values) { const o = document.createElement('option'); o.value = String(v); o.textContent = label; sel.appendChild(o); }
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+function render() {
+  fillSelect($('project-client'), DATA.clients.map(c => [c, c]));
+  fillSelect($('task-project'), DATA.projects.map(p => [p.id, p.title + ' (' + p.client + ')']));
+  const tb = $('projects').querySelector('tbody'); tb.textContent = '';
+  for (const p of [...DATA.projects].sort((a, b) => a.due_in_days - b.due_in_days)) {
+    const tr = document.createElement('tr'); const f = flag(p);
+    cell(tr, p.title); cell(tr, p.client); cell(tr, p.due_in_days < 0 ? Math.abs(p.due_in_days) + ' day(s) ago' : 'in ' + p.due_in_days + ' day(s)');
+    const prog = cell(tr, ''); const bar = document.createElement('progress'); bar.max = 100; bar.value = pct(p);
+    bar.setAttribute('aria-label', p.title + ' progress'); prog.appendChild(bar); prog.appendChild(document.createTextNode(' ' + pct(p) + '%'));
+    cell(tr, f, f === 'Late' ? 'bad' : f === 'At risk' ? 'warn' : f === 'Delivered' ? 'ok' : '');
+    const td = cell(tr, '');
+    for (const t of p.tasks.filter(t => !t.done)) {
+      const b = document.createElement('button'); b.className = 'ghost'; b.type = 'button'; b.textContent = 'Done: ' + t.title;
+      b.addEventListener('click', () => { t.done = true; render(); }); td.appendChild(b);
+    }
+    if (!p.tasks.some(t => !t.done)) td.textContent = p.tasks.length ? 'none' : 'no tasks yet';
+    tb.appendChild(tr);
+  }
+  const root = $('progress'); root.textContent = '';
+  for (const c of DATA.clients) {
+    const ps = DATA.projects.filter(p => p.client === c);
+    const open = ps.reduce((n, p) => n + p.tasks.filter(t => !t.done).length, 0);
+    const next = ps.filter(p => flag(p) !== 'Delivered').sort((a, b) => a.due_in_days - b.due_in_days)[0];
+    const late = ps.filter(p => flag(p) === 'Late').length;
+    const line = document.createElement('p'); line.className = late ? 'bad' : '';
+    line.textContent = c + ': ' + ps.length + ' project(s), ' + open + ' open task(s), ' + (late ? late + ' late, ' : '') + 'next delivery: ' + (next ? next.title + ' (' + next.due_in_days + ' day(s))' : 'none');
+    root.appendChild(line);
+  }
+}
+function msg(t) { $('form-msg').textContent = t; }
+$('add-client').addEventListener('submit', e => { e.preventDefault();
+  const n = $('client-name').value.trim();
+  if (!n) return msg('Enter a client name.');
+  if (DATA.clients.some(c => c.toLowerCase() === n.toLowerCase())) return msg('That client already exists.');
+  DATA.clients.push(n); $('client-name').value = ''; msg('Client added in this browser tab.'); render();
+});
+$('add-project').addEventListener('submit', e => { e.preventDefault();
+  const c = $('project-client').value, t = $('project-title').value.trim(), d = Number($('project-due').value);
+  if (!c || !t || !Number.isInteger(d) || d < -60 || d > 365) return msg('A project needs a client, a title and a whole number of days.');
+  DATA.projects.push({id: Math.max(0, ...DATA.projects.map(p => p.id)) + 1, client: c, title: t, due_in_days: d, tasks: []});
+  $('project-title').value = ''; msg('Project added. Add its tasks next.'); render();
+});
+$('add-task').addEventListener('submit', e => { e.preventDefault();
+  const p = DATA.projects.find(x => String(x.id) === $('task-project').value), t = $('task-title').value.trim();
+  if (!p || !t) return msg('Choose a project and enter a task.');
+  p.tasks.push({title: t, done: false}); $('task-title').value = ''; msg('Task added to ' + p.title + '.'); render();
+});
+render();
+"""
+    return body, js
+
+
+def _booking(spec):
+    """Appointment booking: free/taken slots, validated booking form, confirmation, cancellation."""
+    e = html.escape
+    options = ''.join(f'<option value="{e(a)}">{e(a)}</option>' for a in spec['attributes'])
+    body = f"""<section class="warn" aria-label="Prototype limitations">DEMO-ONLY: slots and bookings are fictional. No message, reminder or payment is sent; nothing leaves this browser tab.</section>
+<h2>Free slots (next 5 days)</h2><div id="slots" class="grid" aria-live="polite"></div>
+<h2>Book an appointment</h2>
+<form id="book" class="controls"><label for="ref">Client reference</label><input type="text" id="ref" maxlength="40" pattern="[A-Za-z0-9 _\\-]+" required placeholder="e.g. initials">
+<label for="service">Service</label><select id="service" required>{options}</select>
+<label for="slot">Slot</label><select id="slot" required></select>
+<button type="submit">Book</button></form>
+<p id="form-msg" class="muted" aria-live="polite"></p>
+<section id="confirmation" class="card" hidden aria-live="polite"></section>
+<h2>Bookings</h2><table id="bookings"><thead><tr><th>Slot</th><th>Client reference</th><th>Service</th><th>Action</th></tr></thead><tbody></tbody></table>"""
+    js = """'use strict';
+const SPEC = %(spec)s;
+const DATA = %(data)s;
+const $ = (id) => document.getElementById(id);
+const taken = () => new Set(DATA.bookings.map(b => b.slot));
+const label = (id) => { const s = DATA.slots.find(x => x.id === id); return s ? s.day + ' ' + s.time : id; };
+function render() {
+  const t = taken();
+  const grid = $('slots'); grid.textContent = '';
+  for (const day of [...new Set(DATA.slots.map(s => s.day))]) {
+    const card = document.createElement('div'); card.className = 'card';
+    const h = document.createElement('h3'); h.textContent = day; card.appendChild(h);
+    for (const s of DATA.slots.filter(x => x.day === day)) {
+      const tag = document.createElement('span'); tag.className = 'tag ' + (t.has(s.id) ? 'bad' : 'ok');
+      tag.textContent = s.time + (t.has(s.id) ? ' taken' : ' free'); card.appendChild(tag);
+    }
+    grid.appendChild(card);
+  }
+  const sel = $('slot'); const keep = sel.value; sel.textContent = '';
+  for (const s of DATA.slots.filter(x => !t.has(x.id))) { const o = document.createElement('option'); o.value = s.id; o.textContent = s.day + ' ' + s.time; sel.appendChild(o); }
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  const tb = $('bookings').querySelector('tbody'); tb.textContent = '';
+  for (const b of [...DATA.bookings].sort((x, y) => DATA.slots.findIndex(s => s.id === x.slot) - DATA.slots.findIndex(s => s.id === y.slot))) {
+    const tr = document.createElement('tr');
+    for (const v of [label(b.slot), b.ref, b.service]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    const td = document.createElement('td'); const btn = document.createElement('button'); btn.className = 'ghost'; btn.type = 'button';
+    btn.textContent = 'Cancel';
+    btn.addEventListener('click', () => { DATA.bookings = DATA.bookings.filter(x => x !== b); $('form-msg').textContent = 'Booking cancelled; ' + label(b.slot) + ' is free again.'; render(); });
+    td.appendChild(btn); tr.appendChild(td); tb.appendChild(tr);
+  }
+}
+$('book').addEventListener('submit', e => { e.preventDefault();
+  const ref = $('ref').value.trim(), service = $('service').value, slot = $('slot').value;
+  if (!/^[A-Za-z0-9 _-]{1,40}$/.test(ref)) { $('form-msg').textContent = 'Enter a short client reference (letters, digits, spaces).'; return; }
+  if (!SPEC.attributes.includes(service)) { $('form-msg').textContent = 'Choose a service.'; return; }
+  if (!DATA.slots.some(s => s.id === slot)) { $('form-msg').textContent = 'Choose a slot.'; return; }
+  if (taken().has(slot)) { $('form-msg').textContent = 'That slot was just taken. Choose another.'; render(); return; }
+  DATA.bookings.push({slot, ref, service});
+  const c = $('confirmation'); c.hidden = false; c.textContent = '';
+  const h = document.createElement('h3'); h.textContent = 'Booking recorded (DEMO)'; c.appendChild(h);
+  const p = document.createElement('p'); p.textContent = ref + ': ' + service + ' on ' + label(slot) + '. No confirmation message was sent; this prototype cannot send anything.'; c.appendChild(p);
+  $('ref').value = ''; $('form-msg').textContent = ''; render();
+});
+render();
+"""
+    return body, js
+
+
+BUILDERS = {'directory': _directory, 'forecast': _forecast, 'practice': _practice, 'planner': _planner, 'tracker': _tracker, 'booking': _booking}
 
 
 def build(spec: dict, seed: int) -> dict:

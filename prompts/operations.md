@@ -6,4 +6,4 @@
 
 ## Contract
 
-Input: recorded events, labelled manual/mock metrics, feedback with provenance, issues, demand tests. Output: derived metrics, a rule-based recommendation and a proposal back to Phase 1 or 3.
+Input: recorded events, labelled manual/mock metrics, feedback with provenance, issues, demand tests. Output: derived metrics, a rule-based recommendation, INSUFFICIENT EVIDENCE below 10 paid orders, the bottleneck and the phase it loops back to, and a proposal back to Phase 1 or 3.

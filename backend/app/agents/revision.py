@@ -2,7 +2,7 @@
 
 Understood commands (one per line, case-insensitive):
   name: <text> | headline: <text> | add filter: <text> | remove filter: <text> | color: <#RRGGBB or name>
-  type: directory|forecast|practice|planner | hide search | show search
+  type: directory|forecast|practice|planner|tracker|booking | hide search | show search
 Anything else is kept as a note and reported as NOT APPLIED (nothing is guessed).
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ def parse(feedback: str, current: dict) -> tuple[dict, list[dict]]:
             if c:
                 o['accent'] = c
             continue
-        m = re.match(r'(?i)^type\s*:\s*(directory|forecast|practice|planner)$', line)
+        m = re.match(r'(?i)^type\s*:\s*(directory|forecast|practice|planner|tracker|booking)$', line)
         if m:
             o['archetype'] = m.group(1).lower(); log.append({'line': line, 'applied': True, 'change': f'prototype type -> {o["archetype"]}'}); continue
         if re.match(r'(?i)^(hide|remove) search$', line):

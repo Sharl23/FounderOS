@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.10.0 — 17 Nov 2026 (founder-specific decisions)
+
+- **Next decision.** "Your next decision" was added to the Decision Passport. It gives:
+  - the decision and why, with evidence IDs and the claims still unknown;
+  - the options considered and rejected, and the trade-off;
+  - the founder-fit reasons and the next action;
+  - the cost and time (ASSUMPTION), a success criterion, and what would change the decision;
+  - the approval needed, and a confidence level that describes evidence coverage, not a probability.
+- **Strategy engine.** It now weighs the founder's budget (with a TEAM_ASSUMPTION floor per currency for paid tests), skills (whether they can build a page) and time.
+  - Each critical claim has candidate methods: problem walk-through, concierge, self-built page, neutral opt-in, paid ad, switching trial, side-by-side task, two-price test, and a refused real deposit.
+  - The pilot window follows the chosen method, never beyond the stated time.
+  - Behaviour change: a 6-week founder now gets the stronger 14-day concierge test instead of a 7-day opt-in, and one test assertion was updated to match.
+- **Build.** Two new working prototype types: a client and project tracker (the freelancer case) and appointment booking. Both have QA checks, and `scripts/prototype_e2e.py` drives them in a real browser.
+- **Commercial.** A recommendation layer covers loss per sale with the minimum viable price, break-even against scenarios, budget fit, churn sensitivity and unsupported price.
+- **Operate.** Adds INSUFFICIENT EVIDENCE, the bottleneck, the phase the next iteration loops back to, and a count of each data source.
+- **Research.** The plan is ranked by the weakest critical claim, and each bucket states what research cannot prove.
+- **Evaluation.** `evals/founder_cases.py` runs six synthetic founders (StudyFlow, freelancer, booking, weak evidence, adverse result, safety stop) and writes `evals/founder_eval_results.md`; `tests/test_founder_eval.py` enforces the same expectations.
+- **Fixes:**
+  - A safety-blocked venture no longer shows an evidence confidence level.
+  - The passport's side panel no longer says "design the next test" under a STOP verdict.
+  - The passport no longer crashes on an evidence row without claim text.
+
 ## 0.9.0 — 17 Nov 2026 (all six phases, MOCKED / TEST MODE for 3-6)
 
 - **Phase 3 Build:**

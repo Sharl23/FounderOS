@@ -761,7 +761,8 @@
     body.innerHTML = `<div class="stack">
       <section class="panel"><header><h2>Research plan from your brief</h2><span class="small muted">Brief v${plan.brief_version}</span></header>
         <p class="small muted">${esc(plan.notice)} Ranking by keyword overlap is an exploratory heuristic only.</p>
-        <form id="plan-form">${plan.buckets.map((b) => `<div class="bucket"><h3>${esc(b.title)}</h3><p class="small">${esc(b.question)}</p>
+        ${plan.priority_order ? `<p class="small"><b>Research these first:</b> ${plan.priority_order.slice(0, 2).map((id) => { const b = plan.buckets.find((x) => x.id === id); return `${esc(b.title)} (${esc(b.why_priority)})`; }).join('; ')}</p>` : ''}
+        <form id="plan-form">${plan.buckets.map((b) => `<div class="bucket"><h3>${esc(b.title)} ${b.priority ? tag(b.priority <= 2 ? 'REVIEW_REQUIRED' : 'INFO', 'Priority ' + b.priority) : ''} ${b.claim_status && b.claim_status !== 'ALWAYS_CHECKED' ? tag(b.claim_status === 'SUPPORTED_BY_BEHAVIOR' ? 'PASS' : 'UNKNOWN', b.claim_status === 'SUPPORTED_BY_BEHAVIOR' ? 'VERIFIED BY BEHAVIOUR' : 'NEEDS EVIDENCE') : ''}</h3><p class="small">${esc(b.question)}</p>${b.limit ? `<p class="small muted">${esc(b.limit)}</p>` : ''}
           ${b.items.map((it, i) => `<div class="query"><label class="check"><input type="checkbox" name="sel" value="${esc(b.id)}|${i}" checked><span class="prov-name">${esc(prov[it.provider].name)}</span></label>
             ${it.query != null ? `<label class="sr-only" for="q-${b.id}-${i}">Query</label><input id="q-${b.id}-${i}" name="q:${b.id}|${i}" value="${esc(it.query)}" maxlength="160">` : `<span>${esc(it.indicator)} <span class="small faint">official national statistic</span></span>`}<span></span></div>`).join('')}
           ${b.status === 'DISCOVERY_NOT_AVAILABLE' ? `<p class="small">${chip('DISCOVERY_NOT_AVAILABLE')}</p>` : ''}
@@ -1060,6 +1061,7 @@
     const evLink = (id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`;
     const ids = (a) => a && a.length ? a.map(evLink).join(', ') : '<span class="faint">none</span>';
     const dec = pp.founder_decision;
+    const nd = g.next_decision;
     main.innerHTML = `${head('Decision passport', `Validation v${val.version}, brief v${val.brief_version}, ${when(val.created_at)}.`, `<div class="row no-print">${runBtn}<button class="btn quiet" id="print">Print or save as PDF</button></div>`)}
       ${val.invalidated_reason ? `<div class="notice warn">This passport is out of date: ${esc(val.invalidated_reason)}. Run validation again.</div>` : ''}
       <div class="cols"><div class="stack">
@@ -1072,6 +1074,23 @@
           ${gateButtons({ ...val, phase: 'validate' }, pid, g.verdict)}
           ${dec ? `<p class="small">Your decision: ${chip(dec.action === 'APPROVE' ? 'APPROVED' : dec.action === 'STOP' ? 'STOPPED' : dec.action + '_REQUESTED')} ${when(dec.created_at)}${dec.feedback ? `, “${esc(dec.feedback)}”` : ''}${dec.acknowledged_risk ? ' (you chose a different course than the gate)' : ''}.</p>` : ''}
         </div></section>
+        ${nd ? `<section class="panel next-decision" aria-labelledby="nd-h"><header><h2 id="nd-h">Your next decision</h2>${tag('INFO', 'Confidence: ' + nd.confidence.level)}</header>
+          <p class="nd-decision"><b>${esc(nd.decision)}</b></p>
+          <dl class="facts small">
+            <dt>Why</dt><dd><ul class="bullets">${nd.why.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>
+            <dt>Evidence</dt><dd>${nd.evidence_ids.length ? ids(nd.evidence_ids) : `${tag('UNKNOWN', 'NEEDS EVIDENCE')} ${esc(nd.evidence_note)}`}</dd>
+            <dt>Still unknown</dt><dd>${nd.unknowns.length ? `<ul class="bullets">${nd.unknowns.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : 'None of the critical claims.'}</dd>
+            <dt>Do next</dt><dd>${esc(nd.next_action || '')}</dd>
+            ${nd.cost_and_time ? `<dt>Cost and time</dt><dd>${tag('HYPOTHESIS', 'ASSUMPTION')} ${esc(nd.cost_and_time.cost)} ${esc(nd.cost_and_time.time)}</dd>` : ''}
+            ${nd.success_criterion ? `<dt>Success looks like</dt><dd>${esc(nd.success_criterion)}</dd>` : ''}
+            ${nd.founder_fit.length ? `<dt>Fits you because</dt><dd><ul class="bullets">${nd.founder_fit.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>` : ''}
+            <dt>Trade-off</dt><dd>${esc(nd.trade_off || '')}</dd>
+            <dt>Would change it</dt><dd><ul class="bullets">${nd.what_would_change_it.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd>
+            <dt>Needs your approval</dt><dd>${tag('REVIEW_REQUIRED', 'FOUNDER APPROVAL REQUIRED')} ${esc(nd.needs_founder_approval)}</dd>
+            <dt>Confidence</dt><dd>${esc(nd.confidence.basis)}. ${esc(nd.confidence.meaning)}</dd></dl>
+          ${nd.alternatives.length ? `<details class="adv"><summary>Options considered and rejected (${nd.alternatives.length})</summary><ul class="plain small">${nd.alternatives.map((a) => `<li><b>${esc(a.option)}</b>${a.cost ? ` (${esc(a.cost)}, about ${esc(a.assumed_days)} days, ASSUMED)` : ''}: ${esc(a.not_chosen_because)}</li>`).join('')}</ul></details>` : ''}
+          ${g.next_experiment && g.next_experiment.kind === 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL' ? `<a class="btn secondary" href="/projects/${pid}/experiments" data-link>Review and design this test</a>` : ''}
+          <p class="small muted">${nd.limitations.map(esc).join(' ')}</p></section>` : ''}
         <section class="panel"><header><h2>Five dimensions</h2><span class="small muted">Click an id to see the exact evidence</span></header><div class="table-wrap"><table><thead><tr><th>Dimension</th><th>Status</th><th>Supported by</th><th>Challenged by</th><th>Note</th></tr></thead><tbody>
           ${Object.values(g.matrix).map((m) => `<tr><td><b>${esc(m.label)}</b></td><td>${chip(m.status)}${m.evidence_classes && m.evidence_classes.length ? `<div class="small faint">${esc(m.evidence_classes.map((k) => label(k).toLowerCase()).join(', '))}</div>` : ''}</td><td>${ids(m.supporting_ids)}</td><td>${ids(m.contradicting_ids)}</td><td class="small">${esc(m.note)}</td></tr>`).join('')}</tbody></table></div></section>
         <div class="cards"><section class="card"><h3>Reasons for</h3>${g.reasons_for.length ? `<ul class="bullets small">${g.reasons_for.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="faint small">No accepted evidence supports it yet.</p>'}</section>
@@ -1083,13 +1102,7 @@
           ${g.experiment_outcomes.length ? `<section class="card wide"><h3>Locked tests read against their criteria</h3><ul class="plain small">${g.experiment_outcomes.map((o) => `<li>${chip(({ PASS: 'HIT', FAIL: 'CLEAR_MISS', INCONCLUSIVE: 'TOO_LITTLE_DATA', NEAR_MISS: 'NEAR_MISS' })[o.outcome])} ${esc(o.positives)}/${esc(o.n)} = ${esc(o.rate_pct)}% against ${esc(o.criteria.success_threshold_pct)}% (locked ${when(o.locked_at)}), evidence ${evLink(o.evidence_id)}</li>`).join('')}</ul></section>` : ''}
           ${g.excluded_evidence.length ? `<section class="card wide"><h3>Not counted</h3><ul class="bullets small">${g.excluded_evidence.map((x) => `<li>${evLink(x.id)}: ${esc(x.reason)}</li>`).join('')}</ul></section>` : ''}
         </div>
-        ${g.next_experiment && g.next_experiment.kind === 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL' ? `<section class="panel"><header><h2>Founder-specific next decision</h2>${chip('DRAFT', 'Proposed test, not verified evidence')}</header>
-          <p><b>Why:</b> ${esc(g.next_experiment.risk_ranking_note)}</p>
-          <p><b>Next measurable action:</b> ${esc(g.next_experiment.metric)}</p>
-          <p><b>Constraint check:</b> ${esc((g.next_experiment.constraint_fit || {}).note || '')}</p>
-          <p class="small muted">Your approval is required to pre-register this test; FounderOS does not contact customers.</p>
-          <a class="btn secondary" href="/projects/${pid}/experiments" data-link>Review and design the test</a></section>`
-          : g.next_experiment && g.next_experiment.kind !== 'RUN_LOCKED_EXPERIMENT' ? `<div class="notice warn"><b>Next experiment paused:</b> ${esc(g.next_experiment.instruction || '')}</div>` : ''}
+        ${g.next_decision ? '' : `<div class="notice warn">Run validation again to get a next-decision card.</div>`}
         ${g.criteria ? `<section class="panel"><header><h2>Validate criteria</h2><span class="small muted">${esc(g.criteria.criteria_version)}, ${g.criteria.unknown_count} unknown</span></header>${criteriaTable(g.criteria.criteria, pid)}</section>` : ''}
         <section class="panel"><header><h2>The local model's commentary</h2>${chip('HYPOTHESIS', 'AI text explaining a code verdict; checked against it')}</header>
           <p class="small muted">Secondary to the verdict above. Code removes fragments and sentences that contradict the verdict, and rewrites “X does not exist” as “no evidence of X was recorded”.</p>
@@ -1101,7 +1114,7 @@
           ${(r._skeptic_flags || []).length ? `<div class="notice warn small"><b>Skeptic review flagged ${r._skeptic_flags.length} passage(s)</b><ul class="bullets">${r._skeptic_flags.map((f) => `<li>${esc(f.issue)}</li>`).join('')}</ul></div>` : ''}</section>
         <details class="adv"><summary>Advanced: hashes and raw verdict</summary><p class="small">Report <code>${esc(val.report_hash)}</code>, evidence snapshot <code>${esc(g.inputs.evidence_snapshot_hash)}</code>, decision policy ${esc(g.inputs.decision_policy)}, safety policy ${esc(g.inputs.safety_policy)}.</p><pre>${esc(JSON.stringify(g, null, 2))}</pre></details>
       </div>
-      ${nextPanel('What happens next', [g.next_experiment && g.next_experiment.kind === 'RUN_LOCKED_EXPERIMENT' ? 'Run your locked test and enter the real result.' : 'Design and lock the next demand test.', 'Approving allows more research only. Nothing is ever published, sent, spent or signed.', `<a href="/projects/${pid}/audit" data-link>See the decision log</a>.`])}
+      ${nextPanel('What happens next', [g.next_experiment && g.next_experiment.kind === 'RUN_LOCKED_EXPERIMENT' ? 'Run your locked test and enter the real result.' : nd ? esc(nd.decision) : 'Design and lock the next demand test.', 'Approving allows more research only. Nothing is ever published, sent, spent or signed.', `<a href="/projects/${pid}/audit" data-link>See the decision log</a>.`])}
       </div>`;
     wireVal();
     wireGate({ ...val, phase: 'validate' }, pid, g.verdict);
@@ -1237,6 +1250,11 @@
         ${f('sales_per_month_low', 'Sales/month low', '1')}${f('sales_per_month_base', 'Sales/month base', '1')}${f('sales_per_month_high', 'Sales/month high', '1')}${f('monthly_churn_pct', 'Monthly churn %', '0.1')}</div>
         <div class="field"><label for="c-ev">Evidence note <span class="opt">(where any figure comes from; otherwise it stays an ASSUMPTION)</span></label><input id="c-ev" name="evidence_note" maxlength="600" value="${esc(i.evidence_note || '')}"></div>
         <button class="btn" id="c-save" type="submit" ${st.build_gate.outcome !== 'GO' ? 'disabled' : ''}>Calculate a new plan version</button></form></section>
+        ${r && r.decision ? `<section class="panel" aria-labelledby="cd-h"><header><h2 id="cd-h">Commercial recommendation</h2>${tag(r.decision.top_issue && /NEGATIVE|ALL_SCENARIOS|OVER_BUDGET/.test(r.decision.top_issue) ? 'FAIL' : r.decision.top_issue ? 'REVIEW_REQUIRED' : 'PASS', 'Calculated, not advice')}</header>
+          <p><b>${esc(r.decision.recommendation)}</b></p>
+          <ul class="plain small">${r.decision.findings.map((f) => `<li>${tag(f.severity === 'CRITICAL' || f.severity === 'HIGH' ? 'FAIL' : f.severity === 'MEDIUM' ? 'REVIEW_REQUIRED' : 'INFO', f.severity)} <b>${esc(f.code.replace(/_/g, ' ').toLowerCase())}</b>: ${esc(f.reasoning)} <i>${esc(f.what_to_do)}</i></li>`).join('') || '<li>No issues in the arithmetic.</li>'}</ul>
+          ${r.decision.missing_inputs.length ? `<p class="small">${tag('UNKNOWN', 'Missing')} ${r.decision.missing_inputs.map(esc).join('; ')}</p>` : ''}
+          <p class="small">Revisit if: ${r.decision.revisit_if.map(esc).join('; ')}.</p><p class="small muted">${esc(r.decision.labels)}</p></section>` : ''}
         ${r ? `<section class="panel"><header><h2>Unit economics (plan v${p.version})</h2>${tag('INFO', 'CALCULATED SCENARIO')}</header>
           <dl class="facts small"><dt>Price</dt><dd>${r.unit_economics.price} ${esc(i.currency)}</dd><dt>Fee per sale</dt><dd>${r.unit_economics.fee_per_sale}</dd><dt>Contribution per sale</dt><dd>${r.unit_economics.contribution_per_sale} (${r.unit_economics.contribution_margin_pct}%)</dd>
           <dt>Break-even</dt><dd>${esc(r.unit_economics.break_even_note)}</dd><dt>Lifetime contribution</dt><dd>${r.unit_economics.lifetime_contribution_per_customer}</dd></dl>
@@ -1313,7 +1331,9 @@
           <dt>Checkouts started</dt><dd>${m.checkouts_started}</dd><dt>Paid</dt><dd>${m.orders_paid} (${pct(m.checkout_to_paid_pct)})</dd><dt>Refunded</dt><dd>${m.orders_refunded} (${pct(m.refund_rate_pct)})</dd>
           <dt>Repeat buyers</dt><dd>${m.repeat_buyers} of ${m.unique_buyers} (${pct(m.repeat_buyer_pct)})</dd><dt>Access links used</dt><dd>${m.access_links_used} (${pct(m.access_usage_pct)})</dd>
           <dt>Net (mock)</dt><dd>${money(m.net_cents)}</dd><dt>Duplicate events ignored</dt><dd>${m.duplicate_events_ignored}</dd></dl></section>
-        <section class="panel"><header><h2>Recommendation</h2>${tag(GATE_TONE[st.gate.outcome] || 'INFO', r.recommendation)}</header><p><b>${esc(r.recommendation.replace(/_/g, ' '))}</b></p><ul class="bullets small">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <section class="panel"><header><h2>Recommendation</h2>${tag(GATE_TONE[st.gate.outcome] || 'INFO', r.recommendation)}</header><p><b>${esc(r.recommendation.replace(/_/g, ' '))}</b></p>
+          ${r.evidence_status ? `<p>${tag(r.evidence_status.startsWith('INSUFFICIENT') ? 'UNKNOWN' : 'INFO', r.evidence_status)}</p><dl class="facts small"><dt>Bottleneck</dt><dd>${esc(r.bottleneck)}</dd><dt>Next iteration</dt><dd>${esc(r.next_iteration)} (goes back to Phase ${r.loops_back_to_phase})</dd>
+          <dt>Data used</dt><dd>${Object.entries(r.data_sources).map(([k, v]) => `${esc(k.replace(/_/g, ' '))}: ${v}`).join('; ')}</dd></dl>` : ''}<ul class="bullets small">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
           <p class="small muted">${esc(r.caveat)}</p><button class="btn" id="o-an">Analyse and propose next iteration</button></section>
         <section class="panel"><header><h2>Proposals</h2></header>${st.proposals.length ? `<ul class="plain small">${st.proposals.map((p) => `<li>${tag(p.status === 'APPLIED' ? 'PASS' : 'NOT_STARTED', p.status)} <b>Phase ${p.target_phase} revision</b>: ${esc(p.rationale)}
           <div class="faint">${Object.entries(p.change || {}).map(([k, v]) => `${esc(k.replace(/_/g, ' '))}: ${esc(Array.isArray(v) ? v.join(', ') : String(v))}`).join('; ')}</div>${p.status === 'PROPOSED' ? `<button class="btn small" data-apply="${p.id}">Approve and apply as a new version</button>` : `<div>Applied as ${esc(p.applied_ref)}</div>`}</li>`).join('')}</ul>` : '<p class="faint">None yet.</p>'}</section>

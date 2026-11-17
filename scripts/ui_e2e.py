@@ -173,6 +173,9 @@ with sync_playwright() as p:
     check(page.locator('[aria-selected="true"][data-tab="matrix"]').count() == 1, 'research opens on the criteria matrix')
     shot(page, '05a-criteria-matrix-empty-1366')
     page.click('[data-tab="plan"]')
+    page.wait_for_selector('#plan-run')
+    check(page.locator('text=Research these first').count() == 1 and page.locator('.bucket .chip', has_text='Priority 1').count() == 1,
+          'research plan is ranked by the weakest critical claim')
     page.click('#plan-run')
     page.wait_for_selector('text=searches returned results')
     page.click('[data-f="unreviewed"]')
@@ -255,6 +258,10 @@ with sync_playwright() as p:
     check(verdict == 'Stop: do not launch', f'failed critical locked test gives an advisory stop (got {verdict})')
     check(page.locator('#main a[href*="research?ev="]').count() >= 1, 'passport links to exact evidence ids')
     no_raw_json(page, 'decision')
+    nd = page.locator('.next-decision')
+    check(nd.count() == 1 and all(t in nd.inner_text() for t in ('Why', 'Still unknown', 'Do next', 'Would change it', 'Needs your approval', 'Confidence')),
+          'passport shows "Your next decision" with why, unknowns, action, what would change it, approval and confidence')
+    check('not a probability' in nd.inner_text(), 'confidence is described as evidence coverage, not a probability')
     shot(page, '07-decision-passport-1366')
     page.click('[data-decide="APPROVE"]')
     page.click('#dlg-ok')
@@ -423,6 +430,8 @@ with sync_playwright() as p:
     page.wait_for_selector('text=Plan v1 calculated')
     check(page.locator('table.data tbody tr').count() == 3, 'three calculated scenarios shown')
     check(page.locator('text=CALCULATED SCENARIO').count() >= 1 and page.locator('.chip', has_text='MOCKED').count() >= 1, 'assumption and mock labels shown')
+    check(page.locator('text=Commercial recommendation').count() == 1 and page.locator('text=Not a profit forecast').count() >= 1,
+          'commercial setup shows a reasoned recommendation, labelled as not a forecast')
     shot(page, '17-commercial-1366')
     page.click('#c-act')
     approve_dialog()
@@ -474,6 +483,7 @@ with sync_playwright() as p:
     page.locator('[data-apply]').first.click()
     approve_dialog()
     page.wait_for_selector('text=Applied as build v3')
+    check(page.locator('text=Bottleneck').count() >= 1 and page.locator('text=goes back to Phase').count() >= 1, 'operate names the bottleneck and the phase it loops back to')
     shot(page, '19-operate-1366')
     no_raw_json(page, 'operate')
     log = api.get(f'/api/projects/{sp}/agent-log', headers=sh).json()['entries']

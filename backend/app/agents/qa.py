@@ -19,10 +19,13 @@ FORBIDDEN_HTML = [(r'<[^>]*\son[a-z]+\s*=', 'inline event handler'), (r'<[^>]*(s
                   (r'<[^>]*javascript:', 'javascript: URL'), (r'<form[^>]+action\s*=', 'form posting elsewhere'),
                   (r'(?i)\b(testimonial|5 stars|★★★★★|only \d+ left|offer ends|countdown)\b', 'fake social proof or urgency')]
 REQUIRED_IDS = {'directory': ['list', 'filters', 'area', 'detail'], 'forecast': ['log', 'forecast', 'history'],
-                'practice': ['question', 'choices', 'feedback'], 'planner': ['add', 'list']}
+                'practice': ['question', 'choices', 'feedback'], 'planner': ['add', 'list'],
+                'tracker': ['add-client', 'add-project', 'add-task', 'projects', 'progress'], 'booking': ['slots', 'book', 'bookings', 'confirmation']}
 CHECK_EVIDENCE = {'list': r'id="list"', 'search': r'id="search"', 'filters': r'class="feature"', 'detail': r'<dialog id="detail"', 'shortlist': r'id="shortlist"',
                   'form': r'<form id="(log|add)"', 'table': r'<table id="(history|list)"', 'forecast': r'id="forecast"', 'warning': r'(id="warning"|Overdue)',
-                  'quiz': r'id="question"', 'feedback': r'id="feedback"', 'score': r'id="retry"', 'done': r"textContent = 'Done'"}
+                  'quiz': r'id="question"', 'feedback': r'id="feedback"', 'score': r'id="retry"', 'done': r"textContent = 'Done'",
+                  'clients': r'<form id="add-client"', 'projects': r'<table id="projects"', 'tasks': r'<form id="add-task"', 'progress': r'id="progress"',
+                  'slots': r'id="slots"', 'booking_form': r'<form id="book"', 'confirm': r'id="confirmation"', 'cancel': r"textContent = 'Cancel'"}
 
 
 class _Tags(HTMLParser):

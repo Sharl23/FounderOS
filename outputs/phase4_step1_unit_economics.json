@@ -64,6 +64,54 @@
       }
     }
   },
+  "decision": {
+    "recommendation": "COLLECT PRICE EVIDENCE before relying on this plan",
+    "top_issue": "PRICE_UNSUPPORTED",
+    "findings": [
+      {
+        "code": "PRICE_UNSUPPORTED",
+        "severity": "MEDIUM",
+        "reasoning": "No evidence is recorded for the price of 5.0 USD; it is an ASSUMPTION.",
+        "what_to_do": "Run the no-payment price-commitment test (Validate, claim C-VIAB) before treating this price as real."
+      },
+      {
+        "code": "BUDGET_NOT_COMPARABLE",
+        "severity": "INFO",
+        "reasoning": "Your budget is in EGP and this plan is in USD; FounderOS does not convert currencies.",
+        "what_to_do": "Re-enter the plan in EGP to check affordability."
+      },
+      {
+        "code": "CHURN_SENSITIVITY",
+        "severity": "INFO",
+        "reasoning": "Recurring revenue depends on churn: churn 5% -> about 20.0 months, 81.1 USD per customer; churn 10% -> about 10.0 months, 40.55 USD per customer; churn 20% -> about 5.0 months, 20.28 USD per customer.",
+        "what_to_do": "Churn is an ASSUMPTION until you observe real renewals; compare with a one-time price of about one lifetime contribution.",
+        "table": {
+          "5%": {
+            "avg_months": 20.0,
+            "lifetime_contribution": 81.1
+          },
+          "10%": {
+            "avg_months": 10.0,
+            "lifetime_contribution": 40.55
+          },
+          "20%": {
+            "avg_months": 5.0,
+            "lifetime_contribution": 20.28
+          }
+        }
+      }
+    ],
+    "missing_inputs": [
+      "evidence for the price"
+    ],
+    "minimum_viable_price": 0.82,
+    "revisit_if": [
+      "A pre-registered price test passes or fails",
+      "Real variable or fixed costs differ from these inputs",
+      "Observed renewals (subscription) differ from the churn assumption"
+    ],
+    "labels": "CALCULATED from ASSUMPTION inputs. Not a profit forecast; not financial, tax or legal advice."
+  },
   "pricing_hypotheses": [
     {
       "hypothesis": "Customers will pay 2.5 USD (lower price point)",

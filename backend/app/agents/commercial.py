@@ -76,6 +76,75 @@ MODELS = {
 }
 
 
+def decide(i: CommercialInputs, ue: dict, brief: dict) -> dict:
+    """Turn the calculated numbers into a recommendation with its arithmetic, assumptions and what would change it.
+
+    Pure code over the same unit economics. It never promises profit, never picks an 'optimal' price without
+    evidence, and never converts currencies (a budget in another currency is reported as not comparable).
+    """
+    from ..founder_strategy import parse_budget
+    findings, missing = [], []
+    fee_pct, fee_fixed, var = i.payment_fee_pct / 100, i.payment_fee_fixed, i.variable_cost_per_sale
+    contribution = i.price - (i.price * fee_pct + fee_fixed) - var
+    min_price = (var + fee_fixed) / (1 - fee_pct) if fee_pct < 1 else None
+    be, base, high = ue['break_even_sales_per_month'], i.sales_per_month_base, i.sales_per_month_high
+    if contribution <= 0:
+        findings.append({'code': 'NEGATIVE_CONTRIBUTION', 'severity': 'CRITICAL',
+                         'reasoning': f'Each sale brings in {r2(i.price)} but costs {r2(i.price * fee_pct + fee_fixed)} in fees and {r2(var)} to deliver: '
+                                      f'{r2(contribution)} per sale. More sales increase the loss under these assumptions.',
+                         'what_to_do': f'Any price below {r2(min_price)} {i.currency} loses money per sale (fees + variable cost). Re-check the variable cost, or test a higher price.'})
+    elif be is not None and be > high:
+        findings.append({'code': 'BREAK_EVEN_ABOVE_ALL_SCENARIOS', 'severity': 'HIGH',
+                         'reasoning': f'Break-even needs {be} sales/month; even the high scenario assumes {high}. '
+                                      f'At the base scenario ({base}) the monthly result is {ue["scenarios"]["base"]["profit_per_month"]} {i.currency}.',
+                         'what_to_do': 'Lower fixed costs, raise the price, or find evidence that more sales are realistic before adopting this plan.'})
+    elif be is not None and be > base:
+        findings.append({'code': 'BREAK_EVEN_ABOVE_BASE', 'severity': 'MEDIUM',
+                         'reasoning': f'Break-even needs {be} sales/month but the base scenario assumes {base}: '
+                                      f'{ue["scenarios"]["base"]["profit_per_month"]} {i.currency}/month at base.',
+                         'what_to_do': 'The plan only covers costs in the high scenario; treat it as a test, not a budget.'})
+    b = parse_budget(brief.get('budget') or '')
+    upfront = i.build_cost_one_off + 3 * i.fixed_costs_monthly
+    if b['amount'] is None:
+        missing.append('budget amount (to check affordability)')
+    elif b['currency'] and b['currency'] != i.currency:
+        findings.append({'code': 'BUDGET_NOT_COMPARABLE', 'severity': 'INFO',
+                         'reasoning': f'Your budget is in {b["currency"]} and this plan is in {i.currency}; FounderOS does not convert currencies.',
+                         'what_to_do': f'Re-enter the plan in {b["currency"]} to check affordability.'})
+    elif upfront > b['amount']:
+        findings.append({'code': 'OVER_BUDGET', 'severity': 'HIGH',
+                         'reasoning': f'One-off build cost {r2(i.build_cost_one_off)} plus 3 months of fixed costs ({r2(3 * i.fixed_costs_monthly)}) = {r2(upfront)} {i.currency}, '
+                                      f'above your stated budget of {r2(b["amount"])} {i.currency}.',
+                         'what_to_do': 'Use the DEMO prototype or no-code tools and drop paid infrastructure until a price test passes; '
+                                       'a one-time price needs no recurring hosting promise.'})
+    if i.billing == 'monthly':
+        sens = {f'{c:g}%': {'avg_months': r2(100 / c), 'lifetime_contribution': r2(contribution * 100 / c)}
+                for c in sorted({max(1.0, i.monthly_churn_pct / 2), i.monthly_churn_pct, min(100.0, i.monthly_churn_pct * 2)})}
+        findings.append({'code': 'CHURN_SENSITIVITY', 'severity': 'INFO',
+                         'reasoning': 'Recurring revenue depends on churn: ' + '; '.join(f'churn {k} -> about {v["avg_months"]} months, {v["lifetime_contribution"]} {i.currency} per customer' for k, v in sens.items()) + '.',
+                         'what_to_do': 'Churn is an ASSUMPTION until you observe real renewals; compare with a one-time price of about one lifetime contribution.',
+                         'table': sens})
+    if not i.evidence_note:
+        findings.append({'code': 'PRICE_UNSUPPORTED', 'severity': 'MEDIUM',
+                         'reasoning': f'No evidence is recorded for the price of {r2(i.price)} {i.currency}; it is an ASSUMPTION.',
+                         'what_to_do': 'Run the no-payment price-commitment test (Validate, claim C-VIAB) before treating this price as real.'})
+        missing.append('evidence for the price')
+    order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'INFO': 3}
+    findings.sort(key=lambda f: order[f['severity']])
+    top = findings[0]['code'] if findings and findings[0]['severity'] != 'INFO' else None
+    rec = {'NEGATIVE_CONTRIBUTION': 'DO_NOT_ADOPT: fix price or variable cost first',
+           'BREAK_EVEN_ABOVE_ALL_SCENARIOS': 'DO_NOT_ADOPT YET: costs are not covered in any scenario',
+           'OVER_BUDGET': 'REDUCE SCOPE: this plan does not fit your stated budget',
+           'BREAK_EVEN_ABOVE_BASE': 'TEST ONLY: costs are covered only in the high scenario',
+           'PRICE_UNSUPPORTED': 'COLLECT PRICE EVIDENCE before relying on this plan',
+           None: 'Arithmetic is consistent; use it for TEST MODE only and keep testing the price'}[top]
+    return {'recommendation': rec, 'top_issue': top, 'findings': findings, 'missing_inputs': missing,
+            'minimum_viable_price': r2(min_price) if min_price is not None else None,
+            'revisit_if': ['A pre-registered price test passes or fails', 'Real variable or fixed costs differ from these inputs',
+                           'Observed renewals (subscription) differ from the churn assumption'],
+            'labels': 'CALCULATED from ASSUMPTION inputs. Not a profit forecast; not financial, tax or legal advice.'}
+
+
 def plan(i: CommercialInputs, brief: dict) -> dict:
     ue = unit_economics(i)
     hyps = []
@@ -94,7 +163,7 @@ def plan(i: CommercialInputs, brief: dict) -> dict:
         {'item': 'Business registration and tax', 'status': 'TO DO', 'note': f'Requirements in {country} are not checked by FounderOS.'},
         {'item': 'Payment provider account', 'status': 'NOT CREATED', 'note': 'FounderOS never creates accounts. Checkout is MOCKED / TEST MODE.'},
     ]
-    return {'inputs': i.model_dump(), 'unit_economics': ue, 'pricing_hypotheses': hyps, 'packages': pk,
+    return {'inputs': i.model_dump(), 'unit_economics': ue, 'decision': decide(i, ue, brief), 'pricing_hypotheses': hyps, 'packages': pk,
             'business_models': [{'id': k, 'name': v[0], 'trade_off': v[1], 'selected': k == i.billing} for k, v in MODELS.items()],
             'terms_checklist': checklist,
             'payment_provider': {'status': 'MOCKED', 'detail': 'No payment provider is configured. Live payment processing is disabled in code; only the built-in TEST MODE simulator exists.'},

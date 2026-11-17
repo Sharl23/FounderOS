@@ -400,7 +400,33 @@ def _c(s, n=60):
     return re.sub(r'\s+', ' ', re.sub(r'[^\w\s\-؀-ۿ]', ' ', s or '')).strip()[:n]
 
 
-def plan(brief: dict, jurisdiction: dict) -> dict:
+BUCKET_CLAIM = {'PROBLEM': 'C-PROB', 'MARKET': 'C-DEM', 'COMPETITORS': 'C-COMP', 'FEASIBILITY': 'C-FEAS', 'VIABILITY': 'C-VIAB'}
+_WEAK = {'UNTESTED': 0, 'REFUTED': 0, 'MIXED': 1, 'BACKGROUND_ONLY': 1, 'STATED_ONLY': 2, 'SUPPORTED_BY_BEHAVIOR': 3}
+_CRIT = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+
+
+def prioritise(buckets: list[dict], register: list[dict] | None) -> list[str]:
+    """Order research by business risk: critical claims with the weakest evidence first. Mutates buckets with the reason."""
+    by = {r['claim_id']: r for r in (register or [])}
+    for b in buckets:
+        cid = BUCKET_CLAIM.get(b['id'])
+        r = by.get(cid)
+        b['claim_id'] = cid
+        b['claim_status'] = r['assumption_status'] if r else ('ALWAYS_CHECKED' if b['id'] == 'SAFETY' else 'UNKNOWN')
+        b['criticality'] = r['criticality'] if r else None
+        if b['id'] == 'MARKET':
+            b['limit'] = 'Research can size the market; it cannot show demand. Demand needs a behaviour test (Demand tests screen).'
+        elif b['id'] == 'VIABILITY':
+            b['limit'] = 'Prices found online are context; willingness to pay needs a price-commitment test.'
+    rank = sorted([b for b in buckets if b['claim_id']], key=lambda b: (_CRIT.get(b['criticality'] or 'LOW', 2), _WEAK.get(b['claim_status'], 0)))
+    for i, b in enumerate(rank, 1):
+        b['priority'] = i
+        b['why_priority'] = (f'{b["claim_id"]} is {b["claim_status"]} and {b["criticality"] or "UNRATED"} criticality.' if register else
+                             'No risk register yet (run Discover first); default order.')
+    return [b['id'] for b in rank]
+
+
+def plan(brief: dict, jurisdiction: dict, register: list[dict] | None = None) -> dict:
     # v0.8: queries come from STRUCTURED fields as whole key words (never a truncated slice of raw text).
     from .rubric import keyphrase
     seg = keyphrase(re.sub(r'\(.*?\)', '', brief.get('target_customers') or ''), 3) or 'target customers'
@@ -442,8 +468,9 @@ def plan(brief: dict, jurisdiction: dict) -> dict:
                                      f'{country or place} personal data protection law']],
          'caution': 'Only regulator, statute or government pages can resolve legal questions; blogs do not. Attach an official page on the Safety screen.'},
     ]
+    order = prioritise(buckets, register)
     return {'brief_fields_used': {'segment': seg, 'problem': prob, 'topic': topic, 'workaround': work or None, 'place': place or None, 'country': country},
-            'buckets': buckets, 'providers': PROVIDERS,
+            'buckets': buckets, 'priority_order': order, 'providers': PROVIDERS,
             'notice': 'This plan is generated locally. Nothing is sent anywhere until you press Run. Results are candidates, never evidence, until you review them.'}
 
 

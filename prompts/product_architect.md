@@ -6,4 +6,4 @@
 
 ## Contract
 
-Input: brief + gate 2 verdict + mode. Output: spec (archetype, entity, features, out of scope), user stories with acceptance criteria, status label. Uses only the founder's own words; never claims validation.
+Input: brief + gate 2 verdict + mode. Output: spec (one of six archetypes: directory, forecast, practice, planner, tracker, booking; entity, features, out of scope), user stories with acceptance criteria, status label. Uses only the founder's own words; never claims validation.

@@ -12,13 +12,15 @@ FounderOS is an open-source, local-first team of AI agents. It takes a founder's
 
 Each phase ends in a gate that code decides. Moving on needs a founder approval that the server enforces. A small open-weight model, running locally through Ollama, drafts the text.
 
+**Different founders get different decisions.** The Decision Passport's "Your next decision" names the riskiest unproven claim, picks the strongest test the founder can afford and finish in time with their own skills, lists the rejected options and why, and says what result would change the decision. Six synthetic founders take six different paths in [`evals/founder_eval_results.md`](evals/founder_eval_results.md).
+
 **Phases 3-6 run in MOCKED / TEST MODE.**
 
 - The website it builds is a DEMO-ONLY prototype that uses demo data.
 - Payments go through a built-in signed simulator.
 - Nothing is published, sent, spent, signed or deployed.
 
-Version 0.9.0 (17 Nov 2026). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md). Outputs of a real run: [`outputs/`](outputs/README.md) and [`decision_log.json`](decision_log.json).
+Version 0.10.0 (17 Nov 2026). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md). Outputs of a real run: [`outputs/`](outputs/README.md) and [`decision_log.json`](decision_log.json).
 
 ## Quickstart
 
@@ -35,7 +37,7 @@ Without a model, the interface still opens. Phases 1-2 then say plainly that the
 - **Ollama in a container instead.** Set `OLLAMA_URL=http://ollama:11434` in `.env`, then run `docker compose --profile ollama up`.
 - **Machine settings.** Copy `.env.example` to `.env`. On a GPU with 6 GB or less that runs out of memory, set `OLLAMA_NUM_GPU=0`. If RAM runs out, set `OLLAMA_NUM_CTX=1024`. Troubleshooting is in [`docs/user-guide.md`](docs/user-guide.md).
 - **Reproduce `outputs/` and `decision_log.json`.** Run `pip install -r backend/requirements-dev.txt && python scripts/demo_run.py`.
-- **Tests.** Run `python -m pytest -q` from the repository root. `python scripts/check_submission.py` checks the repository layout and re-runs the pipeline.
+- **Tests.** Run `python -m pytest -q` from the repository root. `python scripts/check_submission.py` checks the repository layout and re-runs the pipeline. `python evals/founder_cases.py` re-runs the founder evaluation.
 
 ## What works and what is mocked
 
@@ -43,12 +45,15 @@ Without a model, the interface still opens. Phases 1-2 then say plainly that the
 |---|---|---|
 | Phase 1 Discover: brief, 12-rule safety screen, discovery agent, Discover gate | Working | Model drafts; code screens and decides |
 | Phase 2 Validate: research verification, pre-registered demand tests, verdict, decision log | Working | Customer results are founder-reported |
-| Phase 3 Build: spec, user stories, acceptance criteria, HTML/CSS/JS generator, QA, revision loop, versions, sandboxed preview, ZIP export | Working | Template-based generator; DEMO DATA; a DEMO-ONLY build is never called validated |
+| Phase 2 "Your next decision": riskiest claim, method chosen for budget, skills and time, rejected options, success criterion, what would change it | Working | Costs, durations and thresholds are labelled ASSUMPTION; confidence is evidence coverage, never a probability |
+| Research plan ranked by the weakest critical claim | Working | Competitors are not searched automatically (no free compliant search API): NOT VERIFIED until the founder adds pages |
+| Phase 3 Build: spec, user stories, acceptance criteria, HTML/CSS/JS generator, QA, revision loop, versions, sandboxed preview, ZIP export | Working | Six prototype types chosen from the founder's own words (directory, forecast, practice, study planner, client and project tracker, appointment booking). Template-based, not AI-written code; DEMO DATA; a DEMO-ONLY build is never called validated |
 | Phase 4 Commercial setup: unit economics, break-even, scenarios, pricing hypotheses, business models, terms checklist | Working | Every input is an ASSUMPTION; not financial or legal advice |
+| Phase 4 commercial recommendation: loss per sale, break-even above scenarios, over budget, churn sensitivity, unsupported price | Working | Arithmetic only; never converts currencies or promises profit |
 | Phase 5 payment provider | MOCKED | Built-in HMAC-signed simulator, TEST MODE only; no live mode exists |
 | Phase 5 checkout, idempotent webhook, delivery link, refund and revocation, reconciliation | Working (against the mock) | No card data accepted or stored |
 | Phase 5 publishing the sales page, emailing buyers | STUBBED | Not built on purpose: drafts only |
-| Phase 6 metrics from recorded events, feedback with provenance, issues, recommendation, proposals back to Phase 1 or 3 | Working | Sales events are MOCKED, so results describe the simulation |
+| Phase 6 metrics from recorded events, feedback with provenance, issues, recommendation, bottleneck and the phase it loops back to, proposals back to Phase 1 or 3 | Working | Sales events are MOCKED, so results describe the simulation; under 10 paid orders it says INSUFFICIENT EVIDENCE |
 | Phase 6 real analytics or support inbox | STUBBED | Manual or MOCK_DEMO entries only |
 | Founder approvals: bound to state, single use, expiring, stale or rejected ones refused, append-only history | Working | Enforced on the server |
 | Model used by `scripts/demo_run.py` when Ollama is not running | STUBBED | Labelled offline stand-in; marked in every log entry it touches |

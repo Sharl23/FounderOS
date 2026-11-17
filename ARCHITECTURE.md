@@ -57,6 +57,14 @@ Each phase lists its inputs, its agents (one file per role, prompts in `prompts/
 - **Inputs:** the approved discovery report, the evidence ledger (sources that were fetched, with verified excerpts) and demand tests the founder pre-registers.
 - **Agents:** research gatherer and verifier (code), Experiment Designer (code checks), Validation agent (model; it explains but does not decide) and a skeptic pass.
 - **Outputs:** a validation report and a verdict computed in code: NEEDS_EVIDENCE, CONTINUE_TESTING, PIVOT, STOP_DO_NOT_LAUNCH or BLOCK.
+- **Founder strategy** (`founder_strategy.py`, `decision.next_decision_card`). This is how the next step adapts to the founder:
+  1. The risk register ranks the critical claims (problem, demand, switching, feasibility, price) by criticality, then by evidence strength: untested, background only, stated only, then observed behaviour.
+  2. The weakest critical claim becomes the next test.
+  3. Each claim has several candidate methods. For example, demand has a concierge test, a self-built page, a neutral opt-in, and a paid-ad smoke test. Each method carries an ASSUMED cost, duration, skills needed and evidence strength.
+  4. Methods the founder cannot afford, cannot build, or cannot finish in their stated time are rejected, with the reason recorded.
+  5. The strongest remaining method wins. Ties go to no spend, then wider reach, then a shorter run.
+- **The Decision Passport's "Your next decision".** It states the decision and why, with evidence IDs, the claims still unknown, the rejected options and the trade-off. It also gives the founder-fit reasons, the next action, the cost and time (ASSUMPTION), a success criterion (a starting assumption the founder locks), and what would change the decision. Confidence describes evidence coverage of the critical claims, never a probability. It is NOT_APPLICABLE when a safety hard stop decided.
+- **Research plan.** It is built from the brief's own fields and ranked by the same register, so the weakest critical claim is researched first. Each bucket says what research cannot prove; for example, market size is not demand.
 - **Gate:** Gate 2 has three outcomes.
   - STOP or BLOCK refuses any build, including a demo.
   - GO allows an MVP build, but only when every critical locked test is a hit.
@@ -66,7 +74,13 @@ Each phase lists its inputs, its agents (one file per role, prompts in `prompts/
 
 - **Inputs:** the gate 2 payload (bound into the approval).
 - **Agents:**
-  - `agents/product_architect.py` writes the spec, features, user stories and acceptance criteria, using the founder's own words only.
+  - `agents/product_architect.py` writes the spec, features, user stories and acceptance criteria, using the founder's own words only. The prototype type is chosen from those words, and each type has its own data and working interactions:
+    - **directory:** search, filters and details;
+    - **forecast:** a usage log and a moving-average forecast;
+    - **practice:** a quiz with a score;
+    - **study planner:** tasks, hours and a 7-day schedule;
+    - **client and project tracker:** clients, projects, tasks, % done, late and at-risk flags, and a per-client summary;
+    - **appointment booking:** free and taken slots, a validated booking, a confirmation that sends nothing, and cancelling, which frees the slot.
   - `agents/website_builder.py` writes `index.html`, `styles.css`, `app.js` and `README.txt` with escaped demo data.
   - `agents/qa.py` runs static checks: structure, required ids, no `eval`/`fetch`/storage/`innerHTML`, and the demo label.
   - `agents/revision.py` parses feedback commands. Anything it does not understand is reported as NOT APPLIED.
@@ -77,6 +91,14 @@ Each phase lists its inputs, its agents (one file per role, prompts in `prompts/
 
 - **Inputs:** price, costs, fees, sales scenarios and churn, all labelled ASSUMPTION.
 - **Agents:** `agents/commercial.py`. It computes unit economics in `Decimal`: fee, contribution, margin, break-even, low/base/high scenarios, months to recover the build cost, and lifetime contribution. It also produces pricing hypotheses at 0.5x, 1x and 2x, business-model options, packages and a terms checklist.
+- **Commercial decision** (`commercial.decide`). It turns the numbers into a recommendation with the arithmetic shown:
+  - a loss per sale, with the minimum price that covers fees and variable cost;
+  - break-even above the base or every scenario;
+  - one-off plus 3 months of fixed costs above the founder's stated budget (currencies are never converted);
+  - churn sensitivity for subscriptions;
+  - a price with no recorded evidence, which leads to "collect price evidence".
+
+  It never promises profit.
 - **Outputs:** a versioned commercial plan. The payment provider status is always `MOCKED`.
 - **Gate:** gate 4 gives STOP if every sale loses money. Otherwise it needs founder approval `activate_commercial` (TEST MODE only).
 
@@ -105,7 +127,11 @@ Each phase lists its inputs, its agents (one file per role, prompts in `prompts/
   - repeat buyers and access usage;
   - net revenue.
 
-  It compares demand tests, applies fixed thresholds, and recommends CONTINUE, ITERATE, PIVOT, STOP or COLLECT_MORE_DATA.
+  It compares demand tests, applies fixed thresholds, and recommends CONTINUE, ITERATE, PIVOT, STOP or COLLECT_MORE_DATA. It also:
+  - says INSUFFICIENT EVIDENCE below 10 paid orders;
+  - names the observed bottleneck (failed demand test, open defect, too little data, refunds, abandoned checkouts, unused access, or negative feedback);
+  - names the phase the next iteration loops back to (1, 3, 4 or 5);
+  - counts each data source separately (mocked events, founder-reported, demo; real observed sales are always 0 here).
 - **Outputs:** a recommendation and a proposal that targets Phase 3 (a new build version) or Phase 1 (a new brief version).
 - **Gate:** gate 6 maps the recommendation to an outcome. Applying a proposal needs `apply_proposal` and creates a new version. It never overwrites earlier versions or decisions.
 
@@ -157,12 +183,15 @@ Every change also writes a row to `approval_events`, which SQLite triggers make 
 | Part | Status |
 |---|---|
 | Phases 1-2: brief, safety, discovery, research verification, demand tests, verdicts, decision log | Working |
-| Phase 3: spec, user stories, static site generator, QA, revision loop, versions, sandboxed preview, ZIP export | Working (DEMO DATA; template-based, not model-generated code) |
+| Phase 2: founder-specific next decision (method chosen for budget, skills and time; rejected options; success criterion) | Working (costs, durations and thresholds are ASSUMPTIONS) |
+| Phase 3: spec, user stories, static site generator (six prototype types), QA, revision loop, versions, sandboxed preview, ZIP export | Working (DEMO DATA; template-based, not model-generated code) |
+| Phase 4: commercial recommendation from the unit economics | Working (ASSUMPTION inputs; no currency conversion) |
 | Phase 4: unit economics, scenarios, hypotheses, checklist | Working (inputs are ASSUMPTIONS) |
 | Phase 5: payment provider | MOCKED (built-in signed simulator; no Stripe or other provider) |
 | Phase 5: checkout, webhook idempotency, delivery, refund, revocation, reconciliation | Working against the mock |
 | Phase 5: publishing the sales page, emails to buyers | Not built (refused by design) |
-| Phase 6: metrics from events, recommendation, proposals | Working (on MOCKED events) |
+| Phase 6: metrics from events, recommendation, bottleneck and loop-back phase, proposals | Working (on MOCKED events) |
+| Decision-quality evaluation (`evals/founder_cases.py`, six synthetic founders) | Working (TEST_ONLY fixtures; tests logic, not real markets) |
 | Phase 6: real analytics or support inbox integration | STUBBED (manual or MOCK_DEMO entries only) |
 | Model in `scripts/demo_run.py` when Ollama is absent | STUBBED offline stand-in, labelled in every log line it touches |
 

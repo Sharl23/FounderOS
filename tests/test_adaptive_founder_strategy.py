@@ -38,7 +38,8 @@ def test_problem_known_demand_untested_prefers_actual_opt_in():
     assert 'Cairo, Egypt' in x['founder_actions'][0]
     assert 'First year' in x['target_segment']
     assert x['external_actions'].startswith('DRAFT ONLY')
-    assert x['constraint_fit']['pilot_days'] == 7
+    # v0.10: with 6 weeks available the engine picks the stronger 14-day concierge test (repeat use), so the window follows it.
+    assert x['method_chosen']['id'] == 'concierge' and x['constraint_fit']['pilot_days'] == 14
     assert experiment_design_check({
         'metric': x['metric'], 'min_sample': x['suggested_criteria']['min_sample'],
         'success_threshold_pct': x['suggested_criteria']['success_threshold_pct'],
