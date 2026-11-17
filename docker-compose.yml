@@ -1,0 +1,63 @@
+services:
+  ollama:
+    image: ollama/ollama:0.9.6
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  model-init:
+    image: ollama/ollama:0.9.6
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b-instruct}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until ollama list >/dev/null 2>&1; do sleep 2; done
+        ollama pull "$$OLLAMA_MODEL"
+        echo "FounderOS: model $$OLLAMA_MODEL is pulled. Startup cost is paid BEFORE any timed demo."
+    depends_on:
+      - ollama
+    restart: "no"
+
+  api:
+    build: ./backend
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b-instruct}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-150}
+      FOUNDEROS_DB: /data/founderos-v2.sqlite3
+    volumes:
+      - founder_data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health',timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  n8n:
+    image: n8nio/n8n:1.104.2
+    profiles: ["visual"]
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      GENERIC_TIMEZONE: Africa/Cairo
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - api
+
+volumes:
+  ollama_models:
+  founder_data:
+  n8n_data:

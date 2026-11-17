@@ -1,0 +1,13 @@
+# Windows local Ollama escape hatch: no Docker Hub ollama image download.
+# Start Ollama on Windows first and pull qwen2.5:1.5b-instruct.
+# Run: docker compose -f docker-compose.yml -f compose.windows.yaml up --build
+services:
+  ollama:
+    profiles: ["container-ollama"]
+  model-init:
+    profiles: ["container-ollama"]
+  api:
+    environment:
+      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2.5:1.5b-instruct
+    depends_on: !reset []

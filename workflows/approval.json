@@ -1,0 +1,95 @@
+{
+  "name": "FounderOS \u00b7 Approval (optional adapter)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "founderos-approval",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "53f45475-9d76-4e46-b3e5-abce9351fb3f",
+      "name": "Founder Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "3f0732d2-5cdb-4316-aea9-02dea7dadc5c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://api:8000/api/projects/' + $json.body.project_id + '/phases/' + $json.body.phase + '/decision' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Project-Token",
+              "value": "={{ $json.body.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 180000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({run_id:$json.body.run_id, report_hash:$json.body.report_hash, brief_version:$json.body.brief_version, decision:$json.body.decision, feedback:$json.body.feedback || '', acknowledge_risk:$json.body.acknowledge_risk === true}) }}"
+      },
+      "id": "bbfd7a3e-a86f-471f-bf35-8d7edc55d622",
+      "name": "Call Open-Source Core",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "id": "102cda95-bbf9-445c-9d12-b83296d8bc6d",
+      "name": "Return Backend Decision",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Founder Request": {
+      "main": [
+        [
+          {
+            "node": "Call Open-Source Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Open-Source Core": {
+      "main": [
+        [
+          {
+            "node": "Return Backend Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
