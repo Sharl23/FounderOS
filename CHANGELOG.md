@@ -68,7 +68,7 @@ Repairs every defect seen in the real end-to-end trial on 17 Nov 2026 and regist
 8. **UI.** Highlighted source spans on the brief, D02 status box, Criteria matrix, granular checks under each dimension, review chips in the ledger, fetch-error advice, SIMULATED styling, decision cards.
 
 ### Also fixed
-- **Restart crash:** on Python 3.13 (the Docker image) a second start against an existing database failed with "cannot change into wal mode from within a transaction". The migration transaction is now committed first (`db.init_db`).
+- **Restart crash:** with v0.7 on any Python (reproduced on 3.11, 3.12 = the Docker image, and 3.13), a second start against an existing database failed with "cannot change into wal mode from within a transaction". The migration transaction is now committed first (`db.init_db`).
 
 ### Tests
 - `pytest`: **247 passed** (31 new in `tests/test_v08_contract.py`; research error tests added). TEST_ONLY fake model, mocked providers.

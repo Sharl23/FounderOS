@@ -14,7 +14,7 @@ Scope: the 17 Nov 2026 manual trial of v0.7 plus the team's 67-check rubric. Eve
 | 6 | "Simulated voluntary sign-up" draft; minors | `app/criteria.py` (`experiment_design_check`), `app/main.py` (`SIMULATED_RESULT`), `app/schemas.py`, UI | `test_simulated_waitlist_cannot_lock_as_real…`, `test_minors_tests_must_be_adults_only…`; existing locked-threshold tests | PASS |
 | 7 | Fragmented / categorical validation prose | `app/prose.py`, `app/main.py`, `app/llm.py` (prompt) | `test_prose_rewrites_categorical_absence…`, `test_validation_shows_code_explanation_first`, `test_bad_model_json_does_not_crash_validation` | PASS |
 | 8 | UI polish | `app/static/app.js`, `style.css` | `scripts/ui_e2e.py` (60 checks, 1366 px + 390 px, dark, keyboard) + screenshots | PASS (TEST_ONLY model) |
-| — | Restart crash on existing DB (Python 3.13) | `app/db.py` | `test_migration_keeps_v07_rows` | PASS |
+| — | Restart crash on existing DB (reproduced on Python 3.11–3.13; Docker image is 3.12) | `app/db.py` | `test_migration_keeps_v07_rows` | PASS |
 | — | CPU-only stays CPU-only | `app/llm.py` (`OLLAMA_NUM_GPU` passed through, never overridden) | `test_model_options_respect_num_gpu_zero`, `test_platform_v7.py` OOM mapping | PASS (unit). Live probe: **not run here** |
 
 ## Run results in the authoring sandbox (17 Nov 2026)
