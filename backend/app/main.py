@@ -227,6 +227,13 @@ def public_project(pid):
                     'invalidated_reason': val.get('invalidated_reason')}
     if ev_d:
         ev_d['stale'] = ev_d['fingerprint_hash'] != live_d
+    bp = (brief or {}).get('payload') or {}
+    for x in experiments:
+        x['design_check'] = criteria.experiment_design_check(x['payload'], bp)
+        x['reading'] = None
+        if x.get('result_evidence_id'):
+            r = next((e for e in evidence if e['id'] == x['result_evidence_id']), None)
+            x['reading'] = r and criteria.READING.get(r.get('outcome'))
     return {'project': project, 'brief': brief, 'safety': safety_row, 'safety_sources': sources, 'phase_runs': runs, 'evidence': evidence,
             'experiments': experiments, 'decisions': decisions, 'audit': history, 'passport': passport,
             'criteria': {'version': criteria.VERSION, 'policy_hash': criteria.POLICY_HASH, 'config': cfg, 'config_version': cfg_version,

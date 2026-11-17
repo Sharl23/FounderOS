@@ -1,376 +1,943 @@
+/* FounderOS v0.7 client. Every action below calls the real backend; nothing is simulated in the browser.
+   Routes: /projects, /projects/:id/{brief,safety,discovery,research,experiments,decision,audit}, /roadmap, /help */
 (() => {
   'use strict';
-  const $ = (id) => document.getElementById(id);
-  let session = JSON.parse(localStorage.getItem('founderos_session') || 'null');
-  let state = null;
-  let suggestion = null;
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const pretty = (d) => JSON.stringify(d, null, 2);
-  const stamp = (x) => x ? new Date(x).toLocaleString() : '—';
-  const short = (id) => id ? String(id).slice(0, 8) : '—';
-  const list = (arr, f = esc) => (arr && arr.length) ? '<ul>' + arr.map(x => '<li>' + f(x) + '</li>').join('') + '</ul>' : '<span class="small">none</span>';
-  function tell(message, ok = false) { const e = $('alert'); e.textContent = message; e.className = 'alert' + (ok ? ' ok' : ''); window.scrollTo({top: 0, behavior: 'smooth'}); }
-  function clearAlert() { $('alert').className = 'alert hide'; }
-  function detail(d) { if (typeof d === 'string') return d; if (d && d.message) return d.message + (d.findings ? ' ' + d.findings.map(f => f.rule_id + ': ' + f.reason).join(' | ') : ''); return pretty(d); }
-  async function api(path, method = 'GET', body) {
-    const headers = {'Content-Type': 'application/json'};
-    if (session) headers['X-Project-Token'] = session.access_token;
-    const response = await fetch('/api' + path, {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined});
-    const data = await response.json().catch(() => ({detail: 'Unexpected server response'}));
-    if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + detail(data.detail));
+  const main = document.getElementById('main');
+  const live = document.getElementById('live');
+  const dlg = document.getElementById('dlg');
+
+  // ------------------------------------------------------------------ utilities
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const short = (s, n = 8) => (s ? String(s).slice(0, n) : '—');
+  const when = (s) => { if (!s) return '—'; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
+  const announce = (t) => { live.textContent = ''; setTimeout(() => { live.textContent = t; }, 30); };
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage may be unavailable */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
+  };
+  // Project capability tokens live only in this browser. Migrate the v0.2–v0.4 single-session key.
+  const projects = () => {
+    const p = store.get('founderos_projects', {});
+    const legacy = store.get('founderos_session', null);
+    if (legacy && legacy.project_id && !p[legacy.project_id]) { p[legacy.project_id] = { token: legacy.access_token, name: 'Earlier project', created: null }; store.set('founderos_projects', p); }
+    return p;
+  };
+  const tokenFor = (pid) => (projects()[pid] || {}).token;
+
+  const LABEL = {
+    ALLOW_DISCOVERY: 'Allowed for research', REVIEW_REQUIRED: 'Needs your review', BLOCK: 'Hard stop', HARD_STOP: 'Hard stop', CLEAR: 'No issue found',
+    UNKNOWN_SOURCE: 'Source not checked', NOT_APPLICABLE: 'Not applicable', GO_ON: 'Go on to validation research', REPEAT: 'Repeat with more evidence',
+    PIVOT: 'Pivot', STOP: 'Stop', NEEDS_EVIDENCE: 'Needs evidence', CONTINUE_TESTING: 'Continue testing', STOP_DO_NOT_LAUNCH: 'Stop: do not launch',
+    BLOCK_DO_NOT_LAUNCH: 'Blocked: do not launch', PASS: 'Pass', FAIL: 'Fail', SCORED: 'Scored', UNKNOWN: 'Unknown', AWAITING_JUDGE: 'Awaiting judge',
+    RANKED: 'Ranked', RANKED_WITH_TIE: 'Ranked, with a tie', APPLIED: 'Applied', REPORTED: 'Reported', INSUFFICIENT: 'Insufficient',
+    NOT_DESIGNED: 'Not designed', NOT_SET: 'Not set', DRAFT_NOT_LOCKED: 'Draft, not locked', LOCKED: 'Locked', NO_RESULT: 'No result yet',
+    HIT: 'Hit', NEAR_MISS: 'Near miss', CLEAR_MISS: 'Clear miss', TOO_LITTLE_DATA: 'Too little data', PENDING_APPROVAL: 'Waiting for your decision',
+    APPROVED: 'Approved (research only)', REVISE_REQUESTED: 'Revision requested', PIVOT_REQUESTED: 'Pivot requested', STOPPED: 'Stopped', INVALIDATED: 'Out of date',
+    DRAFT: 'Draft', SUPERSEDED: 'Superseded', ARCHIVED_PIVOT: 'Archived by pivot', CANDIDATE_METADATA: 'Candidate (metadata)', FETCHED: 'Page inspected',
+    FETCH_FAILED: 'Could not fetch', EVIDENCE_ADDED: 'In the ledger', REJECTED: 'Rejected', OK: 'OK', NO_RESULTS: 'No results', OFFLINE: 'Offline',
+    RATE_LIMITED: 'Rate limited', ACCESS_DENIED: 'Access denied', PROVIDER_ERROR: 'Provider error', NOT_AVAILABLE: 'Not available',
+    DISCOVERY_NOT_AVAILABLE: 'Not searched automatically', INVALID_QUERY: 'Invalid query', EXCERPT_MATCHED: 'Excerpt verified', NOT_MATCHED: 'Excerpt not found',
+    NOT_CHECKED: 'Not checked', METADATA_ONLY: 'Metadata only', STRUCTURED_DATUM: 'Official datum', URL_ACCESSIBLE: 'Page reached', UNVERIFIED: 'Unverified',
+    CONTEXT_ONLY: 'Context only', CONTEXT_WEAK: 'Context, weak', DIRECT_STATEMENT: 'Customer statement', DIRECT_BEHAVIOR: 'Customer behaviour',
+    LOCKED_RESULT: 'Locked-test result', EXCLUDED: 'Excluded', READY: 'Model ready', SUPPORTED: 'Supported', REFUTED: 'Refuted', MIXED: 'Mixed',
+  };
+  const TONE = {
+    clear: ['SUPPORTED', 'ALLOW_DISCOVERY', 'CLEAR', 'PASS', 'SCORED', 'GO_ON', 'CONTINUE_TESTING', 'HIT', 'LOCKED', 'APPROVED', 'EXCERPT_MATCHED', 'URL_ACCESSIBLE', 'OK', 'READY', 'EVIDENCE_ADDED', 'RANKED', 'STRUCTURED_DATUM', 'DIRECT_BEHAVIOR', 'LOCKED_RESULT', 'APPLIED', 'REPORTED'],
+    hold: ['MIXED', 'REVIEW_REQUIRED', 'REPEAT', 'NEEDS_EVIDENCE', 'NEAR_MISS', 'AWAITING_JUDGE', 'PENDING_APPROVAL', 'DRAFT', 'DRAFT_NOT_LOCKED', 'PIVOT', 'RANKED_WITH_TIE', 'CONTEXT_WEAK', 'METADATA_ONLY', 'RATE_LIMITED', 'REVISE_REQUESTED', 'PIVOT_REQUESTED', 'INSUFFICIENT', 'TOO_LITTLE_DATA', 'DIRECT_STATEMENT'],
+    stop: ['REFUTED', 'BLOCK', 'HARD_STOP', 'STOP', 'STOP_DO_NOT_LAUNCH', 'BLOCK_DO_NOT_LAUNCH', 'FAIL', 'CLEAR_MISS', 'FETCH_FAILED', 'REJECTED', 'STOPPED', 'NOT_MATCHED', 'OFFLINE', 'ACCESS_DENIED', 'PROVIDER_ERROR', 'EXCLUDED'],
+    info: ['CANDIDATE_METADATA', 'FETCHED', 'CONTEXT_ONLY', 'SUPERSEDED', 'ARCHIVED_PIVOT', 'INVALIDATED'],
+  };
+  const tone = (code) => Object.keys(TONE).find((t) => TONE[t].includes(code)) || 'unknown';
+  const label = (code) => LABEL[code] || String(code || '—').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  const chip = (code, title) => `<span class="chip ${tone(code)}" title="${esc(title || code)}">${esc(label(code))}</span>`;
+  const RULE_NAME = {
+    illegal_in_target_market: 'Legal in the target market', regulated_or_sensitive_area: 'Sensitive or regulated area', physical_goods_exclusion: 'Digital product, not physical goods',
+    financial_crypto_exclusion: 'No financial or crypto functions', health_legal_advice_exclusion: 'No health or legal advice', advice_in_disguise: 'No advice in disguise',
+    income_promise_dependency: 'No income promises', fake_proof_dependency: 'No fake reviews, sign-ups or urgency', impersonation_dependency: 'No impersonation',
+    money_or_credentials_dependency: 'No money handling or stored credentials', harm_to_people: 'No harm to people', founder_values_conflict: 'Fits your stated values',
+    SYSTEM_PROMPT_INJECTION: 'Instructions that try to change the rules', SYSTEM_UNAPPROVED_EXTERNAL_ACTION: 'External actions without your approval',
+  };
+  const DIM = { desirability: 'Problem and customer', demand: 'Demand', competition: 'Competition and alternatives', feasibility: 'Feasibility', viability: 'Viability and pricing' };
+  const FIELD = { problem: 'Problem', target_customers: 'Customer', current_workaround: 'What they use today', target_market: 'Market and location', skills: 'Your skills',
+    budget: 'Budget', timeline: 'Time available', values: 'Your values', constraints: 'Constraints' };
+
+  // ------------------------------------------------------------------ API
+  class ApiError extends Error { constructor(status, detail) { super(typeof detail === 'string' ? detail : (detail && detail.message) || 'Request failed'); this.status = status; this.detail = detail; } }
+  async function api(path, { method = 'GET', body, pid } = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    const t = pid && tokenFor(pid);
+    if (t) headers['X-Project-Token'] = t;
+    let res;
+    try { res = await fetch('/api' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch (e) { throw new ApiError(0, 'FounderOS server is not reachable. Is Docker still running?'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, data.detail ?? data);
     return data;
   }
-  async function act(button, fn, label = 'Working with local model…') {
-    const before = button?.textContent;
-    if (button) { button.disabled = true; button.textContent = label; }
-    clearAlert();
-    try { await fn(); } catch (e) { tell(e.message || String(e)); } finally { if (button) { button.disabled = false; button.textContent = before; } }
-  }
-  // Client-side multi-page journey: never changes backend authorization or gate logic.
-  const JOURNEY = [
-    {id:'idea', title:'Your Idea', desc:'Refine the founder brief; confirm unknowns before research.', cards:['refine-card']},
-    {id:'safety', title:'Safety', desc:'Review hard-stop rules, risk flags and founder constraints.', cards:['safety-card']},
-    {id:'discovery', title:'Discovery', desc:'Understand customer, problem and hypotheses; decide at the approval gate.', cards:['discover-card']},
-    {id:'evidence', title:'Research & Evidence', desc:'Find candidate sources and record verified excerpts; keep demand separate.', cards:['evidence-card']},
-    {id:'experiment', title:'Demand Experiments', desc:'Pre-register measurable tests before collecting honest customer results.', cards:['experiment-card']},
-    {id:'decision', title:'Validation & Decision', desc:'Get a transparent verdict and decide with the founder in control.', cards:['validate-card','passport-card','roadmap-card','decision-list','audit-list']}
-  ];
-  let activeView = sessionStorage.getItem('founderos_view') || 'idea';
-  function navigate(view, scroll = true) {
-    if (!JOURNEY.some(x => x.id === view)) view = 'idea';
-    activeView = view; sessionStorage.setItem('founderos_view', view);
-    const v = JOURNEY.find(x => x.id === view), index = JOURNEY.indexOf(v);
-    const workspace = $('workspace');
-    if (workspace) {
-      const cards = workspace.querySelectorAll('section.card');
-      cards.forEach(card => {
-        // The project status compact card always remains accessible.
-        if (card.classList.contains('compact')) { card.classList.remove('journey-hidden'); return; }
-        card.classList.toggle('journey-hidden', !v.cards.includes(card.id));
-      });
-      // Decision log/audit may live within a section without ID; ensure anything
-      // outside the six page cards is only visible on the decision page.
-      const visibleIds = new Set(v.cards);
-      [...workspace.children].filter(x => x.tagName === 'SECTION' && !x.classList.contains('compact') && !x.id).forEach(x=>x.classList.toggle('journey-hidden',view!=='decision'));
+  function errorHtml(e) {
+    const d = e.detail;
+    const status = e.status ? ` (HTTP ${e.status})` : '';
+    if (d && typeof d === 'object' && d.code) {
+      return `<div class="notice error" role="alert"><b>The local model could not answer: ${esc(label(d.code))}${status}.</b>
+        <p>${esc(d.advice || '')}</p><p class="small muted">${esc(d.note || '')} Details: ${esc(d.message || '')}</p></div>`;
     }
-    $('journey-step').textContent = 'STEP ' + String(index + 1).padStart(2,'0') + ' / 06';
-    $('journey-title').textContent = v.title;
-    $('journey-description').textContent = v.desc;
-    $('journey-back').disabled = index === 0;
-    $('journey-next').disabled = index === JOURNEY.length - 1;
-    $('journey-next').textContent = index === JOURNEY.length - 2 ? 'Review verdict →' : 'Next step →';
-    $('workspace-nav').querySelectorAll('[data-view]').forEach(b => {
-      b.classList.toggle('selected', b.dataset.view === view);
-      b.setAttribute('aria-current', b.dataset.view===view?'step':'false');
-    });
-    if (view === 'evidence' && session) { loadResearchPlan(); loadCriteria(); }
-    if(scroll) $('journey-toolbar').scrollIntoView({behavior:'smooth',block:'start'});
+    let msg = typeof d === 'string' ? d : (d && d.message) || e.message;
+    if (Array.isArray(d)) msg = d.map((x) => `${(x.loc || []).slice(1).join('.')}: ${x.msg}`).join('; ');
+    const list = d && (d.failed || (d.findings || []).map((f) => `${RULE_NAME[f.rule_id] || f.rule_id}: ${f.reason}`));
+    const what = { 401: 'You are not signed in to this project in this browser.', 403: 'Not allowed by policy.', 404: 'Not found, or this browser does not hold the project key.',
+      409: 'Not possible in the current state.', 422: 'Some input needs fixing.' }[e.status] || 'Something went wrong.';
+    return `<div class="notice error" role="alert"><b>${esc(what)}${status}</b><p>${esc(msg)}</p>${list && list.length ? `<ul class="bullets small">${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
   }
-  function initJourney() {
-    $('workspace-nav').innerHTML = JOURNEY.map((v,i) => `<button class="journey-nav-item" type="button" data-view="${v.id}"><span>${String(i+1).padStart(2,'0')}</span>${esc(v.title)}</button>`).join('');
-    $('workspace-nav').addEventListener('click', e => { const b=e.target.closest('[data-view]'); if (b) navigate(b.dataset.view); });
-    $('journey-back').onclick = () => navigate(JOURNEY[Math.max(0,JOURNEY.findIndex(x=>x.id===activeView)-1)].id);
-    $('journey-next').onclick = () => navigate(JOURNEY[Math.min(JOURNEY.length-1,JOURNEY.findIndex(x=>x.id===activeView)+1)].id);
-    // Deep links to evidence still work after all pages have been separated.
-    document.addEventListener('click', e=>{ if(e.target.closest('a[href^="#ev-"]')) navigate('evidence',false); });
-    navigate(activeView,false);
-    $('view-roadmap-link').onclick = e => {e.preventDefault(); navigate('decision'); document.getElementById('roadmap-card')?.scrollIntoView({behavior:'smooth'});};
-  }
-  async function loadResearchPlan() {
-    const div = $('research-suggestions');
-    if (!session) return;
-    try {
-      const data = await api('/projects/' + session.project_id + '/research-plan');
-      div.innerHTML = data.queries.map(q => `<button type="button" class="query-card" data-query="${esc(q.query)}"><strong>${esc(q.title)}</strong><span>${esc(q.query)}</span><small>${esc(q.purpose)}</small></button>`).join('');
-      div.querySelectorAll('[data-query]').forEach(b => b.onclick=()=>{
-        $('research-form').elements.query.value = b.dataset.query;
-        $('research-form').scrollIntoView({behavior:'smooth',block:'center'});
-        $('research-form').elements.query.focus();
-      });
-    } catch (e) {div.textContent='Could not build research suggestions: '+e.message;}
-  }
-  async function loadCriteria() {
-    if (!session) return;
-    try {
-      const data = await api('/projects/' + session.project_id + '/criteria');
-      $('criteria-version').textContent = data.criteria_version;
-      const rows = data.criteria;
-      const unknown = rows.filter(x=>x.status==='UNKNOWN').length;
-      $('criteria-stats').innerHTML = `<div><b>${esc(data.qualified_evidence_count)}</b><span>Qualified records*</span></div><div><b>${esc(unknown)}</b><span>Unknown criteria</span></div><div><b>${esc(rows.length)}</b><span>Active criteria</span></div>`;
-      const groups = [['discover','Discover — nine criteria'],['validate','Validate — seven criteria'],['all','Across every gate — five criteria']];
-      $('criteria-rows').innerHTML = groups.map(([phase, name])=>`<h4>${esc(name)}</h4>` +
-        rows.filter(x=>x.phase===phase).map(x=>`<div class="criterion-row"><div><strong>${esc(x.id)} · ${esc(x.name)}</strong><span>${esc(x.question)}</span><small>${esc(x.reason)}</small></div><span class="criterion-status">${esc(x.status)}</span></div>`).join('')).join('') +
-        '<p class="hint">*Qualified = relevant, non-duplicate records meeting basic provenance conditions; no truth or customer demand independently verified.</p>';
-    } catch(e){$('criteria-rows').textContent='Criteria unavailable: '+e.message;}
-  }
-  async function findResearch(query) {
-    const results = $('research-results');
-    results.innerHTML = '<p class="hint">Searching live Crossref metadata…</p>';
-    try {
-      const payload = await api('/research/crossref?q=' + encodeURIComponent(query));
-      if(!payload.results.length) {results.innerHTML='<p class="hint">No indexed publications found. This is not evidence that research does not exist.</p>';return;}
-      results.innerHTML = '<p class="hint">These are bibliographic leads, NOT inspected evidence. Open the publication; check its geography, methods and relevance; copy an exact excerpt yourself.</p>' + payload.results.map(r=> `<article class="research-result"><div class="research-label">CANDIDATE · NOT VERIFIED · ${esc(r.topic_match === 'POSSIBLE' ? 'Possible title match' : 'Weak title match')}</div><h4>${esc(r.title)}</h4><p>${esc(r.publisher || 'Publisher unknown')} · ${esc(r.year || 'Year unknown')} · ${esc(r.type || '')}</p><p class="small">Title keywords matching query: ${esc((r.matched_query_terms||[]).join(', ') || 'none')}. Read methods, geography and sample before use.</p><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open publication ↗</a> <button class="ghost smal" type="button" data-prefill="${esc(r.id)}">Use citation metadata</button></article>`).join('');
-      results.querySelectorAll('[data-prefill]').forEach(b=>b.onclick=()=>{
-        const r=payload.results.find(x=>x.id===b.dataset.prefill);
-        if(!r)return;
-        const form=$('evidence-src'); form.elements.url.value=r.url; form.elements.title.value=r.title + ' / ' + (r.publisher||''); form.elements.published_on.value=r.year ? String(r.year):'';
-        form.elements.claim.value=''; form.elements.excerpt.value=''; form.elements.direction.value='UNSURE';form.elements.relevance.value='UNSURE';
-        form.scrollIntoView({behavior:'smooth'});
-        tell('Citation metadata copied. YOU must add a specific supported claim and exact excerpt from the publication; no evidence was recorded.',true);
-      });
-    } catch(err) {results.textContent='Research index unavailable: '+err.message+'. Manual evidence entry still works. No source was fabricated.';}
-  }
-  function formData(form) { const d = Object.fromEntries(new FormData(form)); for (const k in d) if (d[k] === '') d[k] = null; form.querySelectorAll('input[type=checkbox]').forEach(c => d[c.name] = c.checked); form.querySelectorAll('input[type=number]').forEach(n => { if (d[n.name] != null) d[n.name] = Number(d[n.name]); }); return d; }
+  function flash(html) { const slot = document.getElementById('flash'); if (slot) { slot.innerHTML = html; slot.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }
+  function ok(msg) { flash(`<div class="notice info" role="status">${esc(msg)}</div>`); announce(msg); }
 
-  async function health() {
+  // Long actions show real elapsed time, never fake progress.
+  async function busy(btn, text, fn) {
+    const before = btn ? btn.innerHTML : '';
+    let s = 0, timer;
+    if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spin" aria-hidden="true"></span>${esc(text)}`; timer = setInterval(() => { s++; btn.innerHTML = `<span class="spin" aria-hidden="true"></span>${esc(text)} ${s} s`; }, 1000); }
+    announce(text);
+    try { return await fn(); }
+    catch (e) { flash(errorHtml(e)); announce('Error: ' + e.message); return null; }
+    finally { clearInterval(timer); if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = before; } }
+  }
+
+  function dialog({ title, body, confirm = 'Confirm', danger = false, cancel = 'Cancel', onConfirm }) {
+    dlg.innerHTML = `<form method="dialog"><div class="d-body"><h2 id="dlg-title">${esc(title)}</h2>${body}<div id="dlg-err"></div></div>
+      <div class="d-foot"><button class="btn quiet" value="cancel" type="submit">${esc(cancel)}</button><button class="btn ${danger ? 'danger' : ''}" value="ok" id="dlg-ok" type="button">${esc(confirm)}</button></div></form>`;
+    dlg.showModal();
+    const okBtn = dlg.querySelector('#dlg-ok');
+    okBtn.onclick = async () => {
+      const form = dlg.querySelector('form');
+      if (!form.reportValidity()) return;
+      okBtn.disabled = true;
+      try { await onConfirm(new FormData(form)); dlg.close(); }
+      catch (e) { if (!e.keepOpen) dlg.querySelector('#dlg-err').innerHTML = errorHtml(e); else okBtn.textContent = 'Test again'; }
+      finally { okBtn.disabled = false; }
+    };
+    const first = dlg.querySelector('textarea, input, select');
+    (first || okBtn).focus();
+  }
+
+  // ------------------------------------------------------------------ routing
+  const STEPS = [['brief', 'Brief'], ['safety', 'Safety'], ['discovery', 'Discover'], ['research', 'Research'], ['experiments', 'Demand tests'], ['decision', 'Decision']];
+  function parse() {
+    const p = location.pathname.replace(/\/+$/, '') || '/projects';
+    let m;
+    if ((m = p.match(/^\/projects\/([a-f0-9]{32})(?:\/(\w+))?$/))) return { view: m[2] || 'brief', pid: m[1] };
+    if (p === '/' || p === '/projects') return { view: 'projects' };
+    if (p === '/roadmap') return { view: 'roadmap' };
+    if (p === '/help') return { view: 'help' };
+    return { view: 'notfound' };
+  }
+  let navigated = false;   // move focus to <main> only after in-app navigation, never on first load (keeps the skip link first)
+  function go(path, replace) { if (replace) history.replaceState({}, '', path); else history.pushState({}, '', path); navigated = true; render(); window.scrollTo(0, 0); }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-link]');
+    if (a && !e.metaKey && !e.ctrlKey && a.origin === location.origin) { e.preventDefault(); go(a.getAttribute('href')); }
+  });
+  window.addEventListener('popstate', () => { navigated = true; render(); });
+
+  let snap = null;   // last snapshot of the current project
+  async function load(pid) { snap = await api(`/projects/${pid}`, { pid }); const p = projects(); if (p[pid]) { p[pid].name = snap.project.name; store.set('founderos_projects', p); } return snap; }
+
+  function stepState(s, key) {
+    if (!s) return 'todo';
+    const st = s.safety && s.safety.status, ack = s.safety && s.safety.acknowledged_at;
+    const disc = s.phase_runs.find((r) => r.phase === 'discover'), val = s.phase_runs.find((r) => r.phase === 'validate');
+    switch (key) {
+      case 'brief': return s.brief ? 'done' : 'attention';
+      case 'safety': return !st ? 'todo' : st === 'BLOCK' ? 'blocked' : (st === 'ALLOW_DISCOVERY' || ack) ? 'done' : 'attention';
+      case 'discovery': return !disc ? 'todo' : disc.state === 'APPROVED' ? 'done' : disc.state === 'PENDING_APPROVAL' ? 'attention' : 'todo';
+      case 'research': return s.evidence.length ? 'done' : 'todo';
+      case 'experiments': return s.experiments.some((x) => x.status === 'LOCKED') ? 'done' : s.experiments.length ? 'attention' : 'todo';
+      case 'decision': return !val ? 'todo' : val.state === 'PENDING_APPROVAL' ? 'attention' : ['APPROVED', 'STOPPED'].includes(val.state) ? 'done' : 'todo';
+    }
+    return 'todo';
+  }
+  const STEP_HINT = { done: 'done', attention: 'needs you', blocked: 'stopped', todo: '' };
+  function renderNav(route) {
+    const steps = document.getElementById('nav-steps');
+    document.getElementById('nav-venture-title').hidden = !route.pid;
+    steps.innerHTML = route.pid ? STEPS.map(([k, name], i) => {
+      const st = stepState(snap, k);
+      return `<a href="/projects/${route.pid}/${k}" data-link data-state="${st}" ${route.view === k ? 'aria-current="page"' : ''}>
+        <span class="num" aria-hidden="true">${st === 'done' ? '✓' : i + 1}</span><span>${name}</span><span class="hint">${STEP_HINT[st]}</span></a>`;
+    }).join('') + `<a href="/projects/${route.pid}/audit" data-link ${route.view === 'audit' ? 'aria-current="page"' : ''}><span class="num" aria-hidden="true">≣</span><span>Decision log</span></a>` : '';
+    for (const [id, v] of [['nav-projects', 'projects'], ['nav-roadmap', 'roadmap'], ['nav-help', 'help']]) {
+      const el = document.getElementById(id);
+      if (route.view === v) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
+    }
+  }
+  function crumb(title, sub) { document.getElementById('crumb-title').textContent = title; document.getElementById('crumb-sub').textContent = sub; document.title = `${title} | FounderOS`; }
+
+  async function render() {
+    const route = parse();
+    snap = null;
+    main.innerHTML = '<p class="muted" role="status">Loading…</p>';
+    try {
+      if (route.pid) {
+        if (!tokenFor(route.pid)) { renderNav(route); crumb('Project key not found', 'This browser does not hold the key for this project'); main.innerHTML = noKey(); return; }
+        await load(route.pid);
+      }
+      renderNav(route);
+      const view = VIEWS[route.view] || VIEWS.notfound;
+      await view(route);
+      if (navigated) main.focus({ preventScroll: true });
+    } catch (e) {
+      renderNav(route);
+      main.innerHTML = `<div id="flash"></div>${errorHtml(e)}<p><a href="/projects" data-link>Back to projects</a></p>`;
+    }
+  }
+  const noKey = () => `<h1>Project key not found</h1><div class="empty"><h2>This browser does not hold the key for this project</h2>
+    <p>Project keys are stored only in the browser that created the project; FounderOS never shows or recovers them. Open the project in that browser, or start a new venture.</p>
+    <p><a class="btn secondary" href="/projects" data-link>Go to projects</a></p></div>`;
+
+  function head(title, lede, right = '') { return `<div class="page-head"><div><h1>${esc(title)}</h1>${lede ? `<p class="lede">${lede}</p>` : ''}</div>${right}</div><div id="flash"></div>`; }
+  function nextPanel(title, items) { return `<aside class="next" aria-label="What happens next"><h2>${esc(title)}</h2><ol>${items.map((i) => `<li>${i}</li>`).join('')}</ol></aside>`; }
+  function actionbar(back, fwd) {
+    const b = back ? `<a class="btn quiet" href="${back[0]}" data-link>Back: ${esc(back[1])}</a>` : '<span></span>';
+    let f = '';
+    if (fwd) f = fwd.disabled ? `<span class="row"><span class="why-disabled">${esc(fwd.reason)}</span><span class="btn" aria-disabled="true">${esc(fwd.label)}</span></span>`
+      : `<a class="btn" href="${fwd.href}" data-link>${esc(fwd.label)}</a>`;
+    return `<div class="actionbar no-print">${b}${f}</div>`;
+  }
+
+  // ------------------------------------------------------------------ model status
+  const modelBtn = document.getElementById('model-status');
+  async function modelStatus() {
     try {
       const h = await api('/health');
-      const ok = h.ollama && h.ollama.ollama_reachable && h.ollama.model_pulled;
-      $('model-status').textContent = ok ? 'Local model ready: ' + h.model : (h.ollama.ollama_reachable ? 'Ollama up, model NOT pulled: ' + h.model : 'Ollama NOT reachable — AI steps will fail honestly');
-      $('model-dot').style.background = ok ? '#71dfad' : '#ff8a8a';
-      $('model-tag').textContent = '◉ ' + h.model + (ok ? '' : ' (unavailable)');
-    } catch (e) { $('model-status').textContent = 'API unreachable'; }
+      const o = h.ollama || {};
+      modelBtn.dataset.s = o.ollama_reachable && o.model_pulled ? 'warn' : 'bad';
+      document.getElementById('model-label').textContent = !o.ollama_reachable ? 'Model offline' : !o.model_pulled ? 'Model not installed' : `${h.model}: installed`;
+      modelBtn.title = 'Installed is not the same as working. Click to run a real one-token test.';
+      if (modelBtn.dataset.verified === '1' && o.model_pulled) { modelBtn.dataset.s = 'ok'; document.getElementById('model-label').textContent = `${h.model}: ready`; }
+    } catch (e) { modelBtn.dataset.s = 'bad'; document.getElementById('model-label').textContent = 'Server unreachable'; }
   }
+  modelBtn.addEventListener('click', () => {
+    dialog({ title: 'Local model check', confirm: 'Run a real test', body: `<p>This sends one tiny prompt to your local model to prove it can load and answer. On a laptop CPU the first load can take a minute.</p><div id="probe-out"></div>`,
+      onConfirm: async () => {
+        const out = dlg.querySelector('#probe-out');
+        out.innerHTML = '<p class="muted" role="status">Testing…</p>';
+        const h = await api('/model/health?probe=1');
+        modelBtn.dataset.verified = h.inference_verified ? '1' : '0';
+        out.innerHTML = `<dl class="facts small"><dt>Model</dt><dd>${esc(h.model)}</dd><dt>Ollama</dt><dd>${esc(h.host)}</dd>
+          <dt>Result</dt><dd>${chip(h.code || (h.inference_verified ? 'READY' : 'UNKNOWN'))}${h.probe_ms ? ` in ${h.probe_ms} ms` : ''}</dd>
+          ${h.device ? `<dt>Device</dt><dd>${h.device.vram_mb ? `${h.device.vram_mb} MB on GPU` : 'Running on CPU'} (${esc(h.device.note)})</dd>` : ''}
+          <dt>Settings</dt><dd>context ${esc(h.settings.num_ctx)}, GPU layers ${h.settings.num_gpu ?? 'automatic'}, timeout ${esc(h.settings.timeout_s)} s</dd></dl>
+          ${h.advice ? `<div class="notice warn"><b>What to do</b><p>${esc(h.advice)}</p></div>` : ''}`;
+        modelStatus();
+        throw Object.assign(new Error('done'), { keepOpen: true });
+      } });
+  });
 
-  async function refresh() {
-    if (!session) { $('new-project').classList.remove('hide'); $('workspace').classList.add('hide'); $('journey-toolbar').classList.add('hide'); return; }
-    state = await api('/projects/' + session.project_id);
-    $('new-project').classList.add('hide'); $('workspace').classList.remove('hide'); $('journey-toolbar').classList.remove('hide'); navigate(activeView,false);
-    const p = state.project, b = state.brief, s = state.safety, cur = state.current;
-    const disc = state.phase_runs.find(x => x.phase === 'discover');
-    const val = state.phase_runs.find(x => x.phase === 'validate');
-    $('project-id').textContent = short(p.id) + '…';
-    $('project-name-display').textContent = (b?.payload?.idea_summary || p.original_idea || 'Founder workspace').slice(0, 88);
-    $('brief-version').textContent = b ? 'v' + b.version : '—';
-    $('safety-label').textContent = s ? s.status : 'NOT SCREENED';
-    $('state-label').textContent = p.stopped ? 'STOPPED' : (val?.state ? 'VALIDATE ' + val.state : disc?.state ? 'DISCOVER ' + disc.state : b ? 'BRIEF READY' : 'ONBOARDING');
-    $('evidence-count').textContent = state.evidence.length;
-    if (activeView === 'evidence') { loadResearchPlan(); loadCriteria(); }
-    $('original-text').textContent = p.original_idea;
-    renderBrief(b);
-    renderSafety(s, b);
-    renderClarifications(b);
-    const blocked = s && s.status === 'BLOCK';
-    const cleared = s && (s.status === 'ALLOW_DISCOVERY' || (s.status === 'REVIEW_REQUIRED' && s.acknowledged_at));
-    renderDiscovery(disc);
-    $('discover-btn').disabled = !b || p.stopped || blocked || !cleared || Boolean(disc && ['PENDING_APPROVAL', 'APPROVED'].includes(disc.state));
-    $('refine-btn').disabled = p.stopped;
-    $('validate-btn').disabled = !disc || disc.state !== 'APPROVED' || p.stopped || Boolean(val && ['PENDING_APPROVAL', 'APPROVED'].includes(val.state));
-    const evLocked = p.stopped || Boolean(val && ['PENDING_APPROVAL', 'APPROVED'].includes(val.state));
-    $('evidence-src').querySelector('button').disabled = evLocked; $('evidence-cust').querySelector('button').disabled = evLocked;
-    renderGate('discover-decision', disc, b);
-    renderGate('validate-decision', val, b);
-    renderValidation(val);
-    renderEvidence(state.evidence);
-    renderExperiments(state.experiments, p.stopped);
-    renderPassport(state.passport, state.evidence);
-    renderLog(state.decisions, state.audit);
-    if (b && !suggestion && !p.stopped) loadSuggestion();
-  }
+  document.getElementById('theme-toggle').addEventListener('click', (e) => {
+    const dark = document.documentElement.dataset.theme !== 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    e.currentTarget.textContent = dark ? 'Light' : 'Dark';
+    store.set('founderos_theme', dark ? 'dark' : 'light');
+  });
+  if (document.documentElement.dataset.theme === 'dark') document.getElementById('theme-toggle').textContent = 'Light';
 
-  function renderDiscovery(disc) {
-    const n=$('discover-output');
-    if(!disc){n.className='output empty';n.textContent='Run Discovery to see hypotheses, audiences and recommended tests.';return;}
-    const r=disc.report||{};
-    n.className='output';
-    n.innerHTML=`<div class="report-lead"><div class="small">Run v${disc.version} · ${esc(disc.state)} · ${disc.latency_ms} ms · AI HYPOTHESES ONLY</div><h3>${esc(r.problem_statement||'Problem not established')}</h3><p>${esc(r.value_proposition||'Value proposition unknown')}</p></div>`
-      + `<div class="report-grid"><div class="field"><b>Who might use it</b>${list(r.target_customers)}</div><div class="field"><b>Alternatives (unverified)</b>${list(r.alternatives_unverified)}</div><div class="field"><b>Hypotheses to test</b>${list(r.hypotheses)}</div><div class="field"><b>Unknowns</b>${list(r.unknowns)}</div></div>`
-      + `<div class="field"><b>Proposed experiments — not results</b>${list(r.experiments)}</div>`
-      + '<details class="advanced"><summary>Technical report and provenance</summary><pre>'+esc(pretty({version:disc.version,brief_version:disc.brief_version,model:disc.model,report:r}))+'</pre></details>';
-  }
-  function renderJson(id, data, placeholder) { const n = $(id); if (!data) { n.textContent = placeholder; n.className = 'output empty'; return; } n.className = 'output'; n.textContent = pretty(data); }
+  // ------------------------------------------------------------------ views
+  const VIEWS = {};
 
-  function renderBrief(b) {
-    const n = $('brief-fields');
-    if (!b) { n.className = 'output empty'; n.textContent = 'No refined brief yet.'; return; }
-    const pl = b.payload, prov = pl.provenance || {};
-    const tag = (k) => `<span class="tag ${esc(prov[k] || 'UNKNOWN')}">${esc(prov[k] || 'UNKNOWN')}</span>`;
-    n.className = 'output';
-    n.innerHTML = ['idea_summary', 'problem', 'target_customers', 'target_market', 'skills', 'budget', 'timeline', 'values', 'constraints'].map(k =>
-      `<div class="field"><b>${esc(k.replace(/_/g, ' '))}</b> ${k === 'idea_summary' ? '<span class="tag INFERRED_UNCONFIRMED">AI SUMMARY</span>' : tag(k)}<div>${esc(pl[k] ?? '—')}</div></div>`).join('')
-      + (pl.assumptions?.length ? `<div class="field"><b>model assumptions (NOT facts)</b>${list(pl.assumptions)}</div>` : '')
-      + (pl.questions?.length ? `<div class="field"><b>clarification questions</b>${list(pl.questions)}</div>` : '')
-      + `<div class="small">brief v${b.version} · ${esc(pl.model || '')} · ${pl.latency_ms ? pl.latency_ms + ' ms' : ''}</div>`;
-  }
+  VIEWS.notfound = async () => { crumb('Not found', ''); main.innerHTML = `${head('This page does not exist', '')}<p><a href="/projects" data-link>Go to projects</a></p>`; };
 
-  function renderClarifications(b) {
-    const div = $('clarify-fields');
-    if (!b || state.project.stopped) { div.innerHTML = ''; return; }
-    const keys = ['problem', 'target_customers', 'target_market', 'skills', 'budget', 'timeline', 'values', 'constraints'];
-    div.innerHTML = '<h3>Correct or complete the brief</h3><p class="small">Any change creates a new brief version, re-runs the safety screen and invalidates approvals built on the old version.</p><form id="clarify-form"><div class="two">'
-      + keys.map(k => `<label>${esc(k.replace(/_/g, ' '))} <span class="tag ${esc(b.payload.provenance?.[k] || 'UNKNOWN')}">${esc(b.payload.provenance?.[k] || 'UNKNOWN')}</span><input name="${k}" placeholder="${esc(b.payload[k] || 'unknown — fill if you know')}"></label>`).join('')
-      + '</div><div class="actions"><button class="secondary" type="submit">Save corrections (new brief version)</button></div></form>';
-    $('clarify-form').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => {
-      const answers = Object.fromEntries([...new FormData(ev.target)].filter(([, v]) => String(v).trim()));
-      if (!Object.keys(answers).length) throw Error('Enter at least one correction.');
-      const r = await api('/projects/' + session.project_id + '/clarify', 'POST', {answers});
-      await refresh(); tell('Brief v' + r.version + ' saved. Safety: ' + r.safety.status + '. Dependent approvals invalidated.', true);
-    }, 'Saving…'); });
-  }
-
-  function renderSafety(s, b) {
-    const out = $('safety-output'), ack = $('safety-ack'), pill = $('safety-pill');
-    if (!s) { out.className = 'output empty'; out.textContent = 'Refine the brief to run the screen.'; ack.innerHTML = ''; pill.textContent = '—'; return; }
-    pill.textContent = s.status; pill.className = 'pill ' + s.status;
-    const a = s.assessment;
-    out.className = 'output';
-    out.innerHTML = `<div class="verdict ${esc(s.status)}">${esc(s.status)}</div><div class="small">policy ${esc(a.policy_version)} · brief v${s.brief_version}${s.acknowledged_at ? ' · acknowledged ' + esc(stamp(s.acknowledged_at)) + ' (research only)' : ''}</div>`
-      + (a.findings.length ? a.findings.map(f => `<div class="finding ${esc(f.severity)}"><b>${esc(f.severity)} · ${esc(f.rule_id)}</b>${f.organizer_rule ? '<div class="small">Organizer rule: ' + esc(f.organizer_rule) + '</div>' : ''}<div>${esc(f.reason)}</div><div class="small">Matched: ${f.matched_text.map(esc).join(' … ')}</div><div class="small"><b>Safe revision:</b> ${esc(f.safe_revision)}</div></div>`).join('') : '<p>No prohibited or high-stakes patterns found. This does not certify legality.</p>')
-      + (a.feasibility_notes.length ? '<div class="field"><b>Feasibility notes</b>' + list(a.feasibility_notes) + '</div>' : '')
-      + '<div class="field"><b>Limitations</b>' + list(a.limitations) + '</div>';
-    if (s.status === 'REVIEW_REQUIRED' && !s.acknowledged_at && !state.project.stopped) {
-      ack.innerHTML = `<form id="ack-form"><label>Acknowledge flagged risks (research only, no legal certification)<input name="statement" required minlength="10" placeholder="e.g. I understand this is a health-related domain and will consult a professional before building."></label><div class="actions"><button class="secondary" type="submit">Acknowledge for brief v${b.version} ↗</button></div></form>`;
-      $('ack-form').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => {
-        await api('/projects/' + session.project_id + '/safety/acknowledge', 'POST', {brief_version: b.version, statement: new FormData(ev.target).get('statement')});
-        await refresh(); tell('Risk acknowledged for research only.', true); }, 'Saving…'); });
-    } else if (s.status === 'BLOCK') {
-      ack.innerHTML = '<p class="warn">This brief is blocked by backend policy. Approval cannot override it. Correct the brief above (new version) or start a new founder brief.</p>';
-    } else ack.innerHTML = '';
-  }
-
-  function renderGate(id, run, b) {
-    const div = $(id);
-    if (!run) { div.innerHTML = ''; return; }
-    const g = run.gate, rec = g.verdict || g.recommendation;
-    let html = `<div class="gate"><strong>Gate · ${esc(run.state)}${run.invalidated_reason ? ' · ' + esc(run.invalidated_reason) : ''}</strong><span class="pill ${esc(rec)}">${esc(rec)}</span><p class="small">${esc((g.reasons || [g.headline]).join(' '))}</p><p class="small">Bound to brief v${run.brief_version} · report ${esc(short(run.report_hash))}… · approval scope: RESEARCH ONLY · external actions: never</p>`;
-    if (run.state === 'PENDING_APPROVAL' && !state.project.stopped) {
-      const caution = ['STOP_DO_NOT_LAUNCH', 'PIVOT', 'REVISE'].includes(rec);
-      html += `<label>Founder feedback / reasons (required for Revise, Pivot${caution ? ', and for approving against the recommendation' : ''})<textarea rows="2" class="decision-feedback" placeholder="What should change, or why you choose a different course?"></textarea></label>`
-        + (caution ? '<label class="warn"><input type="checkbox" class="risk-ack inline">I have read the recommendation and knowingly choose a different course. This permits research only.</label>' : '')
-        + `<div class="actions"><button data-action="APPROVE">Approve (research only)</button><button class="secondary" data-action="REVISE">Revise</button><button class="secondary" data-action="PIVOT">Pivot</button><button class="danger" data-action="STOP">Stop project</button></div>`;
+  // ---------------- Projects
+  VIEWS.projects = async () => {
+    crumb('Projects', 'Start a venture or continue one');
+    const saved = projects();
+    const ids = Object.keys(saved);
+    const draft = store.get('founderos_draft_new', {});
+    const f = (name, lab, opts = {}) => {
+      const v = esc(draft[name] || '');
+      const input = opts.area ? `<textarea id="f-${name}" name="${name}" rows="${opts.rows || 3}" ${opts.req ? 'required minlength="12"' : ''} maxlength="${opts.max || 600}">${v}</textarea>`
+        : `<input id="f-${name}" name="${name}" value="${v}" maxlength="${opts.max || 300}" ${opts.req ? 'required' : ''}>`;
+      return `<div class="field"><label for="f-${name}">${esc(lab)}${opts.req ? '' : ' <span class="opt">(optional)</span>'}</label>${input}${opts.help ? `<p class="help">${esc(opts.help)}</p>` : ''}</div>`;
+    };
+    main.innerHTML = `${head('Ventures', 'FounderOS helps you decide whether an idea deserves more of your time, using evidence rather than enthusiasm. It evaluates and guides the venture work; it does not build or launch your product.')}
+      <div class="cols"><div class="stack">
+        ${ids.length ? `<section class="panel" aria-labelledby="p-list"><header><h2 id="p-list">Continue a venture</h2></header><div class="projects" id="project-list">${ids.map((id) => `<div class="project-row" data-pid="${id}"><div><div class="name">${esc(saved[id].name || 'Untitled venture')}</div><div class="sub">Loading status…</div></div><span></span></div>`).join('')}</div></section>` : ''}
+        <section class="panel" aria-labelledby="new-h"><header><h2 id="new-h">Start a venture</h2><span class="small muted">Your words are stored exactly as written</span></header>
+        <form id="new-form" novalidate>
+          <fieldset><legend>The idea</legend>
+            ${f('idea', 'Describe the idea in your own words', { area: true, req: true, rows: 5, max: 6000, help: 'What would you build, for whom, and why now? Anything you leave out stays unknown; FounderOS will not fill it in silently.' })}
+            <div class="grid2">${f('name', 'Venture name', { max: 80 })}${f('problem', 'The pain you want to solve', { max: 600 })}</div>
+          </fieldset>
+          <fieldset><legend>Who it is for</legend><div class="grid2">
+            ${f('target_customers', 'Customer segment', { help: 'Be narrow: "3rd-year engineering students at Cairo University".' })}
+            ${f('target_market', 'Location or market', { help: 'One country or city, e.g. "Cairo, Egypt". Needed for legal and market checks.' })}</div>
+            ${f('current_workaround', 'What do they use today instead?', { max: 400 })}
+          </fieldset>
+          <fieldset><legend>Your limits and values</legend><div class="grid3">
+            ${f('skills', 'Your skills')}${f('budget', 'Budget', { help: 'e.g. 1000 EGP' })}${f('timeline', 'Time available', { help: 'e.g. 6 weeks' })}</div>
+            <div class="grid2">${f('values', 'Values you will not compromise', { max: 800 })}${f('constraints', 'Other constraints', { max: 800 })}</div>
+          </fieldset>
+          <div class="row"><button class="btn" type="submit" id="create-btn">Create venture</button><span class="small muted">Next you will refine the brief with the local model and run the safety screen.</span></div>
+        </form></section>
+      </div>
+      ${nextPanel('How a venture moves', ['Refine your brief into fields, each marked as yours, inferred or unknown.', 'Run the twelve safety checks. Hard stops cannot be overridden.',
+        'Discover: the local model proposes hypotheses; code scores only what evidence supports.', 'Research: gather and verify sources. Nothing counts until you review it.',
+        'Demand tests: lock your pass mark before collecting real results.', 'Decision: the code gives the verdict; you decide what happens next, for research only.'])}
+      </div>`;
+    const form = document.getElementById('new-form');
+    form.addEventListener('input', () => store.set('founderos_draft_new', Object.fromEntries(new FormData(form))));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      const data = Object.fromEntries([...new FormData(form)].filter(([, v]) => String(v).trim()));
+      await busy(document.getElementById('create-btn'), 'Creating', async () => {
+        const r = await api('/projects', { method: 'POST', body: data });
+        const p = projects(); p[r.project_id] = { token: r.access_token, name: r.name, created: new Date().toISOString() }; store.set('founderos_projects', p);
+        store.del('founderos_draft_new');
+        go(`/projects/${r.project_id}/brief`);
+      });
+    });
+    for (const id of ids) {
+      const row = main.querySelector(`[data-pid="${id}"]`);
+      api(`/projects/${id}/summary`, { pid: id }).then((s) => {
+        const status = s.stopped ? chip('STOPPED') : s.verdict ? chip(s.verdict) : s.discover_exit ? chip(s.discover_exit) : s.safety ? chip(s.safety) : '<span class="chip">Not refined</span>';
+        row.outerHTML = `<a class="project-row" href="/projects/${id}/${s.verdict ? 'decision' : s.discover ? 'discovery' : s.safety ? 'safety' : 'brief'}" data-link>
+          <div><div class="name">${esc(s.name)}</div><div class="sub">Created ${when(s.created_at)}, brief v${s.brief_version || 0}, ${s.evidence} evidence record${s.evidence === 1 ? '' : 's'}</div></div>${status}</a>`;
+      }).catch(() => {
+        row.innerHTML = `<div><div class="name">${esc(saved[id].name || 'Venture')}</div><div class="sub">This key no longer opens a project (the database may have been reset).</div></div><button class="btn quiet small" data-forget="${id}" type="button">Forget</button>`;
+        row.querySelector('[data-forget]').onclick = () => { const p = projects(); delete p[id]; store.set('founderos_projects', p); render(); };
+      });
     }
-    div.innerHTML = html + '</div>';
-    div.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', async () => {
-      await act(button, async () => {
-        const action = button.dataset.action;
-        if (action === 'STOP' && !confirm('Stop this project? This is enforced: no further runs are possible.')) return;
-        const payload = {run_id: run.id, report_hash: run.report_hash, brief_version: run.brief_version, decision: action,
-                         feedback: div.querySelector('.decision-feedback')?.value || '', acknowledge_risk: div.querySelector('.risk-ack')?.checked || false};
-        const r = await api('/projects/' + session.project_id + '/phases/' + run.phase + '/decision', 'POST', payload);
-        suggestion = null; await refresh(); tell('Decision recorded: ' + r.state + ' (scope ' + r.scope + '). No external action was taken.', true);
-      }, 'Recording…');
+  };
+
+  // ---------------- Brief
+  VIEWS.brief = async ({ pid }) => {
+    const s = snap, b = s.brief;
+    crumb(s.project.name, `Brief${b ? `, version ${b.version}` : ''}`);
+    const intake = s.project.intake || {};
+    const stopped = s.current.stopped;
+    let right;
+    if (!b) {
+      right = `<section class="panel"><header><h2>Structured brief</h2>${chip('UNKNOWN', 'Not refined yet')}</header>
+        <p>Your local model will turn your words into structured fields. Fields you typed stay exactly as written; anything it infers is marked for you to confirm.</p>
+        <dl class="facts small">${Object.keys(FIELD).map((k) => `<dt>${FIELD[k]}</dt><dd>${intake[k] ? `${esc(intake[k])} <span class="prov EXPLICIT">Yours</span>` : '<span class="faint">Unknown</span>'}</dd>`).join('')}</dl>
+        <div class="row" style="margin-top:14px"><button class="btn" id="refine-btn" ${stopped ? 'disabled' : ''}>Refine and check safety</button><span class="small muted">Runs on your computer. On a CPU this can take a minute or more.</span></div></section>`;
+    } else {
+      const p = b.payload, prov = p.provenance || {};
+      const PL = { EXPLICIT: 'Yours', INFERRED_UNCONFIRMED: 'Inferred, confirm it', UNKNOWN: 'Unknown' };
+      right = `<section class="panel" aria-labelledby="sb-h"><header><h2 id="sb-h">Structured brief</h2><span class="small muted">Version ${b.version}, ${esc(p.model === 'NOT_CALLED_SAFETY_BLOCK' ? 'model not called (hard stop found first)' : p.model || '')}</span></header>
+        <p class="small muted">${esc(p.idea_summary || '')}</p>
+        <form id="clarify-form">${Object.keys(FIELD).map((k) => `<div class="field-row"><span class="k">${FIELD[k]}</span><span class="prov ${prov[k] || 'UNKNOWN'}">${PL[prov[k] || 'UNKNOWN']}</span>
+          <div class="v ${p[k] ? '' : 'unknown'}">${p[k] ? esc(p[k]) : 'Not stated'}</div>
+          ${stopped ? '' : `<div class="v"><label class="sr-only" for="c-${k}">Correct ${FIELD[k]}</label><input id="c-${k}" name="${k}" placeholder="${prov[k] === 'EXPLICIT' ? 'Change it' : prov[k] === 'INFERRED_UNCONFIRMED' ? 'Confirm or correct' : 'Add it if you know'}" maxlength="1500">${prov[k] === 'INFERRED_UNCONFIRMED' ? `<button class="btn quiet small" type="button" data-confirm="${k}">Confirm as written</button>` : ''}</div>`}</div>`).join('')}
+        ${stopped ? '' : '<div class="row" style="margin-top:12px"><button class="btn secondary" type="submit" id="clarify-btn">Save as new version</button><span class="small muted">Saving re-runs the safety screen and retires approvals based on the old version.</span></div>'}
+        </form>
+        ${(p.questions || []).length ? `<div class="notice info" style="margin-top:14px"><b>The model asks</b><ul class="bullets">${p.questions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></div>` : ''}
+        ${(p.assumptions || []).length ? `<details class="adv"><summary>Model assumptions (not facts, ${p.assumptions.length})</summary><ul class="bullets small">${p.assumptions.map((q) => `<li>${esc(q)}</li>`).join('')}</ul></details>` : ''}
+        ${stopped ? '' : '<div class="row" style="margin-top:12px"><button class="btn quiet small" id="refine-btn">Refine again with the model</button></div>'}
+      </section>`;
+    }
+    const missing = b ? ['target_customers', 'problem', 'current_workaround', 'target_market'].filter((k) => !b.payload[k]) : [];
+    const st = s.safety && s.safety.status;
+    main.innerHTML = `${head('Your brief', 'Your original words on the left; the structured version the agents will use on the right. Nothing marked unknown is guessed later.')}
+      ${stopped ? '<div class="notice warn">This venture was stopped by you. It is read-only.</div>' : ''}
+      <div class="cols"><div class="brief-grid">
+        <section class="panel"><header><h2>Your words</h2><span class="small muted">Stored exactly</span></header><div class="original">${esc(s.project.original_idea)}</div></section>
+        ${right}
+      </div>
+      ${nextPanel('What happens next', [b ? (missing.length ? `Fill in: ${missing.map((k) => FIELD[k].toLowerCase()).join(', ')}. Idea clarity (D02) needs customer, pain and current workaround.` : 'Customer, pain and workaround are named.') : 'Refine the brief.',
+        st ? `Safety screen: ${chip(st)}` : 'The safety screen runs automatically after refinement.', 'Then open Safety to read the twelve checks.'])}
+      </div>
+      ${actionbar(['/projects', 'Projects'], b ? { href: `/projects/${pid}/safety`, label: 'Continue to safety' } : { disabled: true, label: 'Continue to safety', reason: 'Refine the brief first.' })}`;
+    const rb = document.getElementById('refine-btn');
+    if (rb) rb.onclick = () => busy(rb, 'Refining with your local model', async () => { const r = await api(`/projects/${pid}/refine`, { method: 'POST', pid }); await render(); ok(`Brief version ${r.version} saved. Safety screen: ${label(r.safety.status)}.`); });
+    const cf = document.getElementById('clarify-form');
+    if (cf) {
+      cf.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const answers = Object.fromEntries([...new FormData(cf)].filter(([, v]) => String(v).trim()));
+        if (!Object.keys(answers).length) { flash('<div class="notice warn">Type a change in at least one field, or use "Confirm as written".</div>'); return; }
+        await busy(document.getElementById('clarify-btn'), 'Saving', async () => { const r = await api(`/projects/${pid}/clarify`, { method: 'POST', pid, body: { answers } }); await render(); ok(`Saved as version ${r.version}. Safety re-screened: ${label(r.safety.status)}.`); });
+      });
+      cf.querySelectorAll('[data-confirm]').forEach((btn) => btn.onclick = async () => {
+        const k = btn.dataset.confirm;
+        await busy(btn, 'Confirming', async () => { await api(`/projects/${pid}/clarify`, { method: 'POST', pid, body: { answers: { [k]: b.payload[k] } } }); await render(); ok(`${FIELD[k]} confirmed as yours.`); });
+      });
+    }
+  };
+
+  // ---------------- Safety
+  VIEWS.safety = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Safety and eligibility');
+    if (!s.safety) {
+      main.innerHTML = `${head('Safety and eligibility', 'Twelve written checks run before any research.')}<div class="empty"><h2>Not screened yet</h2><p>The screen runs when you refine your brief.</p><p><a class="btn" href="/projects/${pid}/brief" data-link>Go to the brief</a></p></div>`;
+      return;
+    }
+    const a = s.safety.assessment, st = s.safety.status, acked = !!s.safety.acknowledged_at;
+    const t = st === 'BLOCK' ? 'stop' : st === 'REVIEW_REQUIRED' && !acked ? 'hold' : 'clear';
+    const jur = a.jurisdiction || {};
+    const gateBody = st === 'BLOCK'
+      ? `<p class="why">At least one hard stop applies. No approval can override it, including yours. Change the idea on the brief page and the screen runs again.</p>
+         <div class="gate-actions"><a class="btn secondary" href="/projects/${pid}/brief" data-link>Revise the brief</a></div>`
+      : st === 'REVIEW_REQUIRED'
+        ? (acked ? `<p class="why">You acknowledged the flags on ${when(s.safety.acknowledged_at)}: “${esc(s.safety.ack_statement)}”. That permits research only.</p>`
+          : `<p class="why">Some checks need your judgement. You may continue with desk research and tests you run yourself. This does not certify legality and allows no publishing, building or launch.</p>
+             <form id="ack-form" class="gate-actions"><div class="field"><label for="ack-st">In your own words, what you understand</label><textarea id="ack-st" name="statement" required minlength="10" rows="2" placeholder="I understand this involves personal data and will get advice before building."></textarea></div>
+             <label class="check"><input type="checkbox" required> I understand this permits research only, for brief version ${s.brief.version}.</label>
+             <div class="row" style="margin-top:10px"><button class="btn" id="ack-btn">Acknowledge for research only</button><a class="btn quiet" href="/projects/${pid}/brief" data-link>Revise the brief instead</a></div></form>`)
+        : '<p class="why">No check stopped or flagged this brief. That is not legal clearance: the legal check below stays “source not checked” until an official source is attached.</p>';
+    const rows = a.rules.map((r) => {
+      const span = (r.spans || [])[0];
+      const quote = span ? (span.conflicts_with ? `“${esc(span.text)}” in your values vs “${esc(span.conflicts_with.text)}” in ${esc(span.conflicts_with.field)}` : `“${esc(span.text)}”`) : '';
+      return `<tr><td><b>${esc(RULE_NAME[r.rule_id] || r.rule_id)}</b><div class="small faint">${esc(r.rule_id)}</div></td><td>${chip(r.outcome)}</td>
+        <td>${esc(r.reasons[0] || '')}${quote ? `<div class="small">Brief phrase: ${quote}</div>` : ''}${r.detected_by.includes('MODEL_CLASSIFIER_ESCALATION') ? '<div class="small faint">Flagged by the local model (can only ask for your review).</div>' : ''}
+        <details class="adv"><summary>Rule and source</summary><dl class="facts small"><dt>Question</dt><dd>${esc(r.question)}</dd><dt>Fails if</dt><dd>${esc(r.fail_if)}</dd>
+        <dt>Source needed</dt><dd>${esc(r.source_needed || r.research_instruction)}</dd>
+        ${r.official_source ? `<dt>Official source</dt><dd><a href="${esc(r.official_source.url)}" target="_blank" rel="noopener noreferrer">${esc(r.official_source.url)}</a>, ${chip(r.official_source.excerpt_status)} ${r.official_source.official_domain ? '' : '(not an official-looking domain)'}</dd>` : '<dt>Official source</dt><dd>Not found or not checked</dd>'}
+        ${r.attempted_searches && r.attempted_searches.length ? `<dt>Searches</dt><dd>${r.attempted_searches.map((q) => `${esc(q.query)} <span class="faint">(proposed, not run automatically)</span>`).join('<br>')}</dd>` : ''}
+        <dt>Origin of this rule</dt><dd>${esc(r.provenance)}</dd>${r.founder_review_scope ? `<dt>Your review allows</dt><dd>${esc(r.founder_review_scope)}</dd>` : ''}</dl></details></td></tr>`;
+    }).join('');
+    const hits = a.rules.filter((r) => ['HARD_STOP', 'REVIEW_REQUIRED'].includes(r.outcome));
+    const hitList = hits.length ? `<ul class="plain small" style="margin-top:8px">${hits.map((r) => { const sp = (r.spans || [])[0];
+      return `<li>${chip(r.outcome)} <b>${esc(RULE_NAME[r.rule_id] || r.rule_id)}</b>${sp ? `: “${esc(sp.conflicts_with ? sp.conflicts_with.text : sp.text)}”` : ''}<div class="muted">${esc(r.reasons[0] || '')}</div></li>`; }).join('')}</ul>` : '';
+    const guards = (a.system_guards || []).map((g) => `<div class="notice error"><b>${esc(RULE_NAME[g.guard_id] || g.guard_id)}</b><p>${esc(g.reason)} Phrase: “${esc(g.spans[0].text)}”.</p></div>`).join('');
+    const counts = a.counts || {};
+    main.innerHTML = `${head('Safety and eligibility', 'Twelve written checks, applied by code before any research. Grey areas come to you; hard stops end the run.')}
+      <div class="cols"><div class="stack">
+        <section class="gate" data-tone="${t}" aria-labelledby="sg"><div class="gate-body"><div class="gate-kicker">Safety screen for brief version ${s.brief.version}</div>
+          <p class="verdict" id="sg">${esc(label(st))}${st === 'REVIEW_REQUIRED' && acked ? ', acknowledged' : ''}</p>
+          <p class="small muted">${counts.HARD_STOP || 0} hard stop, ${counts.REVIEW_REQUIRED || 0} need review, ${counts.UNKNOWN_SOURCE || 0} source not checked, ${counts.CLEAR || 0} no issue found. Jurisdiction: ${esc(jur.country || jur.status || 'unknown')}.</p>
+          ${hitList}${gateBody}</div></section>
+        ${guards}
+        <section class="panel"><header><h2>The twelve checks</h2><span class="small muted">Policy ${esc(a.policy_version)}</span></header>
+          <div class="table-wrap"><table class="stack-table"><thead><tr><th scope="col" style="width:26%">Check</th><th scope="col" style="width:16%">Result</th><th scope="col">Why</th></tr></thead><tbody>${rows}</tbody></table></div>
+          <p class="small muted">${a.limitations.map(esc).join(' ')}</p></section>
+        ${st !== 'BLOCK' && !s.current.stopped ? `<details class="panel"><summary><b>Attach an official source</b> <span class="small muted">for the legal or regulated-area check</span></summary>
+          <p class="small muted">Only a regulator, statute or government page counts, and only if FounderOS can fetch it and find your exact excerpt on it. A blog or forum never counts.</p>
+          <form id="src-form"><div class="grid2"><div class="field"><label for="src-rule">Check</label><select id="src-rule" name="rule_id"><option value="illegal_in_target_market">Legal in the target market</option><option value="regulated_or_sensitive_area">Sensitive or regulated area</option></select></div>
+          <div class="field"><label for="src-find">What the source says</label><select id="src-find" name="finding"><option value="SETS_RULES">Sets rules that apply</option><option value="REQUIRES_LICENCE">Requires a licence I can obtain</option><option value="REQUIRES_UNOBTAINABLE_LICENCE">Requires a licence I cannot obtain</option><option value="PROHIBITS">Prohibits the activity</option><option value="DOES_NOT_ADDRESS">Does not address it</option></select></div></div>
+          <div class="field"><label for="src-url">Official page (https)</label><input id="src-url" name="url" type="url" required placeholder="https://"></div>
+          <div class="field"><label for="src-ex">Exact excerpt from that page</label><textarea id="src-ex" name="excerpt" rows="2" required minlength="12"></textarea></div>
+          <button class="btn secondary" id="src-btn">Fetch and verify</button></form></details>` : ''}
+      </div>
+      ${nextPanel('What happens next', [st === 'BLOCK' ? 'Revise the idea; the screen re-runs on every new brief version.' : st === 'REVIEW_REQUIRED' && !acked ? 'Acknowledge the flags for research only, or revise the brief.' : 'Run the discovery agent.',
+        'The screen runs again on every brief change and on agent outputs.', 'Nobody, including you, can switch off a hard stop.'])}
+      </div>
+      ${actionbar([`/projects/${pid}/brief`, 'Brief'], st === 'BLOCK' ? { disabled: true, label: 'Continue to discover', reason: 'A hard stop applies.' } : st === 'REVIEW_REQUIRED' && !acked ? { disabled: true, label: 'Continue to discover', reason: 'Acknowledge the flags first.' } : { href: `/projects/${pid}/discovery`, label: 'Continue to discover' })}`;
+    const af = document.getElementById('ack-form');
+    if (af) af.addEventListener('submit', async (e) => { e.preventDefault(); if (!af.reportValidity()) return; await busy(document.getElementById('ack-btn'), 'Saving', async () => {
+      await api(`/projects/${pid}/safety/acknowledge`, { method: 'POST', pid, body: { brief_version: s.brief.version, statement: new FormData(af).get('statement') } }); await render(); ok('Acknowledged for research only.'); }); });
+    const sf = document.getElementById('src-form');
+    if (sf) sf.addEventListener('submit', async (e) => { e.preventDefault(); if (!sf.reportValidity()) return; await busy(document.getElementById('src-btn'), 'Fetching', async () => {
+      const r = await api(`/projects/${pid}/safety/sources`, { method: 'POST', pid, body: Object.fromEntries(new FormData(sf)) }); await render();
+      ok(`Source recorded: ${label(r.url_status)}, ${label(r.excerpt_status)}, ${r.official_domain ? 'official-looking domain' : 'not an official domain'}. Safety now: ${label(r.safety_status)}.`); }); });
+  };
+
+  // ---------------- criteria table (shared)
+  function criteriaTable(rows, pid) {
+    return `<div class="table-wrap"><table><thead><tr><th scope="col">Criterion</th><th scope="col">Kind</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Why</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td><b>${esc(r.name)}</b><div class="small faint">${esc(r.id)}, PDF p.${esc(r.pdf_page)}</div></td><td class="small">${esc(r.kind.replace('_', ' '))}</td>
+        <td>${chip(r.status)}</td><td>${r.score != null ? `<span class="score">${r.score}</span><span class="small faint">/5</span>` : '<span class="faint">—</span>'}</td>
+        <td class="small">${esc(r.reasoning)}${(r.caveats || []).length ? `<div class="faint">${r.caveats.map(esc).join(' ')}</div>` : ''}
+        ${(r.evidence_ids || []).length ? `<div>Evidence: ${r.evidence_ids.map((id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`).join(', ')}</div>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  async function decideFlow(pid, run, rec, evalHash, action) {
+    const against = ['REPEAT', 'PIVOT', 'REVISE', 'STOP_DO_NOT_LAUNCH'].includes(rec);
+    const phaseName = run.phase === 'discover' ? 'discovery' : 'validation';
+    const texts = {
+      APPROVE: { title: run.phase === 'discover' ? 'Approve validation research?' : 'Approve more research?', confirm: 'Approve research only',
+        body: `<p>This records your decision on ${phaseName} version ${run.version} (brief v${run.brief_version}, report ${short(run.report_hash)}). It allows FounderOS to help you design and evaluate demand tests. It never allows building, launching, publishing, sending, spending or signing.</p>
+        ${against ? `<div class="notice warn"><b>The gate says ${esc(label(rec))}.</b><p>You can choose a different course, but you must give your reason. It is logged.</p></div>
+        <div class="field"><label for="d-fb">Your reason</label><textarea id="d-fb" name="feedback" required minlength="5" rows="3"></textarea></div>
+        <label class="check"><input type="checkbox" name="ack" required> I have read the gate's reasons and choose to continue research anyway.</label>`
+        : '<div class="field"><label for="d-fb">Note <span class="opt">(optional)</span></label><textarea id="d-fb" name="feedback" rows="2"></textarea></div>'}` },
+      REVISE: { title: `Ask the agent to revise the ${phaseName}?`, confirm: 'Request revision', body: '<p>Your feedback goes into the next run. This report is kept, unchanged, in the log.</p><div class="field"><label for="d-fb">What should change?</label><textarea id="d-fb" name="feedback" required minlength="5" rows="3"></textarea></div>' },
+      PIVOT: { title: 'Pivot?', confirm: 'Record pivot', body: `<p>A pivot resets work downstream: ${run.phase === 'validate' ? 'discovery reopens and locked tests are archived.' : 'validation is retired.'} The new direction is untested.</p><div class="field"><label for="d-fb">Which direction, and why?</label><textarea id="d-fb" name="feedback" required minlength="5" rows="3"></textarea></div>` },
+      STOP: { title: 'Stop this venture?', confirm: 'Stop the venture', danger: true, body: '<p>Stopping is enforced: no further runs, evidence or tests. The full record stays readable. A defensible decision not to launch is a good outcome.</p><div class="field"><label for="d-fb">Reason <span class="opt">(optional)</span></label><textarea id="d-fb" name="feedback" rows="2"></textarea></div>' },
+    }[action];
+    dialog({ ...texts, onConfirm: async (fd) => {
+      const body = { run_id: run.id, report_hash: run.report_hash, brief_version: run.brief_version, decision: action, feedback: fd.get('feedback') || '', acknowledge_risk: fd.get('ack') === 'on' };
+      if (evalHash) body.evaluation_hash = evalHash;
+      const r = await api(`/projects/${pid}/phases/${run.phase}/decision`, { method: 'POST', pid, body });
+      await render(); ok(`Recorded: ${label(r.state)}. Scope: ${r.scope === 'RESEARCH_ONLY' ? 'research only' : 'none'}. Nothing external happened.`);
+    } });
+  }
+  function gateButtons(run, pid, rec, evalHash) {
+    if (!run || run.state !== 'PENDING_APPROVAL' || snap.current.stopped) return '';
+    const stop = rec === 'STOP';
+    return `<div class="gate-actions row" data-run="${run.id}">${stop ? '' : '<button class="btn" data-decide="APPROVE">Approve research</button>'}<button class="btn secondary" data-decide="REVISE">Revise</button><button class="btn secondary" data-decide="PIVOT">Pivot</button><button class="btn danger" data-decide="STOP">Stop venture</button></div>`;
+  }
+  function wireGate(run, pid, rec, evalHash) { main.querySelectorAll('[data-decide]').forEach((b) => b.onclick = () => decideFlow(pid, run, rec, evalHash, b.dataset.decide)); }
+
+  // ---------------- Discovery
+  VIEWS.discovery = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Discover');
+    const run = s.phase_runs.find((r) => r.phase === 'discover');
+    const st = s.safety && s.safety.status, cleared = st === 'ALLOW_DISCOVERY' || (st === 'REVIEW_REQUIRED' && s.safety.acknowledged_at);
+    const canRun = s.brief && cleared && !s.current.stopped && !(run && ['PENDING_APPROVAL', 'APPROVED'].includes(run.state));
+    const why = !s.brief ? 'Refine the brief first.' : !cleared ? (st === 'BLOCK' ? 'A hard stop applies.' : 'Acknowledge the safety flags first.') : s.current.stopped ? 'This venture is stopped.' : 'Waiting for your decision on the current run.';
+    const ev = s.criteria.discover, e = ev && ev.evaluation;
+    const runBtn = `<button class="btn ${run ? 'secondary' : ''}" id="disc-run" ${canRun ? '' : 'disabled'}>${run ? 'Run again with your feedback' : 'Run the discovery agent'}</button>${canRun ? '' : `<span class="why-disabled">${esc(why)}</span>`}`;
+    if (!run) {
+      main.innerHTML = `${head('Discover', 'A separate agent on your local model proposes the problem, beachhead customer, alternatives, hypotheses and cheap tests. Everything it writes is a hypothesis.')}
+        <div class="empty"><h2>No discovery yet</h2><p>On a laptop CPU the agent can take a minute or more. You will decide what happens next; nothing continues automatically.</p><div class="row">${runBtn}</div></div>
+        ${actionbar([`/projects/${pid}/safety`, 'Safety'], { disabled: true, label: 'Continue to research', reason: 'Run discovery first.' })}`;
+      wireRun();
+      return;
+    }
+    const r = run.report;
+    const list = (xs) => (xs || []).length ? `<ul class="bullets">${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="faint">None given.</p>';
+    const flags = (r._safety_flags || []);
+    const tone2 = e ? ({ GO_ON: 'clear', STOP: 'stop', PIVOT: 'hold', REPEAT: 'hold', REVIEW_REQUIRED: 'hold' }[e.exit] || 'unknown') : 'unknown';
+    const unknownN = e ? e.criteria.filter((c) => c.unknown).length : null;
+    main.innerHTML = `${head('Discover', 'Hypotheses from your local model, then a gate decided by code from the evidence you have.', `<div class="row no-print">${runBtn}</div>`)}
+      ${run.invalidated_reason ? `<div class="notice warn">This run is out of date: ${esc(run.invalidated_reason)}. Run it again.</div>` : ''}
+      ${flags.length ? `<div class="notice error"><b>The agent proposed a prohibited tactic</b><p>${flags.map((f) => `${esc(RULE_NAME[f.rule_id] || f.rule_id)} in “${esc(f.text.slice(0, 120))}”`).join('; ')}. The gate asks you to revise.</p></div>` : ''}
+      <div class="cols"><div class="stack">
+        <div class="cards">
+          <section class="card wide"><h3>Problem and customer <span class="small faint">hypothesis</span></h3><p>${esc(r.problem_statement)}</p>
+            <dl class="facts small"><dt>Who uses it</dt><dd>${esc(r.beachhead_user || '—')}</dd><dt>Who pays</dt><dd>${esc(r.beachhead_payer || '—')}</dd><dt>Target groups</dt><dd>${(r.target_customers || []).map(esc).join('; ')}</dd></dl></section>
+          <section class="card"><h3>What they use today <span class="chip unknown" title="not sourced">Unverified</span></h3>${list(r.alternatives_unverified)}<p class="small faint">Listed by the model, not found by search. “None found” never means no competitors.</p></section>
+          <section class="card"><h3>Value proposition</h3><p>${esc(r.value_proposition)}</p>${(r.opportunities || []).length ? `<h3 style="margin-top:10px">Opportunities</h3>${list(r.opportunities)}` : ''}</section>
+          <section class="card"><h3>Feasibility for you</h3>${list(r.feasibility_notes)}</section>
+          <section class="card"><h3>Viability, first look <span class="chip hold plain">Untested</span></h3><p>${esc(r.viability_first_look || 'No charging idea given.')}</p></section>
+          <section class="card wide"><h3>Falsifiable hypotheses</h3>${list(r.hypotheses)}</section>
+          <section class="card"><h3>Candidate directions</h3>${(r.directions || []).length ? r.directions.map((d) => `<div class="dir"><span class="tag" aria-label="Direction ${esc(d.id)}">${esc(d.id)}</span><div><b>${esc(d.name)}</b><div class="small muted">${esc(d.segment)}: ${esc(d.value)}</div></div></div>`).join('') : '<p class="faint">None given.</p>'}</section>
+          <section class="card"><h3>Most critical unknowns</h3>${list(r.unknowns)}<h3 style="margin-top:10px">Cheap tests it suggests</h3>${list(r.experiments)}</section>
+        </div>
+        ${(r._skeptic_flags || []).length ? `<details class="panel"><summary><b>Skeptic review</b> <span class="small muted">${r._skeptic_flags.length} over-claims or unsourced numbers in the agent's text</span></summary><ul class="bullets small">${r._skeptic_flags.map((f) => `<li>${esc(f.issue)}</li>`).join('')}</ul></details>` : ''}
+        <section class="gate" data-tone="${tone2}" aria-labelledby="dg"><div class="gate-body">
+          <div class="gate-kicker">Discover gate, decided by code (criterion D09), run v${run.version}</div>
+          <p class="verdict" id="dg">${e ? esc(label(e.exit)) : 'Not evaluated'}</p>
+          ${e ? `<div class="why">${e.reasons.map((x) => `<p>${esc(x)}</p>`).join('')}</div><p class="small muted">${unknownN} of ${e.criteria.length} criteria unknown. Unknown is not zero. Settings: pass mark ${e.config.discover_gate.pass_mark}, pivot mark ${e.config.discover_gate.pivot_mark}, at most ${e.config.discover_gate.max_unknown_scored} unknown scores (team assumptions).</p>` : ''}
+          ${ev && ev.stale ? `<div class="notice warn"><b>Evidence or settings changed since this evaluation.</b><p>Re-evaluate before deciding.</p><button class="btn secondary" id="reeval">Re-evaluate criteria</button></div>` : ''}
+          <p class="small">State: ${chip(run.state)} ${run.state === 'APPROVED' ? 'Approval allows validation research only.' : ''}</p>
+          ${ev && ev.stale ? '' : gateButtons(run, pid, e && e.exit)}
+        </div></section>
+        ${e ? `<section class="panel"><header><h2>Criteria scorecard</h2><span class="small muted">${esc(e.criteria_version)}</span></header>${criteriaTable(e.criteria, pid)}
+          <div class="row" style="margin-top:12px"><button class="btn secondary small" id="reeval2">Re-evaluate after new evidence</button><span class="small muted">The judge scores one criterion at a time, only from evidence in your ledger, and code checks every reference.</span></div></section>` : ''}
+        ${settingsPanel(s)}
+        <details class="adv"><summary>Advanced: raw report and hashes</summary><p class="small">Report hash <code>${esc(run.report_hash)}</code>, evaluation <code>${esc(e && e.evaluation_hash)}</code>, model ${esc(run.model)}, ${run.latency_ms} ms.</p><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>
+      </div>
+      ${nextPanel('What happens next', [e && e.exit === 'REPEAT' ? 'Gather evidence in Research, then re-evaluate. Or approve with a recorded reason to start designing a demand test.' : 'Read the gate and decide.',
+        'Approving allows validation research only.', 'Revise sends your feedback to the agent; Pivot resets downstream work.'])}
+      </div>
+      ${actionbar([`/projects/${pid}/safety`, 'Safety'], { href: `/projects/${pid}/research`, label: 'Continue to research' })}`;
+    wireRun();
+    wireGate({ ...run, phase: 'discover' }, pid, e && e.exit, e && ev.evaluation_hash);
+    for (const id of ['reeval', 'reeval2']) { const b = document.getElementById(id); if (b) b.onclick = () => busy(b, 'Evaluating', async () => { const x = await api(`/projects/${pid}/criteria/evaluate`, { method: 'POST', pid }); await render(); ok(`Re-evaluated with ${x.judge_calls} judge call(s). Gate: ${label(x.evaluation.exit)}.`); }); }
+    wireSettings(pid);
+    function wireRun() { const b = document.getElementById('disc-run'); if (b) b.onclick = () => busy(b, 'Running the discovery agent', async () => { const x = await api(`/projects/${pid}/phases/discover/run`, { method: 'POST', pid }); await render(); ok(`Discovery version ${x.version} ready in ${Math.round(x.latency_ms / 1000)} s. Gate: ${label(x.evaluation && x.evaluation.exit)}.`); }); }
+  };
+
+  function settingsPanel(s) {
+    const c = s.criteria.config;
+    return `<details class="panel"><summary><b>Criteria settings</b> <span class="small muted">version ${s.criteria.config_version}, ${esc(c.origin)}</span></summary>
+      <p class="small muted">These weights and pass marks are your team's assumptions, not industry benchmarks. Change them before a run; a change creates a new version and retires approvals made under the old one. Safety checks and knockouts cannot be changed.</p>
+      <form id="cfg-form"><div class="grid3">${Object.entries(c.weights).map(([k, v]) => `<div class="field"><label for="w-${k}">Weight ${esc(k)}</label><input id="w-${k}" name="w.${k}" type="number" min="0.5" max="10" step="0.5" value="${v}"></div>`).join('')}</div>
+      <div class="grid3"><div class="field"><label for="g-pass">Discover pass mark (1–5)</label><input id="g-pass" name="g.pass_mark" type="number" min="1.5" max="5" step="0.5" value="${c.discover_gate.pass_mark}"></div>
+      <div class="field"><label for="g-piv">Pivot mark</label><input id="g-piv" name="g.pivot_mark" type="number" min="1" max="4.5" step="0.5" value="${c.discover_gate.pivot_mark}"></div>
+      <div class="field"><label for="g-unk">Most unknown scores allowed</label><input id="g-unk" name="g.max_unknown_scored" type="number" min="0" max="5" step="1" value="${c.discover_gate.max_unknown_scored}"></div>
+      <div class="field"><label for="g-age">Oldest source, years</label><input id="g-age" name="e.max_age_years" type="number" min="1" max="30" value="${c.evidence.max_age_years}"></div>
+      <div class="field"><label for="g-nm">Near-miss band</label><input id="g-nm" name="r.near_miss_band" type="number" min="0" max="0.5" step="0.05" value="${c.results.near_miss_band}"></div></div>
+      <button class="btn secondary small" id="cfg-btn">Save as new settings version</button></form></details>`;
+  }
+  function wireSettings(pid) {
+    const f = document.getElementById('cfg-form');
+    if (!f) return;
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const changes = { weights: {}, discover_gate: {}, evidence: {}, results: {} };
+      for (const [k, v] of new FormData(f)) {
+        const [g, n] = k.split('.');
+        const num = Number(v);
+        if (g === 'w') changes.weights[n] = num; else if (g === 'g') changes.discover_gate[n] = n === 'max_unknown_scored' ? Math.round(num) : num;
+        else if (g === 'e') changes.evidence[n] = Math.round(num); else changes.results[n] = num;
+      }
+      await busy(document.getElementById('cfg-btn'), 'Saving', async () => { const r = await api(`/projects/${pid}/criteria/config`, { method: 'POST', pid, body: { changes } }); await render(); ok(`Settings version ${r.version} saved. Re-run to apply.`); });
+    });
+  }
+
+  // ---------------- Research
+  const RS_TABS = [['plan', 'Plan and run'], ['sources', 'Sources'], ['ledger', 'Evidence ledger'], ['customers', 'Your customer research']];
+  VIEWS.research = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Research');
+    if (!s.brief) { main.innerHTML = `${head('Research', '')}<div class="empty"><h2>Refine the brief first</h2><p>The research plan is built from your brief.</p><a class="btn" href="/projects/${pid}/brief" data-link>Go to the brief</a></div>`; return; }
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab') || (params.get('ev') ? 'ledger' : 'plan');
+    const [plan, rs] = await Promise.all([api(`/projects/${pid}/research/plan`, { pid }), api(`/projects/${pid}/research`, { pid })]);
+    const blocked = s.safety && s.safety.status === 'BLOCK';
+    const ev = s.criteria.discover;
+    main.innerHTML = `${head('Research', 'Gather sources, inspect the actual pages, and add exact passages to your evidence ledger. Finding a source is not verifying it, and a published article never proves demand for your product.')}
+      ${blocked ? '<div class="notice error"><b>Hard stop.</b><p>No research runs for an idea that hits a hard stop.</p></div>' : ''}
+      <div class="tabs" role="tablist">${RS_TABS.map(([k, n]) => `<button role="tab" aria-selected="${k === tab}" data-tab="${k}">${n}${k === 'sources' ? `<span class="count">${rs.candidates.length}</span>` : k === 'ledger' ? `<span class="count">${s.evidence.length}</span>` : ''}</button>`).join('')}</div>
+      <div class="cols"><div id="tab-body"></div>
+      ${nextPanel('What happens next', ['Run the plan, or inspect pages you found yourself.', 'Add exact passages to the ledger; you choose what each one supports or challenges.',
+        `Re-evaluate the Discover criteria${ev && ev.stale ? ' (evidence has changed)' : ''}.`, 'Then design a demand test: the only route to evidence of demand.'])}</div>
+      <div class="row no-print" style="margin-top:16px"><button class="btn secondary" id="rs-eval" ${s.phase_runs.some((r) => r.phase === 'discover') ? '' : 'disabled'}>Re-evaluate Discover criteria</button>${ev && ev.stale ? chip('INVALIDATED', 'Evidence changed since the last evaluation') : ''}</div>
+      ${actionbar([`/projects/${pid}/discovery`, 'Discover'], { href: `/projects/${pid}/experiments`, label: 'Continue to demand tests' })}`;
+    main.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => { history.replaceState({}, '', `/projects/${pid}/research?tab=${b.dataset.tab}`); VIEWS.research({ pid }); });
+    const evb = document.getElementById('rs-eval');
+    evb.onclick = () => busy(evb, 'Evaluating', async () => { const x = await api(`/projects/${pid}/criteria/evaluate`, { method: 'POST', pid }); await load(pid); ok(`Re-evaluated with ${x.judge_calls} judge call(s). Discover gate: ${label(x.evaluation.exit)}.`); });
+    const body = document.getElementById('tab-body');
+    if (tab === 'plan') renderPlan(body, pid, plan, rs, blocked);
+    else if (tab === 'sources') renderSources(body, pid, rs, plan);
+    else if (tab === 'ledger') renderLedger(body, pid, params.get('ev'));
+    else renderCustomers(body, pid);
+  };
+
+  function renderPlan(body, pid, plan, rs, blocked) {
+    const prov = plan.providers;
+    body.innerHTML = `<div class="stack">
+      <section class="panel"><header><h2>Research plan from your brief</h2><span class="small muted">Brief v${plan.brief_version}</span></header>
+        <p class="small muted">${esc(plan.notice)} Ranking by keyword overlap is an exploratory heuristic only.</p>
+        <form id="plan-form">${plan.buckets.map((b) => `<div class="bucket"><h3>${esc(b.title)}</h3><p class="small">${esc(b.question)}</p>
+          ${b.items.map((it, i) => `<div class="query"><label class="check"><input type="checkbox" name="sel" value="${esc(b.id)}|${i}" checked><span class="prov-name">${esc(prov[it.provider].name)}</span></label>
+            ${it.query != null ? `<label class="sr-only" for="q-${b.id}-${i}">Query</label><input id="q-${b.id}-${i}" name="q:${b.id}|${i}" value="${esc(it.query)}" maxlength="160">` : `<span>${esc(it.indicator)} <span class="small faint">official national statistic</span></span>`}<span></span></div>`).join('')}
+          ${b.status === 'DISCOVERY_NOT_AVAILABLE' ? `<p class="small">${chip('DISCOVERY_NOT_AVAILABLE')}</p>` : ''}
+          <p class="small muted">${esc(b.caution)}</p>
+          ${b.manual.length ? `<p class="small">Search yourself: ${b.manual.map((m) => `<a href="${esc(m.open_in_browser)}" target="_blank" rel="noopener noreferrer">${esc(m.query)}</a>`).join(', ')}. Paste pages you want verified in the Sources tab.</p>` : ''}</div>`).join('')}
+        <div class="row"><button class="btn" id="plan-run" ${blocked ? 'disabled' : ''}>Run selected searches</button><span class="small muted">Sends only the queries shown to the providers listed. Free public services; they may throttle or be offline.</span></div></form></section>
+      <section class="panel"><header><h2>Providers and what they cannot do</h2></header><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Covers</th><th>Does not cover</th></tr></thead><tbody>
+        ${Object.values(prov).map((p) => `<tr><td><b>${esc(p.name)}</b><div class="small faint">${esc(p.access)}</div></td><td class="small">${esc(p.covers)}</td><td class="small">${esc(p.does_not_cover)}</td></tr>`).join('')}</tbody></table></div></section>
+      <section class="panel"><header><h2>Search history</h2></header>${rs.runs.length ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Bucket</th><th>Provider</th><th>Query</th><th>Status</th><th>Results</th></tr></thead><tbody>
+        ${rs.runs.map((r) => `<tr><td class="small">${when(r.created_at)}</td><td>${esc(r.bucket)}</td><td>${esc(prov[r.provider] ? prov[r.provider].name : r.provider)}</td><td class="small">${esc(r.query)}</td><td>${chip(r.status, r.error)}${r.error ? `<div class="small faint">${esc(r.error)}</div>` : ''}</td><td>${r.result_count}</td></tr>`).join('')}</tbody></table></div>` : '<p class="faint">No searches run yet.</p>'}</section></div>`;
+    const f = document.getElementById('plan-form');
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(f);
+      const items = fd.getAll('sel').map((key) => { const [bid, i] = key.split('|'); const b = plan.buckets.find((x) => x.id === bid); const it = b.items[Number(i)];
+        return { bucket: bid, provider: it.provider, query: it.query != null ? (fd.get(`q:${key}`) || it.query) : null, indicator: it.indicator || null }; });
+      if (!items.length) { flash('<div class="notice warn">Select at least one search.</div>'); return; }
+      await busy(document.getElementById('plan-run'), 'Searching', async () => {
+        const r = await api(`/projects/${pid}/research/run`, { method: 'POST', pid, body: { items } });
+        const okN = r.runs.filter((x) => x.status === 'OK').length;
+        history.replaceState({}, '', `/projects/${pid}/research?tab=sources`); await load(pid); await VIEWS.research({ pid });
+        flash(`<div class="notice ${okN ? 'ok' : 'warn'}"><b>${okN} of ${r.runs.length} searches returned results.</b><p>${r.runs.map((x) => `${esc(x.provider)} (${esc(x.bucket)}): ${esc(label(x.status))}${x.error ? `, ${esc(x.error)}` : ''}`).join('; ')}. Candidates are not evidence until you review them.</p></div>`);
+      });
+    });
+  }
+
+  function candFilter(c, s) {
+    if (['REJECTED', 'FETCH_FAILED'].includes(c.state)) return 'excluded';
+    if (c.state === 'EVIDENCE_ADDED') { const e = s.evidence.find((x) => x.id === c.evidence_id); return e && ['EXCERPT_MATCHED', 'STRUCTURED_DATUM'].includes(e.excerpt_status) ? 'verified' : 'context'; }
+    return 'unreviewed';
+  }
+  function renderSources(body, pid, rs, plan) {
+    const s = snap;
+    const f = new URLSearchParams(location.search).get('f') || 'unreviewed';
+    const groups = { unreviewed: 'Unreviewed', verified: 'Verified excerpt', context: 'Context only', excluded: 'Excluded' };
+    const counts = Object.fromEntries(Object.keys(groups).map((k) => [k, rs.candidates.filter((c) => candFilter(c, s) === k).length]));
+    const dirs = ((s.phase_runs.find((r) => r.phase === 'discover') || {}).report || {}).directions || [];
+    const list = rs.candidates.filter((c) => candFilter(c, s) === f);
+    body.innerHTML = `<div class="stack">
+      <section class="panel"><header><h2>Inspect a page you found</h2></header>
+        <form id="insp-form" class="grid2"><div class="field"><label for="i-url">Public page (https)</label><input id="i-url" name="url" type="url" required placeholder="https://"></div>
+        <div class="field"><label for="i-q">Words to look for <span class="opt">(optional)</span></label><input id="i-q" name="query" maxlength="160" placeholder="e.g. students deadlines price"></div>
+        <div class="field"><label for="i-b">Research bucket</label><select id="i-b" name="bucket">${plan.buckets.map((b) => `<option value="${b.id}">${esc(b.title)}</option>`).join('')}</select></div>
+        <div class="field" style="align-self:end"><button class="btn secondary" id="insp-btn">Fetch and inspect</button></div></form>
+        <p class="small muted">FounderOS fetches the page itself (public https only, private addresses blocked, every redirect re-checked) and offers passages that really appear on it.</p></section>
+      <div class="tabs" role="tablist" aria-label="Filter sources">${Object.entries(groups).map(([k, n]) => `<button role="tab" aria-selected="${k === f}" data-f="${k}">${n}<span class="count">${counts[k]}</span></button>`).join('')}</div>
+      ${list.length ? list.map((c) => sourceCard(c, dirs)).join('') : `<div class="empty"><p>${f === 'unreviewed' ? 'No unreviewed candidates. Run the plan or inspect a page.' : 'Nothing here.'}</p></div>`}</div>`;
+    body.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => { history.replaceState({}, '', `/projects/${pid}/research?tab=sources&f=${b.dataset.f}`); renderSources(body, pid, rs, plan); });
+    const insp = document.getElementById('insp-form');
+    insp.addEventListener('submit', async (e) => { e.preventDefault(); if (!insp.reportValidity()) return;
+      await busy(document.getElementById('insp-btn'), 'Fetching', async () => { const c = await api(`/projects/${pid}/research/inspect`, { method: 'POST', pid, body: Object.fromEntries(new FormData(insp)) });
+        await refreshSources(pid, plan); flash(c.state === 'FETCHED' ? `<div class="notice ok">Page inspected: ${c.fetch.passages.length} passages offered from the actual page text.</div>` : `<div class="notice error"><b>Could not fetch.</b><p>${esc(c.fetch && c.fetch.error)}</p></div>`); }); });
+    body.querySelectorAll('[data-fetch]').forEach((b) => b.onclick = () => busy(b, 'Fetching', async () => { const c = await api(`/projects/${pid}/research/candidates/${b.dataset.fetch}/fetch`, { method: 'POST', pid }); await refreshSources(pid, plan);
+      flash(c.state === 'FETCHED' ? '<div class="notice ok">Page inspected.</div>' : `<div class="notice warn"><b>Could not fetch the page.</b><p>${esc(c.fetch && c.fetch.error)}. It stays metadata only.</p></div>`); }));
+    body.querySelectorAll('[data-reject]').forEach((b) => b.onclick = () => dialog({ title: 'Reject this source?', confirm: 'Reject', body: '<div class="field"><label for="rj">Why?</label><input id="rj" name="reason" required minlength="3" maxlength="300" placeholder="Off-topic, wrong country, too old…"></div>',
+      onConfirm: async (fd) => { await api(`/projects/${pid}/research/candidates/${b.dataset.reject}/reject`, { method: 'POST', pid, body: { reason: fd.get('reason') } }); await refreshSources(pid, plan); } }));
+    body.querySelectorAll('form[data-add]').forEach((form) => form.addEventListener('submit', async (e) => {
+      e.preventDefault(); if (!form.reportValidity()) return;
+      const fd = Object.fromEntries([...new FormData(form)].filter(([, v]) => String(v).trim()));
+      await busy(form.querySelector('button[type=submit]'), 'Adding', async () => { const r = await api(`/projects/${pid}/research/candidates/${form.dataset.add}/add`, { method: 'POST', pid, body: fd }); await load(pid); await refreshSources(pid, plan);
+        flash(`<div class="notice ${r.duplicate_of ? 'warn' : 'ok'}">Added to the ledger: ${esc(label(r.excerpt_status))}${r.duplicate_of ? '. Duplicate of an earlier source, so it is not counted twice' : ''}${r.injection_flag ? '. It contains instruction-like text and is excluded' : ''}. Re-evaluate the criteria to use it.</div>`); });
     }));
   }
+  async function refreshSources(pid, plan) { const rs = await api(`/projects/${pid}/research`, { pid }); await load(pid); renderSources(document.getElementById('tab-body'), pid, rs, plan); }
 
-  function renderValidation(val) {
-    const n = $('validate-output');
-    if (!val) { n.className = 'output empty'; n.textContent = 'Approve the latest discovery first.'; return; }
-    const r = val.report;
-    n.className = 'output';
-    n.innerHTML = `<div class="small">v${val.version} · ${esc(val.state)} · ${esc(val.model)} · ${val.latency_ms} ms</div>`
-      + `<div class="field"><b>Agent summary (explains the backend verdict; cannot change it)</b><div>${esc(r.summary)}</div></div>`
-      + `<div class="field"><b>Market research vs customer demand</b><div>${esc(r.market_research_vs_customer_demand)}</div></div>`
-      + `<div class="field"><b>Risks</b>${list(r.risks)}</div><div class="field"><b>Contradictions / gaps</b>${list(r.contradictions_or_gaps)}</div>`
-      + `<div class="field"><b>Pricing hypotheses (UNTESTED)</b>${list(r.pricing_hypotheses)}</div><div class="field"><b>Business model hypotheses (UNTESTED)</b>${list(r.business_model_hypotheses)}</div>`
-      + `<div class="field"><b>Competitor research limitations</b>${list(r.competitor_research_limitations)}</div>`
-      + (r._skeptic_flags?.length ? `<div class="field warn"><b>Skeptic reviewer flags (${r._skeptic_flags.length})</b>${list(r._skeptic_flags, f => esc(f.issue) + ' <span class="small">in ' + esc(f.field) + '</span>')}</div>` : '<div class="small">Skeptic reviewer: no over-claims or unsourced numbers detected in agent text.</div>');
-  }
-
-  function renderEvidence(evidence) {
-    $('evidence-list').innerHTML = evidence.length ? evidence.map(e => `<div class="evidence-row" id="ev-${esc(e.id)}"><strong><code>${esc(short(e.id))}</code> ${esc(e.kind)} · ${esc(e.dimension)} · ${esc(e.direction)}${e.duplicate_of ? ' · <span class="tag UNKNOWN">DUPLICATE of ' + esc(short(e.duplicate_of)) + '</span>' : ''}${e.injection_flag ? ' · <span class="tag BLOCK">EXCLUDED (injection)</span>' : ''}</strong><div>${esc(e.claim)}</div>`
-      + (e.source_url ? `<div class="small">${esc(e.title || '')} ${esc(e.publisher || '')} ${esc(e.published_on || '')} · <a href="${esc(e.source_url)}" target="_blank" rel="noopener noreferrer">${esc(e.source_url)}</a> · <span class="tag ${e.url_status === 'URL_ACCESSIBLE' ? 'EXPLICIT' : 'BLOCK'}">${esc(e.url_status)}</span> <span class="tag ${e.excerpt_status === 'EXCERPT_MATCHED' ? 'EXPLICIT' : 'BLOCK'}">${esc(e.excerpt_status)}</span> · retrieved ${esc(stamp(e.retrieved_at))}</div><div class="small">“${esc(e.excerpt)}”</div>` : `<div class="small">${esc(e.method || '')} · n=${esc(e.sample_size)} · positives=${esc(e.positives ?? '—')} · ${esc(e.collected_from || '')}→${esc(e.collected_to || '')} · <span class="tag INFERRED_UNCONFIRMED">${esc(e.independence)}</span>${e.outcome ? ' · outcome <b>' + esc(e.outcome) + '</b> (' + esc(e.rate_pct) + '%) vs experiment ' + esc(short(e.experiment_id)) + ' v' + esc(e.experiment_version) : ''}</div>`)
-      + `<div class="small">${esc(e.limitations)}</div></div>`).join('') : '<p class="hint">No evidence recorded. The verdict will say NEEDS_EVIDENCE; it will not pretend otherwise.</p>';
-  }
-
-  async function loadSuggestion() {
-    try { suggestion = await api('/projects/' + session.project_id + '/experiments/suggest'); } catch (e) { suggestion = null; return; }
-    const n = $('experiment-suggestion'); n.className = 'output';
-    if (suggestion.kind === 'RUN_LOCKED_EXPERIMENT') { n.innerHTML = `<b>Run your locked experiment ${esc(short(suggestion.experiment_id))} v${suggestion.version}</b><div>${esc(suggestion.instruction)}</div><pre>${esc(pretty(suggestion.criteria))}</pre>`; return; }
-    n.innerHTML = `<div class="small">${esc(suggestion.kind)} · claim ${esc(suggestion.claim_id)} · ${esc(suggestion.dimension)}</div><div class="field"><b>Hypothesis</b><div>${esc(suggestion.hypothesis)}</div></div><div class="field"><b>Target segment</b><div>${esc(suggestion.target_segment)}</div></div><div class="field"><b>Observable metric</b><div>${esc(suggestion.metric)}</div></div><div class="field"><b>Consent</b><div>${esc(suggestion.consent_method)}</div></div><div class="field"><b>You do</b>${list(suggestion.founder_actions)}</div><div class="field"><b>Estimates</b><div>${esc(suggestion.timebox_estimate)} · ${esc(suggestion.cost_estimate)}</div></div><div class="field"><b>Suggested criteria (NOT evidence)</b><div>min n ${suggestion.suggested_criteria.min_sample} · success ≥ ${suggestion.suggested_criteria.success_threshold_pct}% · adverse ≤ ${suggestion.suggested_criteria.adverse_threshold_pct}%</div><div class="small">${esc(suggestion.suggested_criteria.label)}</div></div><div class="small">${esc(suggestion.adverse_result_trigger)} ${esc(suggestion.external_actions)}</div>`;
-  }
-
-  $('experiment-new').onclick = () => {
-    const f = $('experiment-form'); f.classList.remove('hide');
-    if (suggestion && suggestion.kind !== 'RUN_LOCKED_EXPERIMENT') {
-      f.hypothesis.value = suggestion.hypothesis.slice(0, 600); f.claim_id.value = suggestion.claim_id; f.dimension.value = suggestion.dimension; f.target_segment.value = suggestion.target_segment.slice(0, 300);
-      f.metric.value = suggestion.metric.slice(0, 400); f.consent_method.value = suggestion.consent_method.slice(0, 600); f.founder_actions.value = suggestion.founder_actions.join(' ').slice(0, 1200);
-      f.min_sample.value = suggestion.suggested_criteria.min_sample; f.success_threshold_pct.value = suggestion.suggested_criteria.success_threshold_pct; f.adverse_threshold_pct.value = suggestion.suggested_criteria.adverse_threshold_pct;
-      f.timebox_estimate.value = suggestion.timebox_estimate.slice(0, 120); f.cost_estimate.value = suggestion.cost_estimate.slice(0, 120);
+  function sourceCard(c, dirs) {
+    const p = c.payload || {}, fx = c.fetch || {};
+    const meta = [c.publisher || fx.meta && fx.meta.publisher, c.year && `published ${c.year}`, fx.meta && fx.meta.published_on && `dated ${fx.meta.published_on}`, p.geography, c.doi && `DOI ${c.doi}`].filter(Boolean);
+    const addForm = (use, extra) => `<details class="adv"><summary>Add to ledger…</summary><form data-add="${c.id}"><input type="hidden" name="use" value="${use}">${extra}
+      <div class="grid2"><div class="field"><label>Claim this bears on</label><input name="claim" required minlength="8" maxlength="800" placeholder="e.g. Cairo engineering students often miss deadlines"></div>
+      <div class="field"><label>Dimension</label><select name="dimension">${Object.entries(DIM).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div class="field"><label>Does it support or challenge the claim?</label><select name="direction"><option value="UNSURE">Unsure</option><option value="SUPPORTS">Supports</option><option value="CONTRADICTS">Challenges</option></select></div>
+      <div class="field"><label>Relevant to your exact segment?</label><select name="relevance"><option value="UNSURE">Unsure</option><option value="CLAIM_RELEVANT">Yes, relevant</option><option value="IRRELEVANT">No, context only</option></select></div>
+      <div class="field"><label>Geography it describes</label><input name="geography" maxlength="120" value="${esc(p.geography || '')}" placeholder="e.g. Egypt"></div>
+      <div class="field"><label>Candidate direction <span class="opt">(optional)</span></label><select name="direction_id"><option value="">None</option>${dirs.map((d) => `<option value="${esc(d.id)}">${esc(d.id)}: ${esc(d.name)}</option>`).join('')}</select></div></div>
+      <button class="btn small" type="submit">Add to ledger</button></form></details>`;
+    let inner = '';
+    if (c.state === 'FETCHED' && fx.passages) {
+      inner = `${fx.paywall_suspected ? '<div class="notice warn small">This looked like a paywall or a very short page. Read the full source yourself.</div>' : ''}
+        <p class="small muted">Passages from the fetched page, ordered by word overlap (a rough heuristic). Pick one; FounderOS stores it only if it is really on the page.</p>
+        <form data-add="${c.id}"><input type="hidden" name="use" value="PASSAGE">${fx.passages.map((ps, i) => `<label class="passage check"><input type="radio" name="excerpt" value="${esc(ps.text)}" ${i === 0 && !ps.injection_flag ? 'checked' : ''} required><span>${esc(ps.text)}${ps.injection_flag ? ' <span class="chip stop">Instruction-like text</span>' : ''}</span></label>`).join('')}
+        ${addForm('PASSAGE', '').replace(/^<details[^>]*><summary>[^<]*<\/summary><form[^>]*><input[^>]*>/, '').replace(/<\/form><\/details>$/, '')}</form>`;
+    } else if (c.state === 'FETCH_FAILED') {
+      inner = `<p class="small">${chip('FETCH_FAILED')} ${esc(fx.error || '')}</p>${p.abstract ? `<details class="adv"><summary>Provider abstract (metadata only)</summary><blockquote>${esc(p.abstract)}</blockquote>${addForm('ABSTRACT_METADATA', '<p class="small muted">Added as metadata only: kept as context, never counted in scores.</p>')}</details>` : ''}`;
+    } else if (c.state === 'CANDIDATE_METADATA') {
+      inner = `${p.abstract ? `<p class="small muted">Provider abstract, metadata only:</p><blockquote>${esc(p.abstract.slice(0, 500))}${p.abstract.length > 500 ? '…' : ''}</blockquote>` : '<p class="small faint">Title and metadata only. Inspect the page to see what it actually says.</p>'}
+        <div class="row">${c.url ? `<button class="btn secondary small" data-fetch="${c.id}">Inspect the page</button>` : ''}<button class="btn quiet small" data-reject="${c.id}">Reject</button></div>
+        ${p.abstract ? `<details class="adv"><summary>Add the abstract as context only</summary>${addForm('ABSTRACT_METADATA', '')}</details>` : ''}`;
+    } else if (c.state === 'EVIDENCE_ADDED') {
+      inner = `<p class="small">In the ledger as <a href="/projects/${snap.project.id}/research?ev=${c.evidence_id}" data-link>${short(c.evidence_id)}</a>.</p>`;
+    } else if (c.state === 'REJECTED') inner = `<p class="small">Rejected: ${esc(c.reject_reason)}</p>`;
+    if (c.provider === 'worldbank' && c.state === 'FETCHED') {
+      inner = `<blockquote>${esc(p.datum)}</blockquote><p class="small muted">${esc(p.limitation)}</p><div class="row"><button class="btn quiet small" data-reject="${c.id}">Reject</button></div>${addForm('STRUCTURED_DATUM', '')}`;
     }
-    f.scrollIntoView({behavior: 'smooth'});
-  };
-  $('experiment-form').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => {
-    const d = formData(ev.target);
-    const r = await api('/projects/' + session.project_id + '/experiments', 'POST', d);
-    ev.target.classList.add('hide'); suggestion = null; await refresh(); tell('Draft ' + short(r.experiment_id) + ' saved. Lock it before collecting any data.', true);
-  }, 'Saving…'); });
+    return `<article class="source" id="cand-${c.id}"><div class="row" style="justify-content:space-between"><span class="title" data-k="t">${esc((fx.meta && fx.meta.title && (!c.title || c.title === c.url)) ? fx.meta.title : (c.title || c.url))}</span>${chip(c.provider === 'worldbank' && c.state === 'FETCHED' ? 'STRUCTURED_DATUM' : c.state)}</div>
+      ${c.url ? `<div class="url"><a href="${esc(fx.final_url || c.url)}" target="_blank" rel="noopener noreferrer">${esc(fx.final_url || c.url)}</a></div>` : ''}
+      <div class="meta"><span>${esc((PROV_NAMES[c.provider] || c.provider))}</span>${meta.map((m) => `<span>${esc(m)}</span>`).join('')}${fx.retrieved_at ? `<span>fetched ${when(fx.retrieved_at)}</span>` : ''}</div>${inner}</article>`;
+  }
+  const PROV_NAMES = { crossref: 'Crossref metadata', openalex: 'OpenAlex metadata', worldbank: 'World Bank Indicators', founder_url: 'Page you supplied', founder_manual: 'Entered by you' };
 
-  function renderExperiments(experiments, stopped) {
-    const bySeries = {};
-    experiments.forEach(x => { (bySeries[x.id] = bySeries[x.id] || []).push(x); });
-    const div = $('experiment-list');
-    div.innerHTML = Object.values(bySeries).map(rows => rows.map(x => {
-      const c = x.payload;
-      let html = `<div class="evidence-row"><strong><code>${esc(short(x.id))}</code> v${x.version} · <span class="tag ${x.status === 'LOCKED' ? 'EXPLICIT' : x.status === 'DRAFT' ? 'INFERRED_UNCONFIRMED' : 'UNKNOWN'}">${esc(x.status)}</span>${x.locked_at ? ' · pre-registered ' + esc(stamp(x.locked_at)) : ''}</strong><div>${esc(c.hypothesis)}</div><div class="small">${esc(c.target_segment)} · metric: ${esc(c.metric)} · min n ${c.min_sample} · success ≥ ${c.success_threshold_pct}% · adverse ≤ ${c.adverse_threshold_pct}% · ${c.critical ? 'CRITICAL' : 'non-critical'}${c.pivot_alternative ? ' · pivot alt: ' + esc(c.pivot_alternative) : ''} · hash ${esc(short(x.criteria_hash))}…</div>${x.result_evidence_id ? `<div class="small">Result recorded as evidence <a href="#ev-${esc(x.result_evidence_id)}">${esc(short(x.result_evidence_id))}</a></div>` : ''}`;
-      const latest = rows[rows.length - 1] === x;
-      if (latest && !stopped && x.status === 'DRAFT') html += `<div class="actions"><button class="secondary smal" data-lock="${esc(x.id)}" data-v="${x.version}" data-h="${esc(x.criteria_hash)}">Lock / pre-register v${x.version} ↗</button><button class="ghost smal" data-revise="${esc(x.id)}">Edit (new version)</button></div>`;
-      if (latest && !stopped && x.status === 'LOCKED' && !x.result_evidence_id) html += `<form class="result-form" data-sid="${esc(x.id)}" data-v="${x.version}" data-h="${esc(x.criteria_hash)}"><div class="two"><label>Relevant participants (n)<input name="sample_size" type="number" min="1" required></label><label>Positives<input name="positives" type="number" min="0" required></label><label>Method<input name="method" required minlength="10"></label><label>Collected from<input name="collected_from" type="date" required></label><label>Collected to<input name="collected_to" type="date" required></label></div><label>Positive signals<input name="positive_signals"></label><label>Negative signals<input name="negative_signals"></label><label class="warn"><input type="checkbox" name="consent_confirmed" class="inline">Participants consented; nothing invented or incentivized.</label><div class="actions"><button class="secondary smal" type="submit">Submit founder-reported result ↗</button><button class="ghost smal" type="button" data-revise="${esc(x.id)}">Change criteria (new version, retires results)</button></div></form>`;
-      if (latest && !stopped && x.status === 'LOCKED' && x.result_evidence_id) html += `<div class="actions"><button class="ghost smal" data-revise="${esc(x.id)}">Repeat with new criteria (new version)</button></div>`;
-      return html + '</div>';
-    }).join('')).join('') || '<p class="hint">No experiments yet.</p>';
-    div.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => act(b, async () => {
-      if (!confirm('Pre-register these criteria now? After locking they cannot be edited; a change creates a new version.')) return;
-      await api('/projects/' + session.project_id + '/experiments/' + b.dataset.lock + '/lock', 'POST', {version: Number(b.dataset.v), criteria_hash: b.dataset.h, confirm: 'I_PREREGISTER_THESE_CRITERIA_BEFORE_COLLECTING_RESULTS'});
-      suggestion = null; await refresh(); tell('Experiment pre-registered. Collect data now; submit results against the frozen criteria.', true); }, 'Locking…'));
-    div.querySelectorAll('[data-revise]').forEach(b => b.onclick = () => {
-      const x = experiments.filter(e => e.id === b.dataset.revise).pop(); const f = $('experiment-form'); f.classList.remove('hide');
-      for (const k in x.payload) if (f[k] !== undefined) { if (f[k].type === 'checkbox') f[k].checked = Boolean(x.payload[k]); else f[k].value = x.payload[k] ?? ''; }
-      f.dataset.revise = x.id; f.scrollIntoView({behavior: 'smooth'}); tell('Editing creates version ' + (x.version + 1) + '; results against v' + x.version + ' will stop counting.', true);
+  function renderLedger(body, pid, focus) {
+    const s = snap;
+    const q = (s.criteria.discover && s.criteria.discover.evaluation && s.criteria.discover.evaluation.quality) || {};
+    body.innerHTML = s.evidence.length ? `<section class="panel"><header><h2>Evidence ledger</h2><span class="small muted">Immutable; add a challenging record instead of editing</span></header>
+      <ul class="plain">${s.evidence.map((e) => { const g = q[e.id];
+        return `<li id="ev-${e.id}" ${focus === e.id ? 'style="background:var(--accent-tint);padding-left:8px"' : ''}><div class="row" style="justify-content:space-between"><b>${esc(e.claim)}</b><span class="row">${g ? chip(g.grade, g.exclusion || g.flags.join(' ')) : ''}${chip(e.excerpt_status !== 'NOT_APPLICABLE' ? e.excerpt_status : e.independence === 'FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED' ? 'DIRECT_STATEMENT' : 'UNKNOWN')}</span></div>
+          <div class="meta small muted">${esc(e.kind.replace(/_/g, ' ').toLowerCase())}, ${esc(DIM[e.dimension] || e.dimension)}, ${e.direction === 'SUPPORTS' ? 'supports' : e.direction === 'CONTRADICTS' ? 'challenges' : 'direction unsure'}${e.direction_id ? `, direction ${esc(e.direction_id)}` : ''}${e.criterion_id ? `, criterion ${esc(e.criterion_id)}` : ''}, id ${short(e.id)}</div>
+          ${e.excerpt ? `<blockquote>${esc(e.excerpt)}</blockquote>` : ''}
+          ${e.source_url ? `<div class="url small"><a href="${esc(e.final_url || e.source_url)}" target="_blank" rel="noopener noreferrer">${esc(e.final_url || e.source_url)}</a> ${esc([e.publisher, e.published_on, e.geography].filter(Boolean).join(', '))}${e.retrieved_at ? `, retrieved ${when(e.retrieved_at)}` : ''}</div>` : ''}
+          ${e.method ? `<div class="small">${esc(e.method)}: n=${esc(e.sample_size)}${e.positives != null ? `, ${esc(e.positives)} positive` : ''}, ${esc(e.collected_from)}${e.collected_to ? ` to ${esc(e.collected_to)}` : ''}. Founder-reported, not independently verified.</div>` : ''}
+          ${g && g.flags.length ? `<div class="small faint">${g.flags.map(esc).join(' ')}</div>` : ''}${g && g.exclusion ? `<div class="small" style="color:var(--stop)">Not counted: ${esc(g.exclusion)}</div>` : ''}
+          ${!g ? `<div class="small faint">${esc(e.limitations)}</div>` : ''}</li>`; }).join('')}</ul></section>`
+      : '<div class="empty"><h2>The ledger is empty</h2><p>Add verified passages from Sources, or record your own customer research. With no evidence, every scored criterion stays unknown and the verdict is “Needs evidence”.</p></div>';
+    if (focus) { const el = document.getElementById(`ev-${focus}`); if (el) el.scrollIntoView({ block: 'center' }); }
+  }
+
+  function renderCustomers(body, pid) {
+    const today = new Date().toISOString().slice(0, 10);
+    body.innerHTML = `<section class="panel"><header><h2>Record research you ran yourself</h2></header>
+      <p class="small muted">Interviews, sign-ups or usage you observed with real people who agreed to take part. FounderOS never contacts anyone and never invents participants. Everything here stays labelled “founder-reported, not independently verified”.</p>
+      <form id="cust-form"><div class="grid2"><div class="field"><label for="c-kind">What you observed</label><select id="c-kind" name="kind"><option value="CUSTOMER_STATEMENT">What people said (interviews, surveys)</option><option value="CUSTOMER_BEHAVIOR">What people did (opt-ins, sign-ups, use)</option></select><p class="help">Statements help you understand the problem but never count as demand.</p></div>
+      <div class="field"><label for="c-dim">Dimension</label><select id="c-dim" name="dimension">${Object.entries(DIM).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="c-claim">Finding</label><input id="c-claim" name="claim" required minlength="8" maxlength="800" placeholder="e.g. 4 of 12 students joined the waitlist"></div>
+      <div class="grid3"><div class="field"><label for="c-method">Method</label><input id="c-method" name="method" required minlength="10" maxlength="600" placeholder="12 in-person interviews about past deadlines"></div>
+      <div class="field"><label for="c-n">Relevant participants</label><input id="c-n" name="sample_size" type="number" min="1" required></div>
+      <div class="field"><label for="c-pos">Positive responses <span class="opt">(optional)</span></label><input id="c-pos" name="positives" type="number" min="0"></div>
+      <div class="field"><label for="c-from">Collected from</label><input id="c-from" name="collected_from" type="date" max="${today}" required></div>
+      <div class="field"><label for="c-to">Collected to <span class="opt">(optional)</span></label><input id="c-to" name="collected_to" type="date" max="${today}"></div>
+      <div class="field"><label for="c-dir">Supports or challenges?</label><select id="c-dir" name="direction"><option value="UNSURE">Unsure</option><option value="SUPPORTS">Supports</option><option value="CONTRADICTS">Challenges</option></select></div></div>
+      <div class="grid2"><div class="field"><label for="c-ps">Positive signals <span class="opt">(optional)</span></label><input id="c-ps" name="positive_signals" maxlength="1000"></div><div class="field"><label for="c-ns">Negative signals <span class="opt">(optional)</span></label><input id="c-ns" name="negative_signals" maxlength="1000"></div></div>
+      <label class="check"><input type="checkbox" name="consent_confirmed" required> These were real people who knowingly agreed to take part. Nothing here is invented or paid for.</label>
+      <div class="row" style="margin-top:12px"><button class="btn secondary" id="cust-btn">Add to ledger</button></div></form></section>`;
+    const f = document.getElementById('cust-form');
+    f.addEventListener('submit', async (e) => { e.preventDefault(); if (!f.reportValidity()) return;
+      const d = Object.fromEntries([...new FormData(f)].filter(([, v]) => String(v).trim()));
+      d.consent_confirmed = !!d.consent_confirmed; d.sample_size = Number(d.sample_size); if (d.positives) d.positives = Number(d.positives);
+      await busy(document.getElementById('cust-btn'), 'Saving', async () => { await api(`/projects/${pid}/evidence`, { method: 'POST', pid, body: d }); await load(pid); f.reset(); ok('Recorded as founder-reported evidence.'); });
     });
-    div.querySelectorAll('.result-form').forEach(f => f.addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => {
-      const d = formData(f); d.version = Number(f.dataset.v); d.criteria_hash = f.dataset.h;
-      const r = await api('/projects/' + session.project_id + '/experiments/' + f.dataset.sid + '/result', 'POST', d);
-      suggestion = null; await refresh(); tell('Result: ' + r.outcome + ' (' + r.rate_pct + '%). ' + r.explanation, true); }, 'Saving…'); }));
-  }
-  // revise handler: the experiment form submit checks data-revise
-  const expForm = $('experiment-form');
-  expForm.addEventListener('submit', async (ev) => {
-    if (!expForm.dataset.revise) return; ev.stopImmediatePropagation(); ev.preventDefault();
-    await act(ev.submitter, async () => { const r = await api('/projects/' + session.project_id + '/experiments/' + expForm.dataset.revise + '/revise', 'POST', formData(expForm)); delete expForm.dataset.revise; expForm.classList.add('hide'); suggestion = null; await refresh(); tell('Version ' + r.version + ' drafted. ' + r.notice, true); }, 'Saving…');
-  }, true);
-
-  function renderPassport(pp, evidence) {
-    const div = $('passport'), pill = $('passport-pill');
-    if (!pp) { div.innerHTML = '<p class="hint">No validation run yet. The passport appears after the first evidence-based verdict.</p>'; pill.textContent = '—'; return; }
-    const g = pp.verdict; pill.textContent = g.verdict; pill.className = 'pill ' + g.verdict;
-    const evLink = (id) => `<a href="#ev-${esc(id)}"><code>${esc(short(id))}</code></a>`;
-    const ids = (arr) => arr.length ? arr.map(evLink).join(' ') : '<span class="tag UNKNOWN">none</span>';
-    div.innerHTML = `<div class="verdict ${esc(g.verdict)}">${esc(g.verdict)} <small>${esc(g.verdict_kind)}</small></div><p>${esc(g.headline)}</p><p><b>Conditional recommendation:</b> ${esc(g.recommendation)}</p><p class="small">${esc(g.never)} · brief v${pp.brief_version} · safety ${esc(pp.safety_status)} · discovery v${esc(g.inputs.discovery_version)} · report ${esc(short(pp.report_hash))}… · evidence snapshot ${esc(short(g.inputs.evidence_snapshot_hash))}… · ${esc(g.inputs.decision_policy)} · ${esc(stamp(pp.created_at))} · state ${esc(pp.state)}${pp.invalidated_reason ? ' (' + esc(pp.invalidated_reason) + ')' : ''}</p>`
-      + '<table class="matrix"><tr><th>Dimension</th><th>Status</th><th>Supporting</th><th>Contradicting</th><th>Note</th></tr>' + Object.values(g.matrix).map(m => `<tr><td>${esc(m.label)}</td><td><span class="tag ${esc(m.status)}">${esc(m.status)}</span></td><td>${ids(m.supporting_ids)}</td><td>${ids(m.contradicting_ids)}</td><td class="small">${esc(m.note)}</td></tr>`).join('') + '</table>'
-      + `<div class="two"><div class="field"><b>Top reasons FOR</b>${list(g.reasons_for)}</div><div class="field"><b>Top reasons AGAINST</b>${list(g.reasons_against)}</div></div>`
-      + `<div class="field"><b>Strongest existing source</b><div>${g.strongest_source.id ? evLink(g.strongest_source.id) + ' ' + esc(g.strongest_source.kind) + ' — ' + esc(g.strongest_source.claim) + (g.strongest_source.source_url ? ' · <a href="' + esc(g.strongest_source.source_url) + '" target="_blank" rel="noopener noreferrer">source</a>' : '') : '<span class="tag BLOCK">SOURCE UNAVAILABLE</span>'}</div><div class="small">${esc(g.strongest_source.limitations)}</div></div>`
-      + `<div class="field"><b>Unresolved critical assumptions</b>${list(g.unresolved_critical_assumptions, u => '<code>' + esc(u.claim_id) + '</code> <span class="tag ' + esc(u.status) + '">' + esc(u.status) + '</span> ' + esc(u.claim))}</div>`
-      + `<div class="field"><b>Credible contradictions</b>${list(g.contradictions, c => esc(c.dimension) + ': ' + ids(c.supporting_ids) + ' vs ' + ids(c.contradicting_ids))}</div>`
-      + `<div class="field"><b>Excluded evidence (not counted)</b>${list(g.excluded_evidence, x => evLink(x.id) + ' ' + esc(x.kind) + ' — ' + esc(x.reason))}</div>`
-      + `<div class="field"><b>Pre-registered experiment outcomes</b>${list(g.experiment_outcomes, o => esc(short(o.experiment_id)) + ' v' + o.version + ' locked ' + esc(stamp(o.locked_at)) + ' · <b>' + esc(o.outcome) + '</b> ' + esc(o.rate_pct) + '% (n=' + esc(o.n) + ') vs success ≥ ' + esc(o.criteria.success_threshold_pct) + '% / adverse ≤ ' + esc(o.criteria.adverse_threshold_pct) + '% · evidence ' + evLink(o.evidence_id))}</div>`
-      + `<div class="field"><b>Assumption risk register</b><table class="matrix"><tr><th>ID</th><th>Category</th><th>Crit.</th><th>Status</th><th>Claim</th><th>Provenance</th><th>For</th><th>Against</th></tr>${g.risk_register.map(r => `<tr><td><code>${esc(r.claim_id)}</code></td><td>${esc(r.category)}</td><td>${esc(r.criticality)}</td><td><span class="tag ${esc(r.assumption_status)}">${esc(r.assumption_status)}</span></td><td>${esc(r.exact_claim)}<div class="small">if false: ${esc(r.impact_if_false)}</div></td><td class="small">${esc(r.provenance)}</td><td>${ids(r.evidence_ids)}</td><td>${ids(r.contradictory_evidence_ids)}</td></tr>`).join('')}</table></div>`
-      + `<div class="field"><b>What would change our mind?</b>${list(g.what_would_change_our_mind)}</div><div class="field"><b>Caveats</b>${list(g.caveats)}</div>`
-      + `<div class="field"><b>Permissions granted by this verdict</b><div>continue research: ${g.permissions.continue_research} · build: ${g.permissions.build} · launch: ${g.permissions.launch} · external actions: ${g.permissions.external_actions}</div></div>`
-      + `<div class="field"><b>Founder decision on this exact report</b><div>${pp.founder_decision ? esc(pp.founder_decision.action) + ' · scope ' + esc(pp.founder_decision.scope) + ' · ' + esc(stamp(pp.founder_decision.created_at)) + (pp.founder_decision.feedback ? ' · “' + esc(pp.founder_decision.feedback) + '”' : '') + (pp.founder_decision.acknowledged_risk ? ' · <span class="tag BLOCK">chose a different course than recommended</span>' : '') : '<span class="tag UNKNOWN">PENDING — no decision recorded</span>'}</div></div>`;
   }
 
-  function renderLog(decisions, audit) {
-    $('decision-list').innerHTML = decisions.length ? '<table class="matrix"><tr><th>When</th><th>Phase</th><th>Action</th><th>Scope</th><th>Run</th><th>Brief</th><th>Safety</th><th>Report hash</th><th>Gate said</th><th>Experiments at decision</th><th>Reason</th></tr>' + decisions.map(d => `<tr><td class="small">${esc(stamp(d.created_at))}</td><td>${esc(d.phase)}</td><td><b>${esc(d.action)}</b>${d.acknowledged_risk ? ' ⚠' : ''}</td><td>${esc(d.scope)}</td><td><code>${esc(short(d.phase_run_id))}</code> v${d.run_version}</td><td>v${d.brief_version}</td><td>${esc(d.safety_status)}</td><td><code>${esc(short(d.report_hash))}</code></td><td>${esc(d.gate_recommendation)}</td><td class="small">${esc(d.experiment_versions.map(x => short(x.id) + ' v' + x.version + ' ' + x.status).join(', ') || '—')}</td><td class="small">${esc(d.feedback || '—')}</td></tr>`).join('') + '</table>' : '<p class="hint">No founder decisions yet.</p>';
-    $('audit-list').innerHTML = audit.length ? audit.map(e => `<div class="event"><strong>${esc(e.event.replace(/_/g, ' '))}</strong><span class="small">${esc(Object.entries(e.details).map(([k, v]) => k + '=' + (typeof v === 'object' ? JSON.stringify(v) : v)).join(' · ')).slice(0, 220)}</span><time>${esc(stamp(e.created_at))}</time></div>`).join('') : '<p>No events yet.</p>';
+  // ---------------- Demand tests
+  VIEWS.experiments = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Demand tests');
+    if (!s.brief) { main.innerHTML = `${head('Demand tests', '')}<div class="empty"><h2>Refine the brief first</h2><a class="btn" href="/projects/${pid}/brief" data-link>Go to the brief</a></div>`; return; }
+    let sug = null;
+    try { sug = await api(`/projects/${pid}/experiments/suggest`, { pid }); } catch (e) { /* shown below */ }
+    const series = {};
+    s.experiments.forEach((x) => (series[x.id] = series[x.id] || []).push(x));
+    const accepted = s.evidence.filter((e) => !e.duplicate_of && !e.injection_flag);
+    const dirs = ((s.phase_runs.find((r) => r.phase === 'discover') || {}).report || {}).directions || [];
+    const draft = store.get(`founderos_exp_${pid}`, null);
+    main.innerHTML = `${head('Demand tests', 'The only way to learn whether people want this: watch what they do. You fix the pass mark before collecting any result, and code reads the result against it.')}
+      <div class="cols"><div class="stack">
+        ${sug && sug.kind === 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL' ? `<section class="panel"><header><h2>Suggested next test</h2>${chip('DRAFT', 'A suggestion, not a plan you approved')}</header>
+          <p>${esc(sug.hypothesis)}</p><dl class="facts small"><dt>Who</dt><dd>${esc(sug.target_segment)}</dd><dt>What you measure</dt><dd>${esc(sug.metric)}</dd><dt>Consent</dt><dd>${esc(sug.consent_method)}</dd>
+          <dt>You do</dt><dd>${sug.founder_actions.map(esc).join(' ')}</dd><dt>Time and cost</dt><dd>${esc(sug.timebox_estimate)}; ${esc(sug.cost_estimate)}</dd>
+          <dt>Suggested pass mark</dt><dd>${sug.suggested_criteria.success_threshold_pct}% of at least ${sug.suggested_criteria.min_sample} people; stop signal at ${sug.suggested_criteria.adverse_threshold_pct}% or below. <span class="faint">${esc(sug.suggested_criteria.label)}</span></dd>
+          <dt>Why this one</dt><dd>${esc(sug.risk_ranking_note || '')}</dd></dl><button class="btn secondary small" id="use-sug" style="margin-top:10px">Start a draft from this</button></section>`
+          : sug && sug.kind === 'RUN_LOCKED_EXPERIMENT' ? `<div class="notice info"><b>Run your locked test.</b><p>${esc(sug.instruction)}</p></div>` : ''}
+        <section class="panel" id="exp-panel"><header><h2 id="exp-title">Design a test</h2><span class="small muted">Nothing is evidence until results arrive</span></header>
+          <form id="exp-form"><input type="hidden" name="_revise">
+            <div class="field"><label for="x-h">Hypothesis</label><textarea id="x-h" name="hypothesis" required minlength="10" maxlength="600" rows="2"></textarea></div>
+            <div class="grid2"><div class="field"><label for="x-seg">Who you will test with</label><input id="x-seg" name="target_segment" required minlength="3" maxlength="300"></div>
+            <div class="field"><label for="x-m">What people must do (the metric)</label><input id="x-m" name="metric" required minlength="10" maxlength="400" placeholder="Share who voluntarily join the waitlist"><p class="help">An action, not an opinion. “Would you use it?” does not pass.</p></div></div>
+            <div class="grid3"><div class="field"><label for="x-n">Minimum people</label><input id="x-n" name="min_sample" type="number" min="1" required value="10"></div>
+            <div class="field"><label for="x-s">Pass mark (%)</label><input id="x-s" name="success_threshold_pct" type="number" min="1" max="100" required value="30"></div>
+            <div class="field"><label for="x-a">Stop signal at or below (%)</label><input id="x-a" name="adverse_threshold_pct" type="number" min="0" max="99" required value="10"></div>
+            <div class="field"><label for="x-o">Where the pass mark comes from</label><select id="x-o" name="threshold_origin" required><option value="TEAM_ASSUMPTION">My assumption (labelled as such)</option><option value="CITED_BENCHMARK">A benchmark in my ledger</option></select></div>
+            <div class="field"><label for="x-b">Benchmark evidence <span class="opt">(if cited)</span></label><select id="x-b" name="benchmark_evidence_id"><option value="">None</option>${accepted.map((e) => `<option value="${e.id}">${short(e.id)}: ${esc(e.claim.slice(0, 60))}</option>`).join('')}</select></div>
+            <div class="field"><label for="x-w">Time window (days)</label><input id="x-w" name="time_window_days" type="number" min="1" max="365" required value="7"></div>
+            <div class="field"><label for="x-c">Cost (number)</label><input id="x-c" name="cost_estimate" required value="0" maxlength="120"><p class="help">Checked against your budget (${esc(s.brief.payload.budget || 'unknown')}).</p></div>
+            <div class="field"><label for="x-d">Direction tested <span class="opt">(optional)</span></label><select id="x-d" name="direction_id"><option value="">None</option>${dirs.map((d) => `<option value="${esc(d.id)}">${esc(d.id)}: ${esc(d.name)}</option>`).join('')}</select></div>
+            <div class="field"><label for="x-cl">Claim tested</label><select id="x-cl" name="claim_id"><option value="C-DEM">Demand (C-DEM)</option><option value="C-PROB">Problem (C-PROB)</option><option value="C-VIAB">Willingness to pay (C-VIAB)</option><option value="C-COMP">Reason to switch (C-COMP)</option></select></div></div>
+            <div class="field"><label for="x-con">How people consent</label><input id="x-con" name="consent_method" required minlength="10" maxlength="600" value="I explain who I am and why I ask; joining is optional and they can withdraw."></div>
+            <div class="field"><label for="x-act">What you will do yourself</label><textarea id="x-act" name="founder_actions" required minlength="10" maxlength="1200" rows="2"></textarea></div>
+            <div class="field"><label for="x-pv">If it fails, which direction would you test next? <span class="opt">(optional)</span></label><input id="x-pv" name="pivot_alternative" maxlength="400"></div>
+            <label class="check"><input type="checkbox" name="critical" checked> This test checks a critical assumption: a clear miss at the stop signal should mean stop or pivot.</label>
+            <div class="row" style="margin-top:12px"><button class="btn secondary" id="exp-save">Save draft</button><span class="small muted">Drafts are checked (V05) before you can lock them.</span></div></form></section>
+        ${Object.values(series).reverse().map((rows) => expSeries(rows, pid)).join('') || '<div class="empty"><p>No tests yet. A planned test is never evidence.</p></div>'}
+      </div>
+      ${nextPanel('What happens next', ['Save a draft and fix anything the design check flags.', 'Lock it: the pass mark is frozen with a timestamp and hash.', 'Run it yourself, then enter the real result. Code reads it: hit, near miss, clear miss or too little data.', 'Then open Decision to run validation.'])}
+      </div>
+      ${actionbar([`/projects/${pid}/research`, 'Research'], s.phase_runs.some((r) => r.phase === 'discover' && r.state === 'APPROVED') ? { href: `/projects/${pid}/decision`, label: 'Continue to decision' } : { disabled: true, label: 'Continue to decision', reason: 'Approve research at the Discover gate first.' })}`;
+    const f = document.getElementById('exp-form');
+    const fill = (o) => { for (const [k, v] of Object.entries(o || {})) { const el = f.elements[k]; if (!el || v == null) continue; if (el.type === 'checkbox') el.checked = !!v; else el.value = v; } };
+    if (draft) fill(draft);
+    f.addEventListener('input', () => { const d = Object.fromEntries(new FormData(f)); d.critical = f.elements.critical.checked; store.set(`founderos_exp_${pid}`, d); });
+    const us = document.getElementById('use-sug');
+    if (us) us.onclick = () => { fill({ hypothesis: sug.hypothesis.slice(0, 600), target_segment: sug.target_segment.slice(0, 300), metric: sug.metric.slice(0, 400), consent_method: sug.consent_method.slice(0, 600),
+      founder_actions: sug.founder_actions.join(' ').slice(0, 1200), min_sample: sug.suggested_criteria.min_sample, success_threshold_pct: sug.suggested_criteria.success_threshold_pct,
+      adverse_threshold_pct: sug.suggested_criteria.adverse_threshold_pct, time_window_days: sug.suggested_criteria.time_window_days, claim_id: sug.claim_id, cost_estimate: '0' }); f.elements.hypothesis.focus(); };
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault(); if (!f.reportValidity()) return;
+      const d = Object.fromEntries([...new FormData(f)].filter(([, v]) => String(v).trim()));
+      const rev = d._revise; delete d._revise;
+      for (const k of ['min_sample', 'success_threshold_pct', 'adverse_threshold_pct', 'time_window_days']) d[k] = Number(d[k]);
+      d.critical = f.elements.critical.checked; d.dimension = d.claim_id === 'C-PROB' ? 'desirability' : d.claim_id === 'C-VIAB' ? 'viability' : d.claim_id === 'C-COMP' ? 'competition' : 'demand';
+      d.timebox_estimate = `ESTIMATE: ${d.time_window_days} days`;
+      await busy(document.getElementById('exp-save'), 'Saving', async () => {
+        const r = await api(rev ? `/projects/${pid}/experiments/${rev}/revise` : `/projects/${pid}/experiments`, { method: 'POST', pid, body: d });
+        store.del(`founderos_exp_${pid}`); await render(); ok(`Draft saved (version ${r.version}). ${r.notice}`);
+      });
+    });
+    main.querySelectorAll('[data-lock]').forEach((b) => b.onclick = () => {
+      const x = s.experiments.find((e) => e.id === b.dataset.lock && e.version === Number(b.dataset.v));
+      dialog({ title: 'Lock this test?', confirm: 'Lock and timestamp', body: `<p>Locking freezes the pass mark (${x.payload.success_threshold_pct}% of at least ${x.payload.min_sample}), the stop signal (${x.payload.adverse_threshold_pct}%), the time window and where the number comes from (${label(x.payload.threshold_origin)}). Results must be collected after now. Changing anything later creates a new version and retires its results.</p>
+        <label class="check"><input type="checkbox" required name="c"> I have not collected any results for this test yet.</label>`,
+        onConfirm: async () => { await api(`/projects/${pid}/experiments/${x.id}/lock`, { method: 'POST', pid, body: { version: x.version, criteria_hash: x.criteria_hash, confirm: 'I_PREREGISTER_THESE_CRITERIA_BEFORE_COLLECTING_RESULTS' } }); await render(); ok('Locked. Run the test, then enter the real result.'); } });
+    });
+    main.querySelectorAll('[data-revise]').forEach((b) => b.onclick = () => { const x = s.experiments.filter((e) => e.id === b.dataset.revise).pop(); fill({ ...x.payload, _revise: x.id });
+      document.getElementById('exp-title').textContent = `Edit as version ${x.version + 1}`; f.scrollIntoView({ behavior: 'smooth' }); flash(`<div class="notice warn">Saving creates version ${x.version + 1}. Version ${x.version} and any result against it stop counting.</div>`); });
+    main.querySelectorAll('form[data-result]').forEach((rf) => rf.addEventListener('submit', async (e) => {
+      e.preventDefault(); if (!rf.reportValidity()) return;
+      const x = s.experiments.find((ex) => ex.id === rf.dataset.result && ex.status === 'LOCKED');
+      const d = Object.fromEntries([...new FormData(rf)].filter(([, v]) => String(v).trim()));
+      d.version = x.version; d.criteria_hash = x.criteria_hash; d.sample_size = Number(d.sample_size); d.positives = Number(d.positives); d.consent_confirmed = !!d.consent_confirmed;
+      await busy(rf.querySelector('button'), 'Reading the result', async () => { const r = await api(`/projects/${pid}/experiments/${x.id}/result`, { method: 'POST', pid, body: d }); await render(); ok(`${label(r.reading)}: ${r.explanation}`); });
+    }));
+  };
+
+  function expSeries(rows, pid) {
+    const x = rows[rows.length - 1], p = x.payload, today = new Date().toISOString().slice(0, 10);
+    const dc = x.design_check;
+    const resultEv = x.result_evidence_id && snap.evidence.find((e) => e.id === x.result_evidence_id);
+    return `<section class="panel"><header><h2>${esc(p.hypothesis.slice(0, 90))}</h2>${chip(x.status)}</header>
+      <dl class="facts small"><dt>Version</dt><dd>${x.version}${rows.length > 1 ? ` (earlier: ${rows.slice(0, -1).map((r) => `v${r.version} ${label(r.status).toLowerCase()}`).join(', ')})` : ''}</dd>
+      <dt>Metric</dt><dd>${esc(p.metric)}</dd><dt>Pass mark</dt><dd>${p.success_threshold_pct}% of at least ${p.min_sample} people within ${p.time_window_days || '?'} days; stop signal ≤ ${p.adverse_threshold_pct}%; near miss within ${Math.round((p.near_miss_band || 0) * 100)}% below</dd>
+      <dt>Number comes from</dt><dd>${esc(label(p.threshold_origin || 'NOT_SET'))}${p.benchmark_evidence_id ? ` (evidence ${short(p.benchmark_evidence_id)})` : ''}</dd>
+      ${x.locked_at ? `<dt>Locked</dt><dd>${when(x.locked_at)}</dd>` : ''}</dl>
+      ${x.status === 'DRAFT' ? `<div class="gate-actions"><h3>Design check (V05)</h3><ul class="plain small">${Object.entries(dc.items).map(([k, v]) => `<li>${chip(v.ok ? 'PASS' : 'FAIL')} ${esc(k.replace(/_/g, ' '))}${v.ok ? '' : `: ${esc(v.why)}`}</li>`).join('')}</ul>
+        <div class="row">${dc.status === 'PASS' ? `<button class="btn" data-lock="${x.id}" data-v="${x.version}">Lock this test</button>` : '<span class="why-disabled">Fix the failing checks to lock.</span>'}<button class="btn quiet small" data-revise="${x.id}">Edit</button></div></div>` : ''}
+      ${x.status === 'LOCKED' && !x.result_evidence_id ? `<form data-result="${x.id}" class="gate-actions"><h3>Enter the real result</h3><div class="grid3">
+        <div class="field"><label>People who took part</label><input name="sample_size" type="number" min="1" required></div><div class="field"><label>Of them, did the action</label><input name="positives" type="number" min="0" required></div>
+        <div class="field"><label>Method</label><input name="method" required minlength="10" maxlength="600" placeholder="Waitlist form shared in 2 lectures"></div>
+        <div class="field"><label>Collected from</label><input name="collected_from" type="date" min="${(x.locked_at || '').slice(0, 10)}" max="${today}" required></div><div class="field"><label>Collected to</label><input name="collected_to" type="date" max="${today}" required></div>
+        <div class="field"><label>Negative signals <span class="opt">(optional)</span></label><input name="negative_signals" maxlength="1000"></div></div>
+        <label class="check"><input type="checkbox" name="consent_confirmed" required> Real participants who consented. Nothing invented.</label>
+        <div class="row" style="margin-top:10px"><button class="btn">Submit result</button><button type="button" class="btn quiet small" data-revise="${x.id}">Change the test (new version)</button></div></form>` : ''}
+      ${x.reading ? `<div class="gate-actions"><p>${chip(x.reading)} ${esc(resultEv ? `${resultEv.positives}/${resultEv.sample_size} = ${resultEv.rate_pct}%` : '')}</p><p class="small muted">${esc(resultEv ? resultEv.limitations : '')}</p>
+        <a href="/projects/${pid}/research?ev=${x.result_evidence_id}" data-link class="small">See it in the ledger</a> <button class="btn quiet small" data-revise="${x.id}">Repeat with new criteria</button></div>` : ''}
+    </section>`;
   }
 
-  document.querySelectorAll('.tab').forEach(t => t.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); t.classList.add('active'); $('evidence-src').classList.toggle('hide', t.dataset.tab !== 'src'); $('evidence-cust').classList.toggle('hide', t.dataset.tab !== 'cust'); });
-  $('create-form').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => {
-    const data = formData(ev.target);
-    const project = await api('/projects', 'POST', data);
-    session = {project_id: project.project_id, access_token: project.access_token};
-    localStorage.setItem('founderos_session', JSON.stringify(session)); suggestion = null;
-    await refresh(); navigate('idea',false);
-    tell(project.prescreen.status === 'BLOCK' ? 'Workspace created, but the pre-screen found prohibited content: ' + project.prescreen.findings.map(f => f.rule_id).join(', ') + '. Click Refine to see the full safety assessment.' : 'Workspace created. Click "Refine idea" to begin.', project.prescreen.status !== 'BLOCK');
-  }, 'Creating…'); });
-  $('switch-project').onclick = () => { if (confirm('Start a new founder brief? The current project stays in SQLite; save its token first if you want to return.')) { localStorage.removeItem('founderos_session'); session = null; state = null; suggestion = null; refresh(); } };
-  $('refine-btn').onclick = (ev) => act(ev.currentTarget, async () => { const t = performance.now(); const r = await api('/projects/' + session.project_id + '/refine', 'POST'); suggestion = null; await refresh(); $('refine-latency').textContent = 'observed ' + Math.round(performance.now() - t) + ' ms round-trip' + (r.latency_ms ? ' (model ' + r.latency_ms + ' ms)' : ' (model not called: safety block)'); tell('Brief v' + r.version + ' ready · safety: ' + r.safety.status + '. Review provenance tags and correct anything inferred.', r.safety.status !== 'BLOCK'); });
-  $('discover-btn').onclick = (ev) => act(ev.currentTarget, async () => { const r = await api('/projects/' + session.project_id + '/phases/discover/run', 'POST'); suggestion = null; await refresh(); tell('Discovery v' + r.version + ' ready in ' + r.latency_ms + ' ms. Review the hypotheses and decide at the gate.', true); });
-  $('validate-btn').onclick = (ev) => act(ev.currentTarget, async () => { const r = await api('/projects/' + session.project_id + '/phases/validate/run', 'POST'); await refresh(); tell('Verdict: ' + r.gate.verdict + ' (' + r.latency_ms + ' ms). Read the Decision Passport, then decide.', true); navigate('decision'); });
-  $('evidence-src').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => { const d = formData(ev.target); d.kind = 'SECONDARY_BACKGROUND'; const r = await api('/projects/' + session.project_id + '/evidence', 'POST', d); await refresh(); tell('Recorded ' + short(r.id) + ': ' + r.url_status + ' / ' + r.excerpt_status + (r.duplicate_of ? ' · DUPLICATE (not double-counted)' : '') + '. ' + r.limitations, true); }, 'Fetching…'); });
-  $('evidence-cust').addEventListener('submit', async (ev) => { ev.preventDefault(); await act(ev.submitter, async () => { const r = await api('/projects/' + session.project_id + '/evidence', 'POST', formData(ev.target)); await refresh(); tell('Recorded ' + short(r.id) + ' as ' + r.independence + '. ' + r.limitations, true); }, 'Saving…'); });
-  $('research-form').addEventListener('submit', async ev => {ev.preventDefault(); const b=ev.submitter; await act(b,()=>findResearch(ev.target.elements['query'].value),'Searching…');});
-  initJourney();
-  health(); setInterval(health, 20000);
-  refresh().catch(e => { tell('Saved session could not be restored: ' + e.message); });
+  // ---------------- Decision
+  VIEWS.decision = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Decision');
+    const disc = s.phase_runs.find((r) => r.phase === 'discover');
+    const val = s.phase_runs.find((r) => r.phase === 'validate');
+    const canRun = disc && disc.state === 'APPROVED' && !s.current.stopped && !(val && ['PENDING_APPROVAL', 'APPROVED'].includes(val.state));
+    const why = !disc || disc.state !== 'APPROVED' ? 'Approve research at the Discover gate first.' : s.current.stopped ? 'This venture is stopped.' : 'Decide on the current run first, or choose Revise to run again.';
+    const runBtn = `<button class="btn ${val ? 'secondary' : ''}" id="val-run" ${canRun ? '' : 'disabled'}>${val ? 'Run validation again' : 'Run validation'}</button>${canRun ? '' : `<span class="why-disabled">${esc(why)}</span>`}`;
+    if (!val) {
+      main.innerHTML = `${head('Decision', 'Validation reads your ledger and locked tests, code computes the verdict, and the validation agent explains it.')}
+        <div class="empty"><h2>No validation yet</h2><p>With no customer behaviour or locked-test result, the honest verdict will be “Needs evidence”. That is not a judgement that the idea is bad.</p><div class="row">${runBtn}</div></div>`;
+      wireVal(); return;
+    }
+    const g = val.gate, r = val.report, pp = s.passport;
+    const tn = { NEEDS_EVIDENCE: 'hold', CONTINUE_TESTING: 'clear', PIVOT: 'hold', STOP_DO_NOT_LAUNCH: 'stop', BLOCK_DO_NOT_LAUNCH: 'stop' }[g.verdict] || 'unknown';
+    const evLink = (id) => `<a href="/projects/${pid}/research?ev=${id}" data-link>${short(id)}</a>`;
+    const ids = (a) => a && a.length ? a.map(evLink).join(', ') : '<span class="faint">none</span>';
+    const dec = pp.founder_decision;
+    main.innerHTML = `${head('Decision passport', `Validation v${val.version}, brief v${val.brief_version}, ${when(val.created_at)}.`, `<div class="row no-print">${runBtn}<button class="btn quiet" id="print">Print or save as PDF</button></div>`)}
+      ${val.invalidated_reason ? `<div class="notice warn">This passport is out of date: ${esc(val.invalidated_reason)}. Run validation again.</div>` : ''}
+      <div class="cols"><div class="stack">
+        <section class="gate" data-tone="${tn}" aria-labelledby="vg"><div class="gate-body"><div class="gate-kicker">Verdict computed by code, not by the model (code ${esc(g.verdict)})</div>
+          <p class="verdict" id="vg">${esc(label(g.verdict))}</p><p class="why">${esc(g.headline)}</p><p><b>If you continue:</b> ${esc(g.recommendation)}</p>
+          <p class="small muted">Allows: continue research ${g.permissions.continue_research ? 'yes' : 'no'}; build no; launch no; any external action no. ${esc(g.never)}</p>
+          ${gateButtons({ ...val, phase: 'validate' }, pid, g.verdict)}
+          ${dec ? `<p class="small">Your decision: ${chip(dec.action === 'APPROVE' ? 'APPROVED' : dec.action === 'STOP' ? 'STOPPED' : dec.action + '_REQUESTED')} ${when(dec.created_at)}${dec.feedback ? `, “${esc(dec.feedback)}”` : ''}${dec.acknowledged_risk ? ' (you chose a different course than the gate)' : ''}.</p>` : ''}
+        </div></section>
+        <section class="panel"><header><h2>Five dimensions</h2><span class="small muted">Click an id to see the exact evidence</span></header><div class="table-wrap"><table><thead><tr><th>Dimension</th><th>Status</th><th>Supported by</th><th>Challenged by</th><th>Note</th></tr></thead><tbody>
+          ${Object.values(g.matrix).map((m) => `<tr><td><b>${esc(m.label)}</b></td><td>${chip(m.status)}${m.evidence_classes && m.evidence_classes.length ? `<div class="small faint">${esc(m.evidence_classes.map((k) => label(k).toLowerCase()).join(', '))}</div>` : ''}</td><td>${ids(m.supporting_ids)}</td><td>${ids(m.contradicting_ids)}</td><td class="small">${esc(m.note)}</td></tr>`).join('')}</tbody></table></div></section>
+        <div class="cards"><section class="card"><h3>Reasons for</h3>${g.reasons_for.length ? `<ul class="bullets small">${g.reasons_for.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="faint small">No accepted evidence supports it yet.</p>'}</section>
+          <section class="card"><h3>Reasons against</h3>${g.reasons_against.length ? `<ul class="bullets small">${g.reasons_against.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="faint small">None recorded.</p>'}</section>
+          <section class="card"><h3>Strongest source</h3>${g.strongest_source.id ? `<p class="small">${evLink(g.strongest_source.id)} ${esc(label(g.strongest_source.kind))}: ${esc(g.strongest_source.claim)}</p>` : `<p>${chip('UNKNOWN', 'Source unavailable')} Source unavailable</p>`}<p class="small muted">${esc(g.strongest_source.limitations)}</p></section>
+          <section class="card"><h3>What would change this</h3><ul class="bullets small">${g.what_would_change_our_mind.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>
+          <section class="card wide"><h3>Unresolved critical assumptions</h3><ul class="plain small">${g.unresolved_critical_assumptions.map((u) => `<li>${chip(u.status === 'UNTESTED' ? 'UNKNOWN' : u.status === 'REFUTED' ? 'FAIL' : 'REVIEW_REQUIRED', u.status)} <b>${esc(u.claim_id)}</b> ${esc(u.claim)}</li>`).join('') || '<li>None.</li>'}</ul></section>
+          ${g.contradictions.length ? `<section class="card wide"><h3>Contradictions</h3><ul class="bullets small">${g.contradictions.map((c) => `<li>${esc(DIM[c.dimension] || c.dimension)}: ${ids(c.supporting_ids)} against ${ids(c.contradicting_ids)}</li>`).join('')}</ul></section>` : ''}
+          ${g.experiment_outcomes.length ? `<section class="card wide"><h3>Locked tests read against their criteria</h3><ul class="plain small">${g.experiment_outcomes.map((o) => `<li>${chip(({ PASS: 'HIT', FAIL: 'CLEAR_MISS', INCONCLUSIVE: 'TOO_LITTLE_DATA', NEAR_MISS: 'NEAR_MISS' })[o.outcome])} ${esc(o.positives)}/${esc(o.n)} = ${esc(o.rate_pct)}% against ${esc(o.criteria.success_threshold_pct)}% (locked ${when(o.locked_at)}), evidence ${evLink(o.evidence_id)}</li>`).join('')}</ul></section>` : ''}
+          ${g.excluded_evidence.length ? `<section class="card wide"><h3>Not counted</h3><ul class="bullets small">${g.excluded_evidence.map((x) => `<li>${evLink(x.id)}: ${esc(x.reason)}</li>`).join('')}</ul></section>` : ''}
+        </div>
+        ${g.criteria ? `<section class="panel"><header><h2>Validate criteria</h2><span class="small muted">${esc(g.criteria.criteria_version)}, ${g.criteria.unknown_count} unknown</span></header>${criteriaTable(g.criteria.criteria, pid)}</section>` : ''}
+        <section class="panel"><header><h2>The validation agent's explanation</h2>${chip('INFO', 'AI text explaining a code verdict')}</header>
+          <p>${esc(r.summary)}</p><dl class="facts small"><dt>Research vs demand</dt><dd>${esc(r.market_research_vs_customer_demand)}</dd><dt>Risks</dt><dd>${(r.risks || []).map(esc).join('; ') || '—'}</dd>
+          <dt>Gaps</dt><dd>${(r.contradictions_or_gaps || []).map(esc).join('; ') || '—'}</dd><dt>Pricing ideas (untested)</dt><dd>${(r.pricing_hypotheses || []).map(esc).join('; ') || '—'}</dd>
+          <dt>Business model ideas (untested)</dt><dd>${(r.business_model_hypotheses || []).map(esc).join('; ') || '—'}</dd></dl>
+          ${(r._skeptic_flags || []).length ? `<div class="notice warn small"><b>Skeptic review flagged ${r._skeptic_flags.length} passage(s)</b><ul class="bullets">${r._skeptic_flags.map((f) => `<li>${esc(f.issue)}</li>`).join('')}</ul></div>` : ''}</section>
+        <details class="adv"><summary>Advanced: hashes and raw verdict</summary><p class="small">Report <code>${esc(val.report_hash)}</code>, evidence snapshot <code>${esc(g.inputs.evidence_snapshot_hash)}</code>, decision policy ${esc(g.inputs.decision_policy)}, safety policy ${esc(g.inputs.safety_policy)}.</p><pre>${esc(JSON.stringify(g, null, 2))}</pre></details>
+      </div>
+      ${nextPanel('What happens next', [g.next_experiment && g.next_experiment.kind === 'RUN_LOCKED_EXPERIMENT' ? 'Run your locked test and enter the real result.' : 'Design and lock the next demand test.', 'Approving allows more research only. Nothing is ever published, sent, spent or signed.', `<a href="/projects/${pid}/audit" data-link>See the decision log</a>.`])}
+      </div>`;
+    wireVal();
+    wireGate({ ...val, phase: 'validate' }, pid, g.verdict);
+    document.getElementById('print').onclick = () => window.print();
+    function wireVal() { const b = document.getElementById('val-run'); if (b) b.onclick = () => busy(b, 'Running validation', async () => { const x = await api(`/projects/${pid}/phases/validate/run`, { method: 'POST', pid }); await render(); ok(`Verdict: ${label(x.gate.verdict)}.`); }); }
+  };
+
+  // ---------------- Audit
+  VIEWS.audit = async ({ pid }) => {
+    const s = snap;
+    crumb(s.project.name, 'Decision log');
+    main.innerHTML = `${head('Decision log', 'Every founder decision, bound to the exact versions it was made on. The log is append-only in SQLite (application-level protection, not tamper-proof storage).')}
+      <section class="panel"><header><h2>Your decisions</h2></header>${s.decisions.length ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Phase</th><th>Decision</th><th>Gate said</th><th>Bound to</th><th>Reason</th></tr></thead><tbody>
+        ${s.decisions.map((d) => `<tr><td class="small">${when(d.created_at)}</td><td>${esc(d.phase)} v${d.run_version}</td><td>${chip(d.action === 'APPROVE' ? 'APPROVED' : d.action === 'STOP' ? 'STOPPED' : d.action + '_REQUESTED')}<div class="small faint">scope ${esc(d.scope.toLowerCase().replace('_', ' '))}</div></td>
+          <td>${chip(d.gate_recommendation)}</td><td class="small">brief v${d.brief_version}, safety ${esc(label(d.safety_status).toLowerCase())}, report <code>${short(d.report_hash)}</code>, criteria ${esc(d.criteria_version || 'pre-v7')}${d.evaluation_hash ? `, evaluation <code>${short(d.evaluation_hash)}</code>` : ''}${d.experiment_versions.length ? `, tests ${d.experiment_versions.map((x) => `${short(x.id, 6)} v${x.version}`).join(', ')}` : ''}</td>
+          <td class="small">${esc(d.feedback || '—')}${d.acknowledged_risk ? '<div class="faint">Chose a different course than the gate.</div>' : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="faint">No decisions yet.</p>'}</section>
+      <section class="panel" style="margin-top:18px"><header><h2>Timeline</h2><span class="small muted">Latest ${s.audit.length} events</span></header><ul class="timeline">
+        ${s.audit.map((a) => `<li><time datetime="${esc(a.created_at)}">${when(a.created_at)}</time><div><b>${esc(a.event.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()))}</b><div class="small muted">${esc(Object.entries(a.details).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length)).slice(0, 6).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('; ').slice(0, 260))}</div></div></li>`).join('')}</ul></section>`;
+  };
+
+  // ---------------- Roadmap & help
+  VIEWS.roadmap = async () => {
+    crumb('Six-phase roadmap', 'What is live and what is architecture only');
+    const c = await api('/criteria');
+    const live = [['Discover', 'live', 'Brief, safety, discovery, research and the Discover gate run in this prototype.', c.discover], ['Validate', 'live', 'Demand tests, locked targets, result reading and the decision passport run in this prototype.', c.validate]];
+    const later = [['Build', 'build', 'Smallest product that delivers validated value; finished when its acceptance tests pass.'], ['Commercial setup', 'commercial_setup', 'Price and policy drafts for human review. No payments, ever.'],
+      ['Launch', 'launch', 'Marketing drafts only; nothing is published without a separate, specific approval.'], ['Operate and learn', 'operate_learn', 'Real, opt-in results decide double down, adjust, pivot back or shut down.']];
+    main.innerHTML = `${head('Six business phases', 'Research, demand tests and the decision passport are steps inside the two live phases. The other four are documented with their criteria and are not implemented; nothing here pretends they run.')}
+      <section class="panel">${live.map(([n, , d, crit], i) => `<div class="phase" data-live="1"><span class="n">${i + 1}</span><div><h2>${n} ${chip('PASS', 'Implemented')}<span class="small muted"> Live</span></h2><p class="muted">${d}</p>
+        <ul class="bullets small">${crit.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul></div></div>`).join('')}
+        ${later.map(([n, k, d], i) => `<div class="phase"><span class="n">${i + 3}</span><div><h2>${n} <span class="chip plain">Architecture only</span></h2><p class="muted">${d}</p>
+        <ul class="bullets small">${c.architecture_only[k].criteria.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul></div></div>`).join('')}</section>
+      <section class="panel" style="margin-top:18px"><h2>Applied at every live gate</h2><ul class="bullets small">${c.cross_cutting.map((x) => `<li><b>${esc(x.id)} ${esc(x.name)}</b> (${esc(x.kind.replace('_', ' '))}): ${esc(x.question)}</li>`).join('')}</ul>
+      <p class="small muted">Criteria file ${esc(c.version)}, source: “${esc(c.source.title)}”, ${esc(c.source.date)}.</p></section>`;
+  };
+  VIEWS.help = async () => {
+    crumb('How it works', 'Plain-language guide');
+    main.innerHTML = `${head('How FounderOS works', 'It helps you decide, with evidence, whether an idea is worth more of your time. It does not build, publish or sell anything.')}
+      <div class="stack"><section class="panel"><h2>Who decides what</h2><dl class="facts"><dt>Your local model</dt><dd>Refines your brief, drafts hypotheses, proposes scores one criterion at a time, and explains verdicts. Everything it writes is a hypothesis.</dd>
+        <dt>Code</dt><dd>Runs the twelve safety checks, verifies sources, applies pass marks and picks every gate exit. The model cannot change a verdict.</dd>
+        <dt>You</dt><dd>Approve, revise, pivot or stop at each gate. Approval means more research only.</dd></dl></section>
+      <section class="panel"><h2>What the words mean</h2><dl class="facts small"><dt>Unknown</dt><dd>No accepted evidence. Never treated as a zero or a middle score.</dd><dt>Excerpt verified</dt><dd>The exact words were found on the fetched page. It does not mean they are true.</dd>
+        <dt>Metadata only</dt><dd>A title or abstract from an index. Context, never counted.</dd><dt>Founder-reported</dt><dd>Results you entered. FounderOS cannot check them independently.</dd>
+        <dt>Needs evidence</dt><dd>No real customer behaviour yet. Not a judgement that the idea is bad.</dd><dt>Near miss</dt><dd>A locked test came just under its pass mark. Repeat or redesign.</dd></dl></section>
+      <section class="panel"><h2>If the model will not load</h2><p class="small">Click the model status in the top bar to run a real test. Out-of-memory on GPU: set <code>OLLAMA_NUM_GPU=0</code>. Out-of-memory on CPU: close heavy apps and set <code>OLLAMA_NUM_CTX=1024</code>. See the README for Windows steps. FounderOS never switches to another model or shows simulated answers.</p></section></div>`;
+  };
+
+  // ------------------------------------------------------------------ boot
+  modelStatus();
+  setInterval(modelStatus, 30000);
+  if (location.pathname === '/') history.replaceState({}, '', '/projects');
+  render();
 })();
