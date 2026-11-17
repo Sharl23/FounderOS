@@ -117,7 +117,8 @@ def test_planned_experiment_is_not_evidence_and_criteria_are_frozen(client, proj
     draft = client.post(f'/api/projects/{pid}/experiments', headers=h, json={
         'hypothesis': 'Students will join a consented waitlist', 'target_segment': 'Cairo students',
         'metric': 'Share who leave an email', 'success_threshold_pct': 30, 'adverse_threshold_pct': 10, 'min_sample': 10,
-        'consent_method': 'Opt-in explained in person', 'founder_actions': 'Ask classmates face to face'}).json()
+        'consent_method': 'Opt-in explained in person', 'founder_actions': 'Ask classmates face to face',
+        'cost_estimate': '0', 'threshold_origin': 'TEAM_ASSUMPTION', 'time_window_days': 7}).json()
     sid = draft['experiment_id']
     # a DRAFT cannot take results
     r = client.post(f'/api/projects/{pid}/experiments/{sid}/result', headers=h, json={
@@ -150,7 +151,8 @@ def test_planned_experiment_is_not_evidence_and_criteria_are_frozen(client, proj
     rev = client.post(f'/api/projects/{pid}/experiments/{sid}/revise', headers=h, json={
         'hypothesis': 'Students will join a consented waitlist', 'target_segment': 'Cairo students',
         'metric': 'Share who leave an email', 'success_threshold_pct': 15, 'adverse_threshold_pct': 5, 'min_sample': 10,
-        'consent_method': 'Opt-in explained in person', 'founder_actions': 'Ask classmates face to face'})
+        'consent_method': 'Opt-in explained in person', 'founder_actions': 'Ask classmates face to face',
+        'cost_estimate': '0', 'threshold_origin': 'TEAM_ASSUMPTION', 'time_window_days': 7})
     assert rev.status_code == 201 and rev.json()['version'] == 2
     state = client.get(f'/api/projects/{pid}', headers=h).json()
     assert any(e['event'] == 'EXPERIMENT_CRITERIA_CHANGED' and e['details']['had_result'] for e in state['audit'])

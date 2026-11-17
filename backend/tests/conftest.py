@@ -3,7 +3,7 @@ import datetime
 import pytest
 from fastapi.testclient import TestClient
 from app import main
-from app.schemas import RefinedBrief, DiscoveryReport, ValidationReport
+from app.schemas import RefinedBrief, DiscoveryReport, ValidationReport, JudgeOutput
 
 TODAY = datetime.date.today().isoformat()
 
@@ -13,9 +13,11 @@ class FakeModel:
     model = 'TEST FAKE MODEL (never used at runtime)'
     last_latency_ms = 0
 
-    def __init__(self, praise=False):
+    def __init__(self, praise=False, judge=None, flags=None):
         self.praise = praise
         self.calls = []
+        self.judge = judge          # callable(context) -> dict, TEST_ONLY
+        self.flags = flags or []    # TEST_ONLY model risk flags
 
     async def status(self):
         return {'ollama_reachable': False, 'model_pulled': False, 'error': 'test fake'}
@@ -25,14 +27,17 @@ class FakeModel:
         if output_type is RefinedBrief:
             return RefinedBrief(idea_summary='AI study planner for university students', problem='Assignment planning is difficult',
                                 target_customers='University students', target_market='Cairo', questions=['What is your budget?'],
-                                assumptions=['Students might need better planning'])
+                                current_workaround='WhatsApp reminders', assumptions=['Students might need better planning'],
+                                risk_flags=self.flags)
         if output_type is DiscoveryReport:
             return DiscoveryReport(problem_statement='Students might struggle with assignments',
                                    target_customers=['Egyptian university students'], value_proposition='Plan tasks clearly',
                                    alternatives_unverified=['Paper planners (unverified)'],
                                    hypotheses=['Students may pay 50 EGP/month for planning' if self.praise else 'Students may pay for planning',
                                                'Students currently use WhatsApp reminders as a workaround'],
-                                   experiments=['Interview 10 volunteers with consent'], unknowns=['Willingness to pay'])
+                                   experiments=['Interview 10 volunteers with consent'], unknowns=['Willingness to pay'],
+                                   directions=[{'name': 'Planner for engineering students', 'segment': 'Engineering students', 'value': 'Deadline view'},
+                                               {'name': 'Planner for TAs', 'segment': 'Teaching assistants', 'value': 'Class reminders'}])
         if output_type is ValidationReport:
             return ValidationReport(summary='Huge demand, this idea is validated and will definitely succeed' if self.praise
                                     else 'No independent evidence of actual purchasing demand',
@@ -40,6 +45,12 @@ class FakeModel:
                                     risks=['Demand is not confirmed'], contradictions_or_gaps=['No customer behaviour'],
                                     pricing_hypotheses=['Untested: 50 EGP/month'], business_model_hypotheses=['Subscription (untested)'],
                                     competitor_research_limitations=['No competitor data sourced'])
+        if output_type is JudgeOutput:
+            if self.judge:
+                return JudgeOutput(**self.judge(context))
+            ids = [e['id'] for e in context['accepted_evidence']]
+            return JudgeOutput(criterion_id=context['criterion']['id'], proposed_score=3, evidence_ids=ids[:1],
+                               reasoning='Context-level support from the cited evidence.', caveats=['TEST_ONLY judge'])
         raise AssertionError('Unexpected schema')
 
 
@@ -98,7 +109,8 @@ def decide(client, pid, h, phase, run_json, decision, **extra):
 def approved_discovery(client, pid, h):
     refine(client, pid, h)
     d = run(client, pid, h, 'discover')
-    r = decide(client, pid, h, 'discover', d, 'APPROVE')
+    # With zero evidence the D09 gate says REPEAT (PDF p.2); continuing is a recorded founder override, research-only.
+    r = decide(client, pid, h, 'discover', d, 'APPROVE', acknowledge_risk=True, feedback='TEST_ONLY: proceed to design a demand test')
     assert r.status_code == 200, r.text
     return d
 
@@ -110,7 +122,8 @@ def locked_experiment(client, pid, h, critical=True, pivot=None, min_sample=10, 
         'metric': 'Share of people shown the description who voluntarily leave an email',
         'success_threshold_pct': success, 'adverse_threshold_pct': adverse, 'min_sample': min_sample, 'critical': critical,
         'pivot_alternative': pivot, 'consent_method': 'Explain who I am and why I ask; opt-in only',
-        'founder_actions': 'Ask 15 classmates in person; record yes/no honestly'})
+        'founder_actions': 'Ask 15 classmates in person; record yes/no honestly', 'cost_estimate': '0 EGP',
+        'threshold_origin': 'TEAM_ASSUMPTION', 'time_window_days': 7})
     assert draft.status_code == 201, draft.text
     d = draft.json()
     lock = client.post(f'/api/projects/{pid}/experiments/{d["experiment_id"]}/lock', headers=h,

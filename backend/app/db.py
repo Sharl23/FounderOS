@@ -63,11 +63,55 @@ def file_path():
     return os.getenv('FOUNDEROS_DB', '/data/founderos-v2.sqlite3')
 
 
+SCHEMA_V7 = '''
+CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS criteria_configs (project_id TEXT NOT NULL, version INTEGER NOT NULL, payload_json TEXT NOT NULL,
+  config_hash TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(project_id, version));
+CREATE TABLE IF NOT EXISTS criteria_evaluations (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, phase TEXT NOT NULL,
+  version INTEGER NOT NULL, payload_json TEXT NOT NULL, evaluation_hash TEXT NOT NULL, fingerprint_hash TEXT NOT NULL,
+  criteria_version TEXT NOT NULL, criteria_policy_hash TEXT NOT NULL, config_hash TEXT NOT NULL, created_at TEXT NOT NULL,
+  UNIQUE(project_id, phase, version));
+CREATE TABLE IF NOT EXISTS judgments (cache_key TEXT PRIMARY KEY, project_id TEXT NOT NULL, criterion_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL, model TEXT, latency_ms INTEGER, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_runs (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, bucket TEXT NOT NULL, provider TEXT NOT NULL,
+  query TEXT NOT NULL, status TEXT NOT NULL, error TEXT, result_count INTEGER NOT NULL DEFAULT 0, brief_version INTEGER, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_candidates (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, run_id TEXT, bucket TEXT, provider TEXT NOT NULL,
+  url TEXT, doi TEXT, title TEXT, publisher TEXT, year INTEGER, state TEXT NOT NULL, payload_json TEXT NOT NULL,
+  fetch_json TEXT, evidence_id TEXT, reject_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS safety_sources (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, brief_version INTEGER NOT NULL, rule_id TEXT NOT NULL,
+  url TEXT NOT NULL, final_url TEXT, excerpt TEXT NOT NULL, finding TEXT NOT NULL, jurisdiction TEXT, official_domain INTEGER NOT NULL,
+  url_status TEXT NOT NULL, excerpt_status TEXT NOT NULL, retrieved_at TEXT, source_hash TEXT, created_at TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS criteria_configs_immutable BEFORE UPDATE ON criteria_configs BEGIN SELECT RAISE(ABORT,'criteria configs are versioned; add a new version'); END;
+CREATE TRIGGER IF NOT EXISTS criteria_evaluations_immutable BEFORE UPDATE ON criteria_evaluations BEGIN SELECT RAISE(ABORT,'evaluations are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS safety_sources_immutable BEFORE UPDATE ON safety_sources BEGIN SELECT RAISE(ABORT,'safety sources are immutable'); END;
+'''
+
+# Additive column migrations from v0.2–v0.4 databases (never destructive).
+COLUMNS_V7 = {
+    'projects': [('name', 'TEXT')],
+    'evidence': [('direction_id', 'TEXT'), ('criterion_id', 'TEXT'), ('source_hash', 'TEXT'), ('candidate_id', 'TEXT'),
+                 ('doi', 'TEXT'), ('provider', 'TEXT'), ('final_url', 'TEXT')],
+    'decisions': [('criteria_version', 'TEXT'), ('criteria_policy_hash', 'TEXT'), ('config_hash', 'TEXT'),
+                  ('evaluation_hash', 'TEXT'), ('safety_policy_hash', 'TEXT')],
+}
+
+
+def migrate(db):
+    db.executescript(SCHEMA_V7)
+    for table, cols in COLUMNS_V7.items():
+        have = {r[1] for r in db.execute(f'PRAGMA table_info({table})')}
+        for name, typ in cols:
+            if name not in have:
+                db.execute(f'ALTER TABLE {table} ADD COLUMN {name} {typ}')
+    db.execute('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?,?)', ('v7', now()))
+
+
 def init_db():
     path = file_path()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path, timeout=20) as db:
         db.executescript(SCHEMA)
+        migrate(db)
         db.execute('PRAGMA journal_mode=WAL')
 
 

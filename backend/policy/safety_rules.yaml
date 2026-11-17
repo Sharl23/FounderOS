@@ -1,0 +1,158 @@
+# FounderOS safety policy — the twelve rules, verbatim semantics from the founder-supplied
+# criteria contract (V7, Appendix A/B, citing "Criteria Types for the Agent Workflow", Sharl,
+# Nov 16 2026, and "The Gate at the Edge of the Map", MADS × CSEA Fall 2026).
+# Provenance note: the quoted passages establish the REQUESTED product policy. They are design
+# provenance, NOT legal evidence; nothing here certifies legality, and the system never
+# practices law. A missing official source never proves an activity legal OR illegal.
+#
+# outcome semantics (Appendix C is binding):
+#   BLOCK            — non-overridable hard stop; founder approval cannot override.
+#   REVIEW_REQUIRED  — pause; founder may approve RESEARCH ONLY after reading the flag.
+#   UNKNOWN_SOURCE   — a claim needing an official source that was not found/verified:
+#                      research-only pause, never promoted to a pass or dressed as a ban.
+# Editing authority: no one may disable a BLOCK rule. REVIEW scopes are founder-acknowledgeable
+# per brief version only. This file is versioned and hashed into every assessment.
+version: safety-policy-2026-11-17.v7-1
+rules:
+  - id: illegal_in_target_market
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Is the core product, or its main way of earning money, prohibited by law in the target market?"
+    fail_if: "An official source shows the activity is banned in the target market, or requires a licence the founder cannot obtain; a blog post or forum is not a source."
+    research_instruction: "Identify the founder's target jurisdiction from the brief, then cite one official source (statute, regulator page or government guidance) stating whether the core product or its revenue method is banned or needs a licence; if none exists, record the search queries and jurisdiction."
+    outcome_on_fail: BLOCK
+    outcome_without_source: UNKNOWN_SOURCE   # never a pass, never a manufactured ban
+    provenance: 'Criteria Types for the Agent Workflow (Sharl, Nov 16 2026), "Phase 1: Discover, The ethics screen, in three tiers": "Illegal in the target market, built on deceiving or harming people". Page not visible in supplied text.'
+    notes: "Jurisdiction-specific. Non-overridable ONLY with a verified authoritative prohibition. Absence of a legal-search provider is not permission."
+
+  - id: regulated_or_sensitive_area
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout   # as classified by the source document
+    brief_fields: [idea, target_market]
+    question: "Does the product operate in a legal area that is sensitive or regulated?"
+    fail_if: "The product handles children's data, personal or special-category data, or a regulated activity, so pause the run, state what is uncertain, recommend professional advice, and continue only after the founder approves."
+    research_instruction: "Match the idea to sensitive categories (children, personal or special-category data, or any regulated activity), then cite one regulator page or piece of legislation describing the rules that apply in the target market."
+    outcome_on_fail: REVIEW_REQUIRED   # per its own fail_if: pause + founder approval, not prohibition
+    provenance: 'Criteria Types for the Agent Workflow (Sharl): "Legal but sensitive or regulated areas, such as health, money, children or personal data" — a flag to the founder, not automatic rejection.'
+
+  - id: physical_goods_exclusion
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea]
+    question: "Is the main thing the customer receives a physical good?"
+    fail_if: "The core offering is a physical item, or revenue depends on making, selling or shipping physical items."
+    research_instruction: "Read the brief to identify what the customer receives, then cite one independent source confirming whether that deliverable is digital or physical."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3 "The Hard Walls": "Physical goods. The system covers digital products only." (hackathon scope exclusion)'
+    notes: "Ordinary software that ENABLES a physical business (e.g. inventory forecasting for restaurants) is NOT itself a physical product."
+
+  - id: financial_crypto_exclusion
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea]
+    question: "Does the product trade, lend, give investing advice, issue tokens, or move or manage money for users?"
+    fail_if: "The core function involves trading, lending, investing advice, tokens, or any handling or management of users' money."
+    research_instruction: "Read the brief to list every way the product touches money, then cite one regulator page or reputable publication that classifies each function as financial, crypto or neither."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "This covers trading, lending, investing advice, tokens and anything that moves or manages money."'
+    notes: "A business ACCEPTING payment through an external processor is distinguished from a platform HANDLING users' money; only the latter fails."
+
+  - id: health_legal_advice_exclusion
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea]
+    question: "Does the product diagnose, treat, interpret symptoms, or tell people what the law requires of them?"
+    fail_if: "The product gives health or legal guidance that a user acts on, whatever label the founder gives it."
+    research_instruction: "Read the brief to identify what the product tells users to do, then cite one independent source classifying that output as health advice, legal advice or neither."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "An app that diagnoses, treats, interprets symptoms or tells people what the law requires of them is excluded."'
+
+  - id: advice_in_disguise
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Does the product give advice a user acts on for their health, money or legal position, even when it is labeled educational or a tracker?"
+    fail_if: "The output of the product is advice a user acts on for their health, money or legal position, so pause the run and escalate to the founder in plain language instead of approving."
+    research_instruction: "Find how the brief describes the product and how comparable live products describe themselves, then cite one independent source on whether such products count as health, money or legal advice."
+    outcome_on_fail: REVIEW_REQUIRED   # per its own fail_if: pause/escalate, not auto-clear by branding, not auto-block when ambiguous
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "does the product give advice a person might act on for their health, money or legal position?" — border cases decided by whether people would act on it, unsure cases go to the founder.'
+    notes: "If the product is plainly actionable individual health/legal guidance it escalates to health_legal_advice_exclusion (BLOCK)."
+
+  - id: income_promise_dependency
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Does the idea depend on promising income to the founder or to customers?"
+    fail_if: "The idea sells or markets itself on a promise of income or a guaranteed financial outcome."
+    research_instruction: "Read the brief to identify how the product attracts customers and earns revenue, then cite one independent source on rules or guidance for income claims in the target market."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "Promising income to the founder or to customers."'
+    notes: "Not every legitimate business aiming for revenue; the DEPENDENCY on a promised outcome is what fails."
+
+  - id: fake_proof_dependency
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Does the idea depend on faked reviews, sign-ups, testimonials or urgency?"
+    fail_if: "The business logic needs fabricated reviews, sign-ups, testimonials or urgency in order to work."
+    research_instruction: "Read the brief to identify how the product obtains reviews, sign-ups, testimonials and urgency, then cite one consumer-protection source that prohibits fabricated versions of them."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "Faking reviews, sign-ups, testimonials or urgency."'
+    notes: "Honest ANTI-fraud products (detecting fake reviews) must not be falsely blocked."
+
+  - id: impersonation_dependency
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Does the idea depend on impersonating a person or an organization?"
+    fail_if: "The product speaks as, or poses as, a real person, company or brand without being that person, company or brand."
+    research_instruction: "Read the brief to identify whose name, voice or brand the product speaks in, then cite one independent source on impersonation rules in the target market."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "Impersonating any person or organization."'
+    notes: "AUTHORIZED branding (reselling with permission) is distinguished and goes to REVIEW when ambiguous."
+    outcome_when_ambiguous: REVIEW_REQUIRED
+
+  - id: money_or_credentials_dependency
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea]
+    question: "Does the idea require the system to move money or store credentials?"
+    fail_if: "The product only works if the system moves money, holds funds, or stores passwords, keys or card details."
+    research_instruction: "Read the brief to identify whether the product needs payments, balances or login credentials in order to function, then cite one independent source on the handling rules for whatever you find."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "Moving money or storing credentials."'
+    notes: "Storing customer business sales measurements is NOT storing payment credentials (may still trigger regulated_or_sensitive_area). FounderOS itself never collects credentials."
+
+  - id: harm_to_people
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, target_market]
+    question: "Is the product designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or intellectual property theft?"
+    fail_if: "The product's purpose matches any of the listed harms, whatever the size of the market."
+    research_instruction: "Read the brief to identify who uses the product and who it acts on, then cite one regulator, court record or reputable report on whether that function is harmful or unlawful in the target market."
+    outcome_on_fail: BLOCK
+    provenance: '"The Gate at the Edge of the Map", Chapter 3: "products designed for harassment, stalking, surveillance of individuals, academic or credential fraud, deceptive manipulation of vulnerable people, or clear intellectual property theft are rejected regardless of market size." The chapter labels this expanded harm wall a PROPOSED ASSUMPTION.'
+
+  - id: founder_values_conflict
+    phase: 1
+    type: Ethics and legality screen
+    kind: knockout
+    brief_fields: [idea, values]
+    question: "Does the idea clash with a value the founder wrote in the brief?"
+    fail_if: "The idea or the way it must be run betrays a stated value, so pause the run and surface the mismatch to the founder."
+    research_instruction: "Quote the founder's values field word for word, then quote the part of the idea that touches each stated value; no web source is needed."
+    outcome_on_fail: REVIEW_REQUIRED   # per its own fail_if: pause + surface, founder decides (research-only) or revises
+    provenance: '"The Gate at the Edge of the Map", Chapter 2 "The Cast": "Values are an ethical input, not decoration. An idea that betrays the founder’s own stated values is a mismatch the system must surface."'
+    notes: "Requires exact quotations of BOTH spans (value + conflicting idea text) in the finding. Never dressed up as illegality."

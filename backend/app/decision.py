@@ -39,7 +39,8 @@ def norm(text: str) -> str:
 # ---------------------------------------------------------------- experiments
 def criteria_of(exp_payload: dict) -> dict:
     keys = ('hypothesis', 'claim_id', 'dimension', 'target_segment', 'metric', 'success_threshold_pct',
-            'adverse_threshold_pct', 'min_sample', 'critical', 'pivot_alternative')
+            'adverse_threshold_pct', 'min_sample', 'critical', 'pivot_alternative', 'threshold_origin',
+            'benchmark_evidence_id', 'time_window_days', 'near_miss_band', 'direction_id')
     return {k: exp_payload.get(k) for k in keys}
 
 
@@ -53,7 +54,14 @@ def evaluate_result(criteria: dict, n: int, positives: int) -> dict:
                 'explanation': f'Only {n} relevant participants; the locked minimum was {criteria["min_sample"]}. Insufficient evidence.',
                 'caveats': caveats}
     adverse = rate <= float(criteria['adverse_threshold_pct'])
-    if rate >= float(criteria['success_threshold_pct']):
+    band = float(criteria.get('near_miss_band') or 0)
+    success = float(criteria['success_threshold_pct'])
+    if success > rate >= success * (1 - band) and not adverse:
+        return {'outcome': 'NEAR_MISS', 'rate_pct': rate, 'adverse': False,
+                'explanation': f'{positives}/{n} = {rate}% is just below the locked success threshold of {success:g}% '
+                               f'(within the locked near-miss band of {band:.0%}). Too close to call: repeat or redesign; this is not a pass.',
+                'caveats': caveats}
+    if rate >= success:
         return {'outcome': 'PASS', 'rate_pct': rate, 'adverse': False,
                 'explanation': f'{positives}/{n} = {rate}% met the locked success threshold of {criteria["success_threshold_pct"]}%. '
                                'This hypothesis passed its pre-registered criterion; the business is NOT validated.',
@@ -75,10 +83,14 @@ def exclusion_reason(e: dict, live_experiments: dict) -> str | None:
         return 'Marked IRRELEVANT to the claim.'
     kind = e['kind']
     if kind == 'SECONDARY_BACKGROUND':
+        if e.get('excerpt_status') == 'METADATA_ONLY':
+            return 'METADATA_ONLY: bibliographic metadata/abstract, not an inspected passage. Context only, not counted.'
         if e.get('url_status') != 'URL_ACCESSIBLE':
             return 'UNVERIFIED: source URL could not be retrieved.'
-        if e.get('excerpt_status') != 'EXCERPT_MATCHED':
+        if e.get('excerpt_status') not in ('EXCERPT_MATCHED', 'STRUCTURED_DATUM'):
             return 'UNVERIFIED: excerpt NOT found in retrieved source.'
+        if e.get('stale_and_offmarket'):
+            return 'Fails the evidence standard: older than the age limit AND about a different geography.'
         return None
     if kind in ('CUSTOMER_STATEMENT', 'CUSTOMER_BEHAVIOR'):
         if not e.get('consent_confirmed'):
@@ -354,6 +366,11 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
             verdict, kind = 'NEEDS_EVIDENCE', 'BUSINESS_ADVISORY'
             headline = (f'A critical criterion was missed ({o["rate_pct"]}% < {o["criteria"]["success_threshold_pct"]}%) but not at the adverse level. '
                         'Repeat or redesign the test, or record a pivot alternative.')
+    elif any(o['outcome'] == 'NEAR_MISS' and o['critical'] for o in exp_outcomes) and not passes:
+        o = next(o for o in exp_outcomes if o['outcome'] == 'NEAR_MISS' and o['critical'])
+        verdict, kind = 'NEEDS_EVIDENCE', 'BUSINESS_ADVISORY'
+        headline = (f'Near miss on a critical pre-registered test ({o["rate_pct"]}% vs locked {o["criteria"]["success_threshold_pct"]}%). '
+                    'Too close to call: repeat with a new locked version or a larger sample. Not a pass and not a failure.')
     elif passes or behavior_sup:
         verdict, kind = 'CONTINUE_TESTING', 'BUSINESS_ADVISORY'
         headline = ('Promising but incomplete: some real behavior evidence supports demand. Continue testing the remaining critical assumptions. '
@@ -372,7 +389,7 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
     contradictions = [{'dimension': d, 'supporting_ids': m['supporting_ids'], 'contradicting_ids': m['contradicting_ids']}
                       for d, m in matrix.items() if m['status'] == 'MIXED' and m['supporting_ids'] and m['contradicting_ids']]
     change_mind = {
-        'NEEDS_EVIDENCE': ['A locked experiment PASSING its criterion with real target customers → CONTINUE_TESTING.',
+        'NEEDS_EVIDENCE': ['A locked experiment HITTING its criterion with real target customers → CONTINUE_TESTING.',
                            'A critical locked experiment FAILING at/below its adverse trigger → STOP, or PIVOT if an alternative is recorded.'],
         'CONTINUE_TESTING': ['Failure of any remaining critical locked experiment → PIVOT/STOP.',
                              'Evidence that the positive sample was unrepresentative or incentivised → back to NEEDS_EVIDENCE.'],

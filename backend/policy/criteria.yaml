@@ -1,0 +1,312 @@
+# FounderOS criteria policy — machine-readable, versioned, hashed into every evaluation and decision.
+# Source: "Criteria Types for the Agent Workflow" (@Sharl, Nov 16 2026, 11 pages) — page refs below.
+# Each criterion carries the PDF's eight parts (p9): name+gate, kind, question, scale, evidence
+# required, weight or pass mark, origin, who may change it.
+#
+# Kinds (p2): knockout · scored · evidence_standard · threshold · output_check.
+# Consequences enforced in code (p2): knockouts run first; a score without evidence is UNKNOWN,
+# not a middle mark; too many unknowns => REPEAT; the model never applies the threshold.
+#
+# ORIGIN labels: the QUESTION and KIND come from the PDF (origin: PDF p.N). Every numeric weight,
+# pass mark, scale wording and band is labelled TEAM_ASSUMPTION — the PDF prescribes that these
+# exist and are fixed before the run, not their values.
+version: criteria-2026-11-17.v7.1
+source: {title: "Criteria Types for the Agent Workflow", author: "@Sharl", date: "2026-11-16", pages: 11}
+
+scale_anchored_1_5:   # TEAM_ASSUMPTION wording; used by every `scored` criterion
+  "1": "Accepted evidence points against it (direct contradiction from the target segment)."
+  "2": "Weak or indirect support only; serious contradictions or gaps remain."
+  "3": "Context-level support (verified secondary sources) or mixed direct evidence."
+  "4": "Direct support from the target segment with stated limitations."
+  "5": "Strong, direct, independent and repeated support from the target segment."
+  UNKNOWN: "No accepted, relevant evidence reference. Never scored as 0 or as a middle mark."
+
+evidence_caps:   # code-enforced ceilings by strongest accepted evidence class (TEAM_ASSUMPTION)
+  SECONDARY_BACKGROUND: 3        # market context can never exceed 'context-level support'
+  CUSTOMER_STATEMENT: 3          # stated opinions are not behaviour (Mom Test)
+  CUSTOMER_BEHAVIOR: 5
+  PRE_REGISTERED_EXPERIMENT_RESULT: 5
+demand_requires_behavior: true   # D04 above 3 requires behaviour/experiment evidence
+
+discover:
+  gate: discover
+  pdf_pages: [3, 4]
+  criteria:
+    - id: D01
+      name: Ethics and legality screen
+      kind: knockout
+      question: "Should the system work on this idea at all?"
+      pdf_page: 3
+      tiers_pdf_page: 4
+      evidence_required: "The 12 rules in safety_rules.yaml; official sources where a rule requires them."
+      pass_mark: "No HARD_STOP. REVIEW_REQUIRED tiers (founder decision, values conflict) need the founder's research-only approval."
+      origin: "PDF p.3 (kind), p.4 (three tiers: hard stop / founder decision / values conflict)"
+      who_may_change: "Nobody may switch off hard stops (PDF p.10 rule 7)."
+      founder_editable: false
+    - id: D02
+      name: Idea clarity
+      kind: output_check
+      question: "Is the idea specific enough to research: a named customer, a pain, and what they use today?"
+      pdf_page: 3
+      evidence_required: "Brief fields target_customers, problem, current_workaround with provenance EXPLICIT or founder-confirmed."
+      pass_mark: "All three present. UNKNOWN workaround => clarification question, gate REPEAT."
+      origin: "PDF p.3"
+      who_may_change: "Fixed checklist."
+      founder_editable: false
+    - id: D03
+      name: Problem and customer
+      kind: scored
+      question: "Is the pain real, frequent and felt by a group that can be identified and reached?"
+      pdf_page: 3
+      dimension: desirability
+      evidence_required: "Accepted ledger rows tagged desirability."
+      weight: 3
+      origin: "PDF p.3 (question/kind); weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run (new policy version)."
+      founder_editable: true
+    - id: D04
+      name: Demand signals
+      kind: scored
+      question: "Are people already searching, complaining or paying for a way round this problem?"
+      pdf_page: 3
+      dimension: demand
+      evidence_required: "Accepted ledger rows tagged demand. Signals are tentative; they never validate THIS product."
+      weight: 3
+      origin: "PDF p.3; weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run."
+      founder_editable: true
+    - id: D05
+      name: Competition and alternatives
+      kind: scored
+      question: "What exists today, and is there room for something different?"
+      pdf_page: 3
+      dimension: competition
+      evidence_required: "Accepted ledger rows tagged competition. None found => UNKNOWN, never 'no competitors'."
+      weight: 2
+      origin: "PDF p.3; weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run."
+      founder_editable: true
+    - id: D06
+      name: Feasibility and founder fit
+      kind: scored
+      knockout_for_hard_limits: true
+      question: "Can this founder deliver it as a digital product with their skills, budget and time?"
+      pdf_page: 3
+      dimension: feasibility
+      evidence_required: "Accepted ledger rows tagged feasibility; hard limits from the brief (budget, timeline) checked in code."
+      weight: 3
+      origin: "PDF p.3 ('Scored, with knockouts for hard limits'); weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight; hard limits come from the founder's own brief."
+      founder_editable: true
+    - id: D07
+      name: Viability, first look
+      kind: scored
+      question: "Is there a plausible way to charge, and are comparable products being paid for?"
+      pdf_page: 3
+      dimension: viability
+      evidence_required: "Accepted ledger rows tagged viability. Willingness to pay is never invented."
+      weight: 2
+      origin: "PDF p.3; weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run."
+      founder_editable: true
+    - id: D08
+      name: Direction ranking
+      kind: threshold
+      question: "Of the two or three candidate directions, which ranks first and why?"
+      pdf_page: 3
+      evidence_required: "Ledger rows linked to a direction. Directions with no linked evidence are UNRANKED."
+      pass_mark: "Rank by net accepted support (supporting minus contradicting, behaviour first). Ties stay ties. If fewer than two directions have evidence, the ranking is UNKNOWN."
+      origin: "PDF p.3 (kind); ranking rule TEAM_ASSUMPTION"
+      who_may_change: "Fixed rule."
+      founder_editable: false
+    - id: D09
+      name: Discover gate rule
+      kind: threshold
+      question: "Which combination of scores and unknowns means go on, repeat, pivot or stop?"
+      pdf_page: 3
+      evidence_required: "D01–D08 results and X01–X05."
+      thresholds:
+        pass_mark: 3.0            # weighted mean of KNOWN scores needed to go on (TEAM_ASSUMPTION)
+        pivot_mark: 2.0           # a known D03 or D04 score at or below this => PIVOT (TEAM_ASSUMPTION)
+        max_unknown_scored: 2     # more unknown scored criteria than this => REPEAT (PDF p.2 consequence; number TEAM_ASSUMPTION)
+      exits:
+        STOP: "D01 hard stop."
+        REVIEW_REQUIRED: "D01 flag not yet acknowledged by the founder."
+        REPEAT: "Clarity incomplete, hard limit exceeded, agent output proposed a prohibited tactic, too many unknowns, or known scores below the pass mark."
+        PIVOT: "Direct accepted evidence scores the problem or demand at/below the pivot mark."
+        GO_ON: "Permission for VALIDATION RESEARCH ONLY — never building, launching or any external action."
+      origin: "PDF p.3 (four exits), p.2 (unknowns => repeat; code applies the threshold)"
+      who_may_change: "Founder may change pass_mark, pivot_mark, max_unknown_scored before a run (new policy version). Exit semantics fixed."
+      founder_editable: true
+
+validate:
+  gate: validate
+  pdf_pages: [4, 5]
+  criteria:
+    - id: V01
+      name: Business model coherence
+      kind: scored
+      question: "Do the customer segment, value proposition, channel, revenue idea and costs fit each other and the brief?"
+      pdf_page: 5
+      dimension: viability
+      evidence_required: "Accepted ledger rows tagged viability."
+      weight: 3
+      origin: "PDF p.5; weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run."
+      founder_editable: true
+    - id: V02
+      name: Strategy and positioning
+      kind: scored
+      question: "Why would this customer pick this over what they use now, and which narrow group comes first?"
+      pdf_page: 5
+      dimension: competition
+      evidence_required: "Accepted ledger rows tagged competition."
+      weight: 2
+      origin: "PDF p.5; weight TEAM_ASSUMPTION"
+      who_may_change: "Founder may change the weight before a run."
+      founder_editable: true
+    - id: V03
+      name: Financial fit
+      kind: knockout
+      scored_otherwise: true
+      question: "Can the plan be carried out inside the founder's budget and time?"
+      pdf_page: 5
+      dimension: feasibility
+      evidence_required: "Brief budget/timeline vs locked experiment cost/time estimates (code); fit score needs accepted feasibility evidence."
+      pass_mark: "Knockout when a parseable cost or duration exceeds the founder's stated limit."
+      weight: 2
+      origin: "PDF p.5 ('Knockout for hard limits, scored otherwise'); weight TEAM_ASSUMPTION"
+      who_may_change: "Hard limit fixed (it is the founder's own brief); weight editable."
+      founder_editable: true
+    - id: V04
+      name: Risk ranking
+      kind: scored
+      question: "Which assumption would sink the business if wrong and has the least support?"
+      pdf_page: 5
+      evidence_required: "Assumption risk register: criticality × evidence weakness, computed in code from ledger links."
+      pass_mark: "The top-ranked risk is the one the demand test must attack (PDF p.5)."
+      origin: "PDF p.5; ranking formula TEAM_ASSUMPTION"
+      who_may_change: "Fixed rule."
+      founder_editable: false
+    - id: V05
+      name: Experiment design
+      kind: output_check
+      question: "Is the proposed demand test fair: does it measure what people do, can it fail, is it cheap, is it honest with participants?"
+      pdf_page: 5
+      evidence_required: "Experiment draft fields."
+      checklist: [behavioral_metric, can_fail, low_cost_within_budget, honest_consent, founder_runs_it, no_prohibited_tactic]
+      pass_mark: "Every checklist item passes before the experiment can be locked."
+      origin: "PDF p.5"
+      who_may_change: "Fixed checklist."
+      founder_editable: false
+    - id: V06
+      name: Target setting
+      kind: threshold
+      question: "What result, from how many people, in how long, counts as success, and where does that number come from?"
+      pdf_page: 5
+      evidence_required: "Success threshold, sample floor, time window, and threshold origin: a cited accepted ledger row OR an explicit TEAM_ASSUMPTION label."
+      pass_mark: "All fields frozen (locked + hashed) before any result is accepted."
+      near_miss_band: 0.2   # a rate within 20% below the success threshold reads as NEAR_MISS (TEAM_ASSUMPTION)
+      origin: "PDF p.5 ('The target is itself a claim'); band TEAM_ASSUMPTION"
+      who_may_change: "Founder sets values before locking; changing them creates a new version that retires old results."
+      founder_editable: true
+    - id: V07
+      name: Result reading
+      kind: threshold
+      evidence_standard: true
+      question: "Given the real results, is this a hit, a near miss, a clear miss or too little data, and which exit follows?"
+      pdf_page: 5
+      evidence_required: "Founder-reported result linked to the exact locked version and hash; collected after the lock; consent confirmed."
+      readings: {HIT: CONTINUE_TESTING, NEAR_MISS: NEEDS_EVIDENCE, CLEAR_MISS: "STOP_DO_NOT_LAUNCH or PIVOT (critical tests only)", TOO_LITTLE_DATA: NEEDS_EVIDENCE}
+      origin: "PDF p.5 ('Results come from the founder, never from the system. Too little data must be an allowed reading, and it leads to repeat.')"
+      who_may_change: "Nobody; code compares results to the frozen criteria."
+      founder_editable: false
+
+cross_cutting:
+  pdf_pages: [8, 9]
+  criteria:
+    - id: X01
+      name: Evidence quality
+      kind: evidence_standard
+      question: "How much weight does this evidence deserve: who published it, how recent is it, how directly does it concern this customer, and does the page really say it?"
+      pdf_page: 8
+      evidence_required: "Per-row: publisher, date, geography, directness, excerpt verification, independence, duplication."
+      pass_mark: "Rows failing the standard are excluded or marked context-only, with the reason shown. Sources older than max_age_years are flagged."
+      max_age_years: 5   # TEAM_ASSUMPTION
+      origin: "PDF p.8"
+      who_may_change: "Founder may change max_age_years; the exclusion rules are fixed."
+      founder_editable: true
+    - id: X02
+      name: Founder constraints and values
+      kind: knockout
+      scored_otherwise: true
+      question: "Does this option stay inside the budget, time, skills and values in the brief?"
+      pdf_page: 8
+      evidence_required: "Brief constraints and values; safety rule founder_values_conflict."
+      pass_mark: "Hard-limit breach or unacknowledged values conflict pauses the gate."
+      origin: "PDF p.8 ('Knockout for hard limits, scored for fit')"
+      who_may_change: "The founder's own brief sets the limits."
+      founder_editable: false
+    - id: X03
+      name: Safety rules
+      kind: knockout
+      question: "Does this output or action break one of the \"never\" rules?"
+      pdf_page: 9
+      evidence_required: "Safety screen of the brief AND of agent outputs (re-run on every change, PDF p.4)."
+      pass_mark: "Any hard stop ends the run; nobody can override it."
+      origin: "PDF p.9"
+      who_may_change: "Nobody."
+      founder_editable: false
+    - id: X04
+      name: Approval scope
+      kind: knockout
+      question: "Does this action publish, send, spend or sign, and so need the founder's yes?"
+      pdf_page: 9
+      evidence_required: "Decision log scope."
+      pass_mark: "All approvals in this prototype are RESEARCH_ONLY; publish/send/spend/sign endpoints hard-deny."
+      origin: "PDF p.9"
+      who_may_change: "Nobody."
+      founder_editable: false
+    - id: X05
+      name: Confidence and unknowns
+      kind: evidence_standard
+      question: "How sure is the system, and is there enough evidence to decide at all?"
+      pdf_page: 9
+      evidence_required: "Counts of UNKNOWN criteria, accepted vs excluded evidence."
+      pass_mark: "Reported as counts and named gaps, never as a percentage or probability."
+      origin: "PDF p.9"
+      who_may_change: "Nobody."
+      founder_editable: false
+
+# Phases 3–6 — named with their questions as the PDF advises (p.11). ARCHITECTURE ONLY: not evaluated.
+architecture_only:
+  build:
+    pdf_page: 6
+    criteria:
+      - {id: B01, name: Scope fit, kind: output_check, question: "Is this the smallest product that delivers the validated value, with nothing the founder cannot afford or maintain?"}
+      - {id: B02, name: Acceptance, kind: threshold, question: "What must the product demonstrably do for the build to count as finished?", pass_mark: "the tests pass"}
+  commercial_setup:
+    pdf_page: 6
+    gate: "founder approval"
+    criteria:
+      - {id: C01, name: Pricing logic, kind: scored, question: "Is the price justified by sourced competitor prices, the value to the customer, the founder's costs and what the target market can afford?"}
+      - {id: C02, name: Offer structure, kind: scored, question: "What exactly is sold and in what form, such as one-off, subscription or tiers, and will a customer understand it at once?"}
+      - {id: C03, name: Policy completeness, kind: output_check, question: "Does each draft policy contain the parts it needs, in plain language, marked as a draft for human review?"}
+      - {id: C04, name: Fair dealing, kind: knockout, question: "Is anything in the price or policies misleading or unfair, such as hidden charges or unclear refund terms?"}
+      - {id: C05, name: Compliance flags, kind: output_check, question: "Which points need a qualified person to check, given the market and the data the product handles?", pdf_page: 7}
+  launch:
+    pdf_page: 7
+    criteria:
+      - {id: L01, name: Positioning and message, kind: scored, question: "Does the message say who it is for, what problem it solves and why it is different, in line with what was validated?"}
+      - {id: L02, name: Channel selection, kind: scored, question: "Where does the target customer already pay attention, and which of those channels fit the founder's budget, time and skills?"}
+      - {id: L03, name: Content honesty, kind: knockout, question: "Does any draft promise income, guarantee results, invent social proof or speak as someone else?"}
+      - {id: L04, name: Content quality, kind: scored, question: "Is each draft clear, in the founder's voice and values, with one obvious next step for the reader?"}
+      - {id: L05, name: Launch readiness, kind: output_check, question: "Are the product, the delivery route, the policies and the support in place before anything goes out?"}
+      - {id: L06, name: Launch targets, kind: threshold, question: "What results, over what period, will count as a successful launch?"}
+  operate_learn:
+    pdf_page: 8
+    criteria:
+      - {id: O01, name: Metric selection, kind: output_check, question: "Which few numbers show whether the business is working, and which only look good?"}
+      - {id: O02, name: Support quality, kind: scored, knockout_for_handoffs: true, question: "Is each drafted reply accurate, within the policies, in the founder's voice, and passed to the founder when it involves money or a complaint?"}
+      - {id: O03, name: Learning validity, kind: evidence_standard, question: "Is a conclusion backed by enough real data, or is it noise?"}
+      - {id: O04, name: Next-step decision, kind: threshold, question: "Do results against the launch targets mean double down, adjust, pivot back or shut down?"}

@@ -21,9 +21,15 @@ def test_full_founder_journey_persists_and_gates(client, project):
     assert d['state'] == 'PENDING_APPROVAL' and d['gate']['approval_scope'] == 'RESEARCH_ONLY'
     assert d['gate']['external_actions_permitted'] is False
     assert client.post(f'/api/projects/{pid}/phases/validate/run', headers=h).status_code == 409
-    assert decide(client, pid, h, 'discover', d, 'APPROVE').status_code == 200
+    # Zero evidence: D09 says REPEAT. Plain approval is refused; a recorded, reasoned override is research-only.
+    ev = client.get(f'/api/projects/{pid}', headers=h).json()['criteria']['discover']
+    assert ev['evaluation']['exit'] == 'REPEAT' and ev['stale'] is False
+    assert decide(client, pid, h, 'discover', d, 'APPROVE').status_code == 422
+    ok = decide(client, pid, h, 'discover', d, 'APPROVE', acknowledge_risk=True, feedback='TEST_ONLY: design a demand test',
+                evaluation_hash=ev['evaluation_hash'])
+    assert ok.status_code == 200, ok.text
     # replay / duplicate
-    assert decide(client, pid, h, 'discover', d, 'APPROVE').status_code == 409
+    assert decide(client, pid, h, 'discover', d, 'APPROVE', acknowledge_risk=True, feedback='x').status_code == 409
     v = run(client, pid, h, 'validate')
     g = v['gate']
     assert g['verdict'] == 'NEEDS_EVIDENCE' and g['verdict_kind'] == 'BUSINESS_ADVISORY'
@@ -88,14 +94,14 @@ def test_tampered_hash_cross_project_and_auth(client):
     refine(client, pid, h)
     d = run(client, pid, h, 'discover')
     bad = dict(d, report_hash='0' * 64)
-    assert decide(client, pid, h, 'discover', bad, 'APPROVE').status_code == 409
+    assert decide(client, pid, h, 'discover', bad, 'APPROVE', acknowledge_risk=True, feedback='x').status_code == 409
     # cross-project: project 2's token cannot decide project 1's run
     assert decide(client, pid, h2, 'discover', d, 'APPROVE').status_code == 404
     refine(client, pid2, h2)
     assert decide(client, pid2, h2, 'discover', d, 'APPROVE').status_code == 409
     assert client.get(f'/api/projects/{pid}').status_code == 401
     assert client.get(f'/api/projects/{pid}', headers={'X-Project-Token': 'wrong'}).status_code == 404
-    assert decide(client, pid, h, 'discover', d, 'APPROVE').status_code == 200  # the honest one still works
+    assert decide(client, pid, h, 'discover', d, 'APPROVE', acknowledge_risk=True, feedback='TEST_ONLY').status_code == 200  # the honest one still works
 
 
 def test_external_actions_hard_denied_and_later_phases_not_simulated(client, project):
@@ -123,7 +129,8 @@ def test_offline_failure_is_visible_not_fake(client, project, monkeypatch):
             raise ModelUnavailable('Ollama is offline')
     monkeypatch.setattr(main, 'LLM', Offline())
     response = client.post(f'/api/projects/{pid}/refine', headers=h)
-    assert response.status_code == 503 and 'offline' in response.json()['detail']
+    assert response.status_code == 503 and 'offline' in response.json()['detail']['message']
+    assert response.json()['detail']['note'].startswith('Your input is saved')
     assert client.get(f'/api/projects/{pid}', headers=h).json()['brief'] is None
     assert client.get('/api/health').json()['ollama']['ollama_reachable'] is False
 

@@ -5,12 +5,15 @@ from typing import Literal
 from urllib.parse import urlparse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-BRIEF_FIELDS = ('problem', 'target_customers', 'skills', 'budget', 'timeline', 'target_market', 'values', 'constraints')
+BRIEF_FIELDS = ('problem', 'target_customers', 'current_workaround', 'skills', 'budget', 'timeline', 'target_market', 'values', 'constraints')
 Dimension = Literal['desirability', 'demand', 'competition', 'feasibility', 'viability']
 
 
 class ProjectCreate(BaseModel):
     idea: str = Field(min_length=12, max_length=6000)
+    name: str | None = Field(default=None, max_length=80)
+    problem: str | None = Field(default=None, max_length=600)
+    current_workaround: str | None = Field(default=None, max_length=400)
     target_customers: str | None = Field(default=None, max_length=300)
     skills: str | None = Field(default=None, max_length=500)
     budget: str | None = Field(default=None, max_length=100)
@@ -31,17 +34,47 @@ class RefinedBrief(BaseModel):
     target_market: str | None = None
     values: str | None = None
     constraints: str | None = None
+    current_workaround: str | None = None
     assumptions: list[str] = Field(default_factory=list)
     questions: list[str] = Field(default_factory=list)
+    risk_flags: list['RiskFlag'] = Field(default_factory=list)
+
+
+class RiskFlag(BaseModel):
+    rule_id: str
+    quote: str
+
+
+RefinedBrief.model_rebuild()
+
+
+class Direction(BaseModel):
+    name: str
+    segment: str
+    value: str
+
+
+class JudgeOutput(BaseModel):
+    criterion_id: str
+    proposed_score: int | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    reasoning: str = ''
+    caveats: list[str] = Field(default_factory=list)
 
 
 class DiscoveryReport(BaseModel):
     problem_statement: str
     target_customers: list[str] = Field(min_length=1)
+    beachhead_user: str | None = None
+    beachhead_payer: str | None = None
     value_proposition: str
     alternatives_unverified: list[str] = Field(default_factory=list)
+    opportunities: list[str] = Field(default_factory=list)
+    feasibility_notes: list[str] = Field(default_factory=list)
+    viability_first_look: str | None = None
     hypotheses: list[str] = Field(min_length=1)
     unknowns: list[str] = Field(default_factory=list)
+    directions: list[Direction] = Field(default_factory=list)
     experiments: list[str] = Field(min_length=1)
 
 
@@ -82,6 +115,7 @@ class DecisionRequest(BaseModel):
     decision: Literal['APPROVE', 'REVISE', 'PIVOT', 'STOP']
     feedback: str = Field(default='', max_length=2000)
     acknowledge_risk: bool = False
+    evaluation_hash: str | None = Field(default=None, min_length=64, max_length=64)
 
 
 class EvidenceAdd(BaseModel):
@@ -91,6 +125,8 @@ class EvidenceAdd(BaseModel):
     claim: str = Field(min_length=8, max_length=800)
     direction: Literal['SUPPORTS', 'CONTRADICTS', 'UNSURE'] = 'UNSURE'
     relevance: Literal['CLAIM_RELEVANT', 'IRRELEVANT', 'UNSURE'] = 'UNSURE'
+    criterion_id: str | None = Field(default=None, pattern='^(D0[3-7]|V0[1-3])$')
+    direction_id: str | None = Field(default=None, pattern='^[A-C]$')
     # secondary sources
     url: str | None = Field(default=None, max_length=2000)
     excerpt: str | None = Field(default=None, max_length=1600)
@@ -154,6 +190,11 @@ class ExperimentDraft(BaseModel):
     founder_actions: str = Field(min_length=10, max_length=1200)
     timebox_estimate: str = Field(default='ESTIMATE: unknown', max_length=120)
     cost_estimate: str = Field(default='ESTIMATE: unknown', max_length=120)
+    threshold_origin: Literal['TEAM_ASSUMPTION', 'CITED_BENCHMARK'] | None = None
+    benchmark_evidence_id: str | None = Field(default=None, max_length=64)
+    time_window_days: int | None = Field(default=None, ge=1, le=365)
+    near_miss_band: float | None = Field(default=None, ge=0, le=0.5)
+    direction_id: str | None = Field(default=None, pattern='^[A-C]$')
 
     @model_validator(mode='after')
     def thresholds(self):
