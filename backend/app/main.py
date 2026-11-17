@@ -35,7 +35,7 @@ from .schemas import (ProjectCreate, RefinedBrief, DiscoveryReport, ValidationRe
                       DecisionRequest, EvidenceAdd, ExperimentDraft, ExperimentLock, ExperimentResult,
                       PublicActionRequest, JudgeOutput, CheckJudgeOutput, BRIEF_FIELDS)
 from .gates import evaluate_validation, PHASES, ACTIVE_PHASES
-from .decision import stable_hash, norm, criteria_of, evaluate_result, skeptic_review, suggest_experiment, risk_register
+from .decision import stable_hash, norm, criteria_of, evaluate_result, skeptic_review, suggest_experiment, risk_register, exclusion_reason
 from . import safety, criteria, research, brief_extract, rubric, discovery_guard, prose, review
 from .research import check_public_url, FetchError
 from .llm import (OllamaClient, ModelUnavailable, ModelOutputError, ADVICE, REFINE_SYSTEM, DISCOVER_SYSTEM,
@@ -1529,14 +1529,26 @@ async def suggest(pid: str, project=Depends(authorize)):
         if not brief:
             raise HTTPException(409, 'Refine the brief first')
         disc = latest_run(db, pid, 'discover')
-        counted = [e for e in evidence_of(db, pid) if not e['duplicate_of'] and not e['injection_flag']]
+        experiments = experiments_of(db, pid)
+        live = {x['id']: x for x in experiments if x['status'] == 'LOCKED'}
+        counted = [e for e in evidence_of(db, pid) if exclusion_reason(e, live) is None]
         reg = risk_register(brief['payload'], disc and disc['report'], disc and disc['version'], counted)
-        s = suggest_experiment(brief['payload'], disc and disc['report'], reg, experiments_of(db, pid))
+        gate = latest_run(db, pid, 'validate')
+        ss = safety_for(db, pid, brief['version'])
+        if ss and ss['status'] == 'BLOCK':
+            s = {'kind': 'NO_EXPERIMENT_SAFETY_BLOCK',
+                 'instruction': 'This venture is blocked by safety policy. Revise the prohibited brief before testing.'}
+        elif (gate and gate['brief_version'] == brief['version'] and gate['state'] != 'INVALIDATED'
+              and gate['gate'].get('verdict') in ('STOP_DO_NOT_LAUNCH', 'PIVOT', 'BLOCK_DO_NOT_LAUNCH')):
+            s = {'kind': 'REVIEW_CRITICAL_RESULT_BEFORE_MORE_TESTS',
+                 'instruction': 'Review the current critical-failure verdict and the founder decision before drafting another test.'}
+        else:
+            s = suggest_experiment(brief['payload'], disc and disc['report'], reg, experiments)
     if s.get('kind') == 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL':
         s['suggested_criteria']['threshold_origin'] = 'TEAM_ASSUMPTION'
-        s['suggested_criteria']['time_window_days'] = 7
+        s['suggested_criteria'].setdefault('time_window_days', 7)
         s['suggested_criteria']['near_miss_band'] = criteria.default_config()['results']['near_miss_band']
-        s['risk_ranking_note'] = 'Targets the highest-ranked risk (largest consequence × weakest proof), not the easiest claim to confirm (PDF p.5).'
+        s.setdefault('risk_ranking_note', 'Targets an evidence gap rather than assuming demand.')
     return s
 
 

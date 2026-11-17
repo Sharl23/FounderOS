@@ -24,7 +24,7 @@ DIMENSIONS = {
     'viability': 'Viability / distribution & pricing',
 }
 EVIDENCE_KINDS = ('SECONDARY_BACKGROUND', 'CUSTOMER_STATEMENT', 'CUSTOMER_BEHAVIOR', 'PRE_REGISTERED_EXPERIMENT_RESULT')
-POLICY_VERSION = 'decision-policy-2026-11-17.1'
+POLICY_VERSION = 'decision-policy-2026-11-17.2'
 METHODOLOGY = 'docs/business-decision-methodology.md'
 
 
@@ -224,42 +224,12 @@ def risk_register(brief: dict, discovery: dict | None, discovery_version, counte
 
 # ---------------------------------------------------------------- next experiment
 def suggest_experiment(brief: dict, discovery: dict | None, register: list[dict], experiments: list[dict]) -> dict:
-    pending = [x for x in experiments if x['status'] == 'LOCKED' and not x.get('result_evidence_id')]
-    if pending:
-        x = pending[0]
-        return {'kind': 'RUN_LOCKED_EXPERIMENT', 'experiment_id': x['id'], 'version': x['version'],
-                'instruction': 'Run your already pre-registered experiment and submit real results. Do not change its criteria after seeing data (that creates a new version and invalidates prior results).',
-                'criteria': criteria_of(x['payload'])}
-    target = next((r for r in register if r['claim_id'] == 'C-DEM' and r['assumption_status'] != 'SUPPORTED_BY_BEHAVIOR'), None) \
-        or next((r for r in register if r['assumption_status'] in ('UNTESTED', 'MIXED', 'BACKGROUND_ONLY', 'STATED_ONLY')), None) \
-        or register[0]
-    seg = brief.get('target_customers') or ((discovery or {}).get('target_customers') or ['UNKNOWN segment — define it first'])[0]
-    budget = brief.get('budget') or 'UNKNOWN'
-    timeline = brief.get('timeline') or 'UNKNOWN'
-    value = (discovery or {}).get('value_proposition') or brief.get('idea_summary') or 'the proposed product'
-    if target['category'] == 'viability':
-        metric = 'Share of relevant contacts who accept a clearly-labelled, non-binding price/pre-order intent (no money collected)'
-    elif target['category'] == 'desirability':
-        metric = 'Share of interviewed target customers who describe a concrete recent occurrence of the problem and an existing workaround (past behavior, not opinions)'
-    else:
-        metric = 'Share of relevant target customers shown a plain description who voluntarily opt in (e.g. leave an email on a consented waitlist form)'
-    return {
-        'kind': 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL',
-        'claim_id': target['claim_id'], 'dimension': target['category'],
-        'hypothesis': f'{target["exact_claim"]} (tested for: {value[:160]})',
-        'target_segment': seg,
-        'metric': metric,
-        'consent_method': 'Tell participants who you are and why you ask; collect only what they knowingly give; let them withdraw. No incentives that buy positive answers.',
-        'founder_actions': ['Find 10–20 people who match the segment through channels you personally use (no scraping, no purchased lists, no automated outreach by FounderOS).',
-                            'Ask about past behavior and current workaround before showing the idea.',
-                            'Show a one-paragraph description and record the voluntary action (or its absence) honestly, including negatives.'],
-        'timebox_estimate': f'ESTIMATE: 5–10 days (your stated timeline: {timeline})',
-        'cost_estimate': f'ESTIMATE: ~0 using free forms/notes (your stated budget: {budget})',
-        'suggested_criteria': {'min_sample': 10, 'success_threshold_pct': 30, 'adverse_threshold_pct': 10,
-                               'label': 'SUGGESTED DEFAULTS — NOT EVIDENCE. Arbitrary starting points; change them to what would genuinely change your decision, then lock BEFORE collecting data.'},
-        'adverse_result_trigger': 'If the observed rate is at/below the adverse threshold with at least the minimum sample, treat the critical assumption as falsified (STOP or PIVOT).',
-        'external_actions': 'FounderOS sends, posts and contacts nothing. You run the experiment yourself.',
-    }
+    """Next-test proposal is tailored to the evidence gap, segment and founder constraints.
+
+    The experiment is a DRAFT; no criteria are pre-registered and no results counted.
+    """
+    from .founder_strategy import propose
+    return propose(brief, discovery, register, experiments)
 
 
 # ---------------------------------------------------------------- skeptical reviewer
@@ -392,6 +362,13 @@ def evaluate_validation(*, brief: dict, brief_version: int, safety: dict, discov
                     'This is not a judgment that the idea is bad: run the next experiment.')
         if matrix['demand']['status'] == 'REFUTED':
             headline += ' Note: unregistered negative behavior exists; pre-register a test to decide PIVOT/STOP fairly.'
+
+    if verdict == 'BLOCK_DO_NOT_LAUNCH':
+        nxt = {'kind': 'NO_EXPERIMENT_SAFETY_BLOCK',
+               'instruction': 'Revise the prohibited venture idea and pass the safety screen first. No experiment is authorised.'}
+    elif verdict in ('STOP_DO_NOT_LAUNCH', 'PIVOT'):
+        nxt = {'kind': 'REVIEW_CRITICAL_RESULT_BEFORE_MORE_TESTS',
+               'instruction': 'Review the failed, pre-registered critical criterion and founder decision first. Do not restart tests or claim a pivot is validated.'}
 
     counted_sorted = sorted(counted, key=lambda e: -STRENGTH[e['kind']])
     strongest = counted_sorted[0] if counted_sorted else None

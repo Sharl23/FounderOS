@@ -932,8 +932,14 @@
           <p>${esc(sug.hypothesis)}</p><dl class="facts small"><dt>Who</dt><dd>${esc(sug.target_segment)}</dd><dt>What you measure</dt><dd>${esc(sug.metric)}</dd><dt>Consent</dt><dd>${esc(sug.consent_method)}</dd>
           <dt>You do</dt><dd>${sug.founder_actions.map(esc).join(' ')}</dd><dt>Time and cost</dt><dd>${esc(sug.timebox_estimate)}; ${esc(sug.cost_estimate)}</dd>
           <dt>Suggested pass mark</dt><dd>${sug.suggested_criteria.success_threshold_pct}% of at least ${sug.suggested_criteria.min_sample} people; stop signal at ${sug.suggested_criteria.adverse_threshold_pct}% or below. <span class="faint">${esc(sug.suggested_criteria.label)}</span></dd>
-          <dt>Why this one</dt><dd>${esc(sug.risk_ranking_note || '')}</dd></dl><button class="btn secondary small" id="use-sug" style="margin-top:10px">Start a draft from this</button></section>`
-          : sug && sug.kind === 'RUN_LOCKED_EXPERIMENT' ? `<div class="notice info"><b>Run your locked test.</b><p>${esc(sug.instruction)}</p></div>` : ''}
+          <dt>Why this one</dt><dd>${esc(sug.risk_ranking_note || '')}</dd>
+          <dt>Fit to your constraints</dt><dd>${esc((sug.constraint_fit || {}).note || '')}</dd>
+          <dt>Evidence basis</dt><dd>${esc(((sug.evidence_basis || {}).counted_evidence_ids || []).join(', ') || 'NONE — TEST REQUIRED')} · ${esc((sug.evidence_basis || {}).status || 'UNKNOWN')}</dd>
+          <dt>If the test fails</dt><dd>${esc(sug.decision_if_test_fails || '')}</dd></dl>
+          <p class="small muted">Founder-specific proposed test, NOT evidence or a validated market claim. Thresholds must be chosen and locked by the founder before collecting results.</p>
+          <button class="btn secondary small" id="use-sug" style="margin-top:10px">Start a draft from this</button></section>`
+          : sug && sug.kind === 'RUN_LOCKED_EXPERIMENT' ? `<div class="notice info"><b>Run your locked test.</b><p>${esc(sug.instruction)}</p></div>`
+          : sug && (sug.kind === 'NO_EXPERIMENT_SAFETY_BLOCK' || sug.kind === 'REVIEW_CRITICAL_RESULT_BEFORE_MORE_TESTS') ? `<div class="notice warn"><b>No new test recommended:</b><p>${esc(sug.instruction)}</p></div>` : ''}
         <section class="panel" id="exp-panel"><header><h2 id="exp-title">Design a test</h2><span class="small muted">Nothing is evidence until results arrive</span></header>
           <form id="exp-form"><input type="hidden" name="_revise">
             <div class="field"><label for="x-h">Hypothesis</label><textarea id="x-h" name="hypothesis" required minlength="10" maxlength="600" rows="2"></textarea></div>
@@ -1077,6 +1083,13 @@
           ${g.experiment_outcomes.length ? `<section class="card wide"><h3>Locked tests read against their criteria</h3><ul class="plain small">${g.experiment_outcomes.map((o) => `<li>${chip(({ PASS: 'HIT', FAIL: 'CLEAR_MISS', INCONCLUSIVE: 'TOO_LITTLE_DATA', NEAR_MISS: 'NEAR_MISS' })[o.outcome])} ${esc(o.positives)}/${esc(o.n)} = ${esc(o.rate_pct)}% against ${esc(o.criteria.success_threshold_pct)}% (locked ${when(o.locked_at)}), evidence ${evLink(o.evidence_id)}</li>`).join('')}</ul></section>` : ''}
           ${g.excluded_evidence.length ? `<section class="card wide"><h3>Not counted</h3><ul class="bullets small">${g.excluded_evidence.map((x) => `<li>${evLink(x.id)}: ${esc(x.reason)}</li>`).join('')}</ul></section>` : ''}
         </div>
+        ${g.next_experiment && g.next_experiment.kind === 'PROPOSED_EXPERIMENT_NEEDS_FOUNDER_APPROVAL' ? `<section class="panel"><header><h2>Founder-specific next decision</h2>${chip('DRAFT', 'Proposed test, not verified evidence')}</header>
+          <p><b>Why:</b> ${esc(g.next_experiment.risk_ranking_note)}</p>
+          <p><b>Next measurable action:</b> ${esc(g.next_experiment.metric)}</p>
+          <p><b>Constraint check:</b> ${esc((g.next_experiment.constraint_fit || {}).note || '')}</p>
+          <p class="small muted">Your approval is required to pre-register this test; FounderOS does not contact customers.</p>
+          <a class="btn secondary" href="/projects/${pid}/experiments" data-link>Review and design the test</a></section>`
+          : g.next_experiment && g.next_experiment.kind !== 'RUN_LOCKED_EXPERIMENT' ? `<div class="notice warn"><b>Next experiment paused:</b> ${esc(g.next_experiment.instruction || '')}</div>` : ''}
         ${g.criteria ? `<section class="panel"><header><h2>Validate criteria</h2><span class="small muted">${esc(g.criteria.criteria_version)}, ${g.criteria.unknown_count} unknown</span></header>${criteriaTable(g.criteria.criteria, pid)}</section>` : ''}
         <section class="panel"><header><h2>The local model's commentary</h2>${chip('HYPOTHESIS', 'AI text explaining a code verdict; checked against it')}</header>
           <p class="small muted">Secondary to the verdict above. Code removes fragments and sentences that contradict the verdict, and rewrites “X does not exist” as “no evidence of X was recorded”.</p>

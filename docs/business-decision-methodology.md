@@ -55,3 +55,19 @@ Verdict + kind, headline, conditional recommendation, 5-dimension matrix with li
 ## Known limitations
 
 English-only pattern safety screen; founder-declared relevance/direction; no automatic source discovery (optional free connectors were not added — see `docs/api-cost-and-licenses.md`); founder-reported customer data is never independently verified by the system.
+
+## Adaptive founder experiment planner (v0.9 enhancement)
+
+`backend/app/founder_strategy.py` proposes a **draft** next experiment using the founder-entered
+segment, market, existing workaround, budget, timeline, privacy constraints, and the evidence
+classified by `risk_register`. A missing workaround prompts a past-behaviour problem test; an
+unsupported demand assumption prompts an observed opt-in test; once demand has supporting behaviour,
+the next questions are switching away from alternatives and price commitment. The proposal shows
+the precise claim ID and the IDs of counted evidence (or `NONE`), its rationale and limits.
+If a test is already locked, the founder must complete it rather than rewriting criteria after results.
+Safety blocks and adverse critical verdicts pause new-test suggestions in the Decision Passport.
+
+Recruitment and all external actions are founder-only. Numeric thresholds are **arbitrary draft
+assumptions**, not researched conversion benchmarks or proof of demand; the founder must select
+and lock them before collecting data. The planner estimates a free, short pilot consistent with
+the stated duration and reports when time is unknown. No inference here can override a gate.
